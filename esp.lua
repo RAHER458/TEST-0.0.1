@@ -1,15 +1,23 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 --==================================================
--- ESP
+-- SETTINGS
 --==================================================
 
 local espEnabled = false
+local flyJumpEnabled = false
+local flyingUp = false
+
 local highlights = {}
+
+--==================================================
+-- ESP
+--==================================================
 
 local function addESP(player)
     if player == LocalPlayer then
@@ -65,6 +73,67 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 --==================================================
+-- FLY JUMP
+--==================================================
+
+local flyConnection
+
+local function startFly()
+    if not flyJumpEnabled then
+        return
+    end
+
+    local character = LocalPlayer.Character
+    if not character then
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not root then
+        return
+    end
+
+    flyingUp = true
+
+    if flyConnection then
+        flyConnection:Disconnect()
+    end
+
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not flyJumpEnabled or not flyingUp then
+            return
+        end
+
+        if root and root.Parent then
+            root.AssemblyLinearVelocity = Vector3.new(
+                root.AssemblyLinearVelocity.X,
+                45,
+                root.AssemblyLinearVelocity.Z
+            )
+        end
+    end)
+end
+
+local function stopFly()
+    flyingUp = false
+
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+end
+
+local function setFlyJump(state)
+    flyJumpEnabled = state
+
+    if not state then
+        stopFly()
+    end
+end
+
+--==================================================
 -- GUI
 --==================================================
 
@@ -75,13 +144,13 @@ gui.IgnoreGuiInset = true
 gui.Parent = PlayerGui
 
 --==================================================
--- Основная панель
+-- MAIN PANEL
 --==================================================
 
 local main = Instance.new("Frame")
 main.Name = "MainPanel"
-main.Size = UDim2.fromOffset(230, 155)
-main.Position = UDim2.new(0.5, -115, 0.5, -78)
+main.Size = UDim2.fromOffset(235, 205)
+main.Position = UDim2.new(0.5, -117, 0.5, -102)
 main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 main.BorderSizePixel = 0
 main.Parent = gui
@@ -97,7 +166,7 @@ stroke.Transparency = 0.25
 stroke.Parent = main
 
 --==================================================
--- Заголовок
+-- HEADER
 --==================================================
 
 local header = Instance.new("Frame")
@@ -117,7 +186,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = header
 
 --==================================================
--- Кнопка скрытия
+-- HIDE
 --==================================================
 
 local hideButton = Instance.new("TextButton")
@@ -131,7 +200,7 @@ hideButton.Font = Enum.Font.GothamBold
 hideButton.Parent = header
 
 --==================================================
--- Кнопка ESP
+-- ESP BUTTON
 --==================================================
 
 local espButton = Instance.new("TextButton")
@@ -149,24 +218,6 @@ local espCorner = Instance.new("UICorner")
 espCorner.CornerRadius = UDim.new(0, 10)
 espCorner.Parent = espButton
 
---==================================================
--- Будущие функции
---==================================================
-
-local futureText = Instance.new("TextLabel")
-futureText.Size = UDim2.new(1, -30, 0, 30)
-futureText.Position = UDim2.fromOffset(15, 112)
-futureText.BackgroundTransparency = 1
-futureText.Text = "More functions coming..."
-futureText.TextColor3 = Color3.fromRGB(120, 120, 130)
-futureText.TextSize = 12
-futureText.Font = Enum.Font.Gotham
-futureText.Parent = main
-
---==================================================
--- ESP кнопка
---==================================================
-
 espButton.Activated:Connect(function()
     setESP(not espEnabled)
 
@@ -180,7 +231,38 @@ espButton.Activated:Connect(function()
 end)
 
 --==================================================
--- Плавающая кнопка
+-- FLY JUMP BUTTON
+--==================================================
+
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(1, -30, 0, 48)
+flyButton.Position = UDim2.fromOffset(15, 112)
+flyButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+flyButton.BorderSizePixel = 0
+flyButton.Text = "FLY JUMP     OFF"
+flyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
+flyButton.TextSize = 16
+flyButton.Font = Enum.Font.GothamSemibold
+flyButton.Parent = main
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0, 10)
+flyCorner.Parent = flyButton
+
+flyButton.Activated:Connect(function()
+    setFlyJump(not flyJumpEnabled)
+
+    if flyJumpEnabled then
+        flyButton.Text = "FLY JUMP     ON"
+        flyButton.TextColor3 = Color3.fromRGB(120, 200, 255)
+    else
+        flyButton.Text = "FLY JUMP     OFF"
+        flyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
+    end
+end)
+
+--==================================================
+-- OPEN BUTTON
 --==================================================
 
 local openButton = Instance.new("TextButton")
@@ -206,7 +288,57 @@ openStroke.Thickness = 1
 openStroke.Parent = openButton
 
 --==================================================
--- Универсальное перетаскивание пальцем
+-- FLY UP TOUCH BUTTON
+--==================================================
+
+local flyTouch = Instance.new("TextButton")
+flyTouch.Name = "FlyTouch"
+flyTouch.Size = UDim2.fromOffset(65, 65)
+flyTouch.Position = UDim2.new(1, -85, 1, -180)
+flyTouch.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+flyTouch.BorderSizePixel = 0
+flyTouch.Text = "↑"
+flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTouch.TextSize = 30
+flyTouch.Font = Enum.Font.GothamBold
+flyTouch.Visible = false
+flyTouch.Parent = gui
+
+local flyTouchCorner = Instance.new("UICorner")
+flyTouchCorner.CornerRadius = UDim.new(1, 0)
+flyTouchCorner.Parent = flyTouch
+
+local flyTouchStroke = Instance.new("UIStroke")
+flyTouchStroke.Color = Color3.fromRGB(90, 90, 100)
+flyTouchStroke.Thickness = 1
+flyTouchStroke.Parent = flyTouch
+
+--==================================================
+-- HOLD TO FLY
+--==================================================
+
+flyTouch.InputBegan:Connect(function(input)
+    if not flyJumpEnabled then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+        startFly()
+    end
+end)
+
+flyTouch.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+        stopFly()
+    end
+end)
+
+--==================================================
+-- DRAG SYSTEM
 --==================================================
 
 local function makeDraggable(object, handle)
@@ -241,7 +373,6 @@ local function makeDraggable(object, handle)
 
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
-
             local delta = input.Position - dragStart
 
             object.Position = UDim2.new(
@@ -254,22 +385,32 @@ local function makeDraggable(object, handle)
     end)
 end
 
--- Панель двигается за верхнюю часть
 makeDraggable(main, header)
-
--- Плавающая кнопка тоже двигается
 makeDraggable(openButton, openButton)
 
 --==================================================
--- Скрытие / открытие
+-- HIDE / OPEN
 --==================================================
 
 hideButton.Activated:Connect(function()
     main.Visible = false
     openButton.Visible = true
+
+    if flyJumpEnabled then
+        flyTouch.Visible = true
+    end
 end)
 
 openButton.Activated:Connect(function()
     main.Visible = true
     openButton.Visible = false
+
+    if flyJumpEnabled then
+        flyTouch.Visible = true
+    end
+end)
+
+-- Показываем кнопку сразу после включения FLY JUMP
+flyButton:GetPropertyChangedSignal("Text"):Connect(function()
+    flyTouch.Visible = flyJumpEnabled
 end)
