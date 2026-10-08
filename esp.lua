@@ -75,12 +75,12 @@ local loadingTitle = make("TextLabel", {
 }, loadingFrame)
 local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1, Text = "NEON SYSTEM  •  VERSION 0.1", TextColor3 = Color3.fromRGB(210, 216, 235),
+    BackgroundTransparency = 1, Text = "NEON SYSTEM  •  VERSION 0.1", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
 local loadingTrack = make("Frame", {
     Size = UDim2.new(0.7, 0, 0, 10), Position = UDim2.new(0.15, 0, 0.56, 0),
-    BackgroundColor3 = Color3.fromRGB(66, 74, 100), BorderSizePixel = 0, ZIndex = 1001
+    BackgroundColor3 = Color3.fromRGB(39, 42, 58), BorderSizePixel = 0, ZIndex = 1001
 }, loadingFrame)
 corner(loadingTrack, 6)
 local loadingFill = make("Frame", {
@@ -95,7 +95,7 @@ local loadingPercent = make("TextLabel", {
 }, loadingFrame)
 local loadingHint = make("TextLabel", {
     Size = UDim2.new(1, -30, 0, 26), Position = UDim2.new(0, 15, 0.68, 0),
-    BackgroundTransparency = 1, Text = "Подготавливаем интерфейс...", TextColor3 = Color3.fromRGB(210, 216, 235),
+    BackgroundTransparency = 1, Text = "Подготавливаем интерфейс...", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.Gotham, ZIndex = 1001
 }, loadingFrame)
 task.spawn(function()
@@ -113,12 +113,12 @@ task.wait(5)
 if loadingFrame then loadingFrame:Destroy() end
 
 local COLORS = {
-    background = Color3.fromRGB(112, 125, 153),
-    panel = Color3.fromRGB(145, 158, 187),
-    panel2 = Color3.fromRGB(171, 185, 211),
-    button = Color3.fromRGB(190, 202, 226),
-    text = Color3.fromRGB(20, 27, 45),
-    muted = Color3.fromRGB(38, 47, 70),
+    background = Color3.fromRGB(8, 10, 18),
+    panel = Color3.fromRGB(16, 19, 31),
+    panel2 = Color3.fromRGB(24, 28, 44),
+    button = Color3.fromRGB(28, 33, 51),
+    text = Color3.fromRGB(245, 248, 255),
+    muted = Color3.fromRGB(142, 153, 180),
     accent = Color3.fromRGB(0, 220, 255),
     green = Color3.fromRGB(58, 235, 164),
     red = Color3.fromRGB(255, 77, 119)
@@ -141,18 +141,16 @@ local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
 make("UIGradient", {
     Rotation = 115,
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(163, 181, 216)),
-        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(130, 151, 190)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(177, 139, 198))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 16, 29)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(9, 12, 21)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 10, 31))
     })
 }, main)
 
 -- Fit the panel to small screens while keeping a comfortable touch layout.
-local miniMode, microMode = false, false
 local function fitPanel()
     local camera = workspace.CurrentCamera
     if not camera then return end
-    if miniMode or microMode then return end
     local viewport = camera.ViewportSize
     -- Compact by default: never occupy almost the entire phone screen.
     local width = math.clamp(viewport.X - 36, 280, 370)
@@ -192,7 +190,7 @@ local rgbGradient = make("UIGradient", {
 local title = make("TextLabel", {
     Name = "Title",
     Position = UDim2.new(0, 15, 0, 5),
-    Size = UDim2.new(1, -150, 0, 30),
+    Size = UDim2.new(1, -132, 0, 30),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
@@ -203,7 +201,7 @@ local title = make("TextLabel", {
 
 local subtitle = make("TextLabel", {
     Position = UDim2.new(0, 16, 0, 34),
-    Size = UDim2.new(1, -150, 0, 16),
+    Size = UDim2.new(1, -132, 0, 16),
     BackgroundTransparency = 1,
     Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
     TextColor3 = COLORS.muted,
@@ -241,20 +239,7 @@ local miniModeButton = make("TextButton", {
     AutoButtonColor = true
 }, header)
 corner(miniModeButton, 10)
-local microModeButton = make("TextButton", {
-    Name = "MicroMode",
-    AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -92, 0, 9),
-    Size = UDim2.fromOffset(32, 38),
-    BackgroundColor3 = COLORS.button,
-    BorderSizePixel = 0,
-    Text = "· · ·",
-    TextColor3 = COLORS.text,
-    TextSize = 14,
-    Font = Enum.Font.GothamBlack,
-    AutoButtonColor = true
-}, header)
-corner(microModeButton, 10)
+local miniMode = false
 local miniPanel
 local mainScale = make("UIScale", {Scale = 1}, main)
 local openCloseTween
@@ -424,7 +409,7 @@ local function selectTab(name)
     activeTab = name
     for tabName, page in pairs(pages) do
         page.Visible = tabName == name
-        tabButtons[tabName].BackgroundColor3 = tabName == name and Color3.fromRGB(69, 88, 124) or COLORS.button
+        tabButtons[tabName].BackgroundColor3 = tabName == name and Color3.fromRGB(44, 57, 83) or COLORS.button
         tabButtons[tabName].TextColor3 = tabName == name and Color3.fromRGB(0, 230, 255) or COLORS.muted
     end
 end
@@ -499,8 +484,8 @@ local liveStatus = make("TextLabel", {
     BackgroundColor3 = COLORS.panel2,
     BorderSizePixel = 0,
     Text = "СТАТУС  •  Загрузка...",
-    TextColor3 = Color3.fromRGB(18, 26, 45),
-    TextSize = 10,
+    TextColor3 = COLORS.text,
+    TextSize = 11,
     Font = Enum.Font.GothamBold,
     TextWrapped = true,
     TextXAlignment = Enum.TextXAlignment.Left,
@@ -664,7 +649,7 @@ local _, setFlyToggle = makeToggle(pages["FUNCTIONS"], "Полёт (удержи
     flyEnabled = value
     if not value then flyHeld = false end
     if flyTouch then
-        flyTouch.Visible = flyEditMode or (main.Visible and ((miniMode and flyEnabled) or (not miniMode and activeTab == "FUNCTIONS" and flyEnabled)))
+        flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
     end
 end)
 
@@ -855,7 +840,7 @@ end)
 -- Show the single FLY button while the feature is enabled or being edited.
 local function updateFlyButton()
     if not flyTouch then return end
-    flyTouch.Visible = flyEditMode or (main.Visible and ((miniMode and flyEnabled) or (not miniMode and activeTab == "FUNCTIONS" and flyEnabled)))
+    flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
 end
 for _, button in pairs(tabButtons) do
     button.Activated:Connect(function() task.defer(updateFlyButton) end)
@@ -1192,54 +1177,16 @@ makeToggle(pages["SETTINGS"], "Звуки интерфейса", false, function
     playUIClick()
 end)
 
--- Compact mini mode: responsive controls with expandable inline sliders.
+-- Compact mini mode: core toggles remain reachable without opening the full menu.
 miniPanel = make("Frame", {
     Name = "MiniPanel",
     Position = UDim2.new(0, 10, 0, 68),
-    Size = UDim2.new(1, -20, 0, 120),
+    Size = UDim2.new(1, -20, 0, 92),
     BackgroundTransparency = 1,
     Visible = false
 }, main)
-local microPanel = make("Frame", {
-    Name = "MicroPanel",
-    Position = UDim2.new(0, 0, 0, 0),
-    Size = UDim2.new(1, 0, 1, 0),
-    BackgroundColor3 = COLORS.panel2,
-    BorderSizePixel = 0,
-    Visible = false
-}, main)
-corner(microPanel, 12)
-stroke(microPanel, COLORS.accent, 1, 0.2)
-local microStatus = make("TextLabel", {
-    Position = UDim2.new(0, 10, 0, 0),
-    Size = UDim2.new(1, -20, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "RH  |  FPS --  |  PING --",
-    TextColor3 = COLORS.text,
-    TextSize = 11,
-    Font = Enum.Font.GothamBold,
-    TextXAlignment = Enum.TextXAlignment.Center,
-    TextWrapped = true
-}, microPanel)
--- MICRO can be dragged anywhere on screen; later FPS/PING values fit here.
-local microDragging, microDragStart, microStartPos = false, nil, nil
-microPanel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        microDragging = true
-        microDragStart = input.Position
-        microStartPos = main.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then microDragging = false end end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if microDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        local delta = input.Position - microDragStart
-        main.Position = UDim2.new(microStartPos.X.Scale, microStartPos.X.Offset + delta.X, microStartPos.Y.Scale, microStartPos.Y.Offset + delta.Y)
-    end
-end)
-
 local miniStatus = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 22),
+    Size = UDim2.new(1, 0, 0, 24),
     BackgroundTransparency = 1,
     Text = "SPD 16  |  SPEED OFF  |  FLY OFF",
     TextColor3 = COLORS.muted,
@@ -1248,7 +1195,7 @@ local miniStatus = make("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left
 }, miniPanel)
 local miniButtonsRow = make("Frame", {
-    Position = UDim2.new(0, 0, 0, 27),
+    Position = UDim2.new(0, 0, 0, 29),
     Size = UDim2.new(1, 0, 0, 40),
     BackgroundTransparency = 1
 }, miniPanel)
@@ -1256,215 +1203,54 @@ make("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
     VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 7),
+    Padding = UDim.new(0, 6),
     SortOrder = Enum.SortOrder.LayoutOrder
 }, miniButtonsRow)
-
-local miniExpanded = nil
-local miniSpeedCard, miniFlyCard
-local miniSpeedLabel, miniFlyLabel
-local miniSpeedTrack, miniSpeedBar, miniSpeedKnob
-local miniFlyTrack, miniFlyBar, miniFlyKnob
-local miniSpeedDragging, miniFlyDragging = false, false
-
-local function miniCard(title, y)
-    local card = make("Frame", {
-        Position = UDim2.new(0, 0, 0, y),
-        Size = UDim2.new(1, 0, 0, 48),
-        BackgroundColor3 = COLORS.panel2,
-        BorderSizePixel = 0,
-        Visible = false
-    }, miniPanel)
-    corner(card, 10)
-    stroke(card, COLORS.accent, 1, 0.55)
-    local label = make("TextLabel", {
-        Position = UDim2.new(0, 10, 0, 2),
-        Size = UDim2.new(1, -20, 0, 17),
-        BackgroundTransparency = 1,
-        Text = title,
-        TextColor3 = COLORS.text,
-        TextSize = 10,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left
-    }, card)
-    local track = make("Frame", {
-        Position = UDim2.new(0, 12, 0, 27),
-        Size = UDim2.new(1, -24, 0, 6),
-        BackgroundColor3 = COLORS.button,
-        BorderSizePixel = 0,
-        Active = true
-    }, card)
-    corner(track, 4)
-    local bar = make("Frame", {
-        Size = UDim2.new(0, 0, 1, 0),
-        BackgroundColor3 = COLORS.accent,
-        BorderSizePixel = 0
-    }, track)
-    corner(bar, 4)
-    local knob = make("TextButton", {
-        Size = UDim2.fromOffset(16, 16),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0, 0, 0.5, 0),
-        BackgroundColor3 = COLORS.text,
-        BorderSizePixel = 0,
-        Text = "",
-        AutoButtonColor = false
-    }, track)
-    corner(knob, 8)
-    stroke(knob, COLORS.accent, 1, 0.1)
-    return card, label, track, bar, knob
-end
-
-miniSpeedCard, miniSpeedLabel, miniSpeedTrack, miniSpeedBar, miniSpeedKnob = miniCard("WALK SPEED: " .. walkSpeed, 72)
-miniFlyCard, miniFlyLabel, miniFlyTrack, miniFlyBar, miniFlyKnob = miniCard("FLY POWER: " .. flySpeed, 72)
-
-local function updateMiniSliderVisuals()
-    local speedAlpha = math.clamp((walkSpeed - 16) / (1000 - 16), 0, 1)
-    miniSpeedLabel.Text = "WALK SPEED: " .. walkSpeed
-    miniSpeedBar.Size = UDim2.new(speedAlpha, 0, 1, 0)
-    miniSpeedKnob.Position = UDim2.new(speedAlpha, 0, 0.5, 0)
-    local flyAlpha = math.clamp((flySpeed - 1) / 19, 0, 1)
-    miniFlyLabel.Text = "FLY POWER: " .. flySpeed
-    miniFlyBar.Size = UDim2.new(flyAlpha, 0, 1, 0)
-    miniFlyKnob.Position = UDim2.new(flyAlpha, 0, 0.5, 0)
-end
-
-local function layoutMiniControls()
-    miniSpeedCard.Visible = miniExpanded == "SPEED" and speedEnabled
-    miniFlyCard.Visible = miniExpanded == "FLY" and flyEnabled
-    local expanded = miniSpeedCard.Visible or miniFlyCard.Visible
-    miniPanel.Size = UDim2.new(1, -20, 0, expanded and 130 or 72)
-    main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 390) - 70, 240, 300), expanded and 218 or 150)
-    updateMiniSliderVisuals()
-end
-
 local function miniButton(label, callback)
     local button = make("TextButton", {
-        Size = UDim2.new(1/3, -6, 1, 0),
+        Size = UDim2.new(1/4, -5, 1, 0),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = label,
         TextColor3 = COLORS.text,
-        TextSize = 11,
+        TextSize = 10,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true
     }, miniButtonsRow)
     corner(button, 10)
-    stroke(button, COLORS.accent, 1, 0.72)
-    button.Activated:Connect(function()
-        playUIClick()
-        callback()
-        layoutMiniControls()
-    end)
+    button.Activated:Connect(function() playUIClick(); callback() end)
     return button
 end
-miniButton("SPEED", function()
-    if speedEnabled then
-        setSpeedToggle(false)
-        miniExpanded = nil
-    else
-        setSpeedToggle(true)
-        miniExpanded = "SPEED"
-    end
-end)
-miniButton("FLY", function()
-    if flyEnabled then
-        setFlyToggle(false)
-        miniExpanded = nil
-    else
-        setFlyToggle(true)
-        miniExpanded = "FLY"
-    end
-end)
+miniButton("SPEED", function() setSpeedToggle(not speedEnabled) end)
+miniButton("FLY", function() setFlyToggle(not flyEnabled) end)
 miniButton("NOCLIP", function() setNoclipToggle(not noclipEnabled) end)
-
-local function miniSetSpeedFromX(x)
-    local left = miniSpeedTrack.AbsolutePosition.X
-    local width = math.max(1, miniSpeedTrack.AbsoluteSize.X)
-    local alpha = math.clamp((x - left) / width, 0, 1)
-    walkSpeed = math.floor(16 + alpha * (1000 - 16) + 0.5)
-    updateMiniSliderVisuals()
-    if speedEnabled then applyWalkSpeed() end
-end
-local function miniSetFlyFromX(x)
-    local left = miniFlyTrack.AbsolutePosition.X
-    local width = math.max(1, miniFlyTrack.AbsoluteSize.X)
-    local alpha = math.clamp((x - left) / width, 0, 1)
-    flySpeed = math.floor(1 + alpha * 19 + 0.5)
-    updateMiniSliderVisuals()
-end
-local function beginMiniDrag(input, which)
-    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
-    if which == "SPEED" then miniSpeedDragging = true; miniSetSpeedFromX(input.Position.X)
-    else miniFlyDragging = true; miniSetFlyFromX(input.Position.X) end
-end
-miniSpeedTrack.InputBegan:Connect(function(input) beginMiniDrag(input, "SPEED") end)
-miniSpeedKnob.InputBegan:Connect(function(input) beginMiniDrag(input, "SPEED") end)
-miniFlyTrack.InputBegan:Connect(function(input) beginMiniDrag(input, "FLY") end)
-miniFlyKnob.InputBegan:Connect(function(input) beginMiniDrag(input, "FLY") end)
-UserInputService.InputChanged:Connect(function(input)
-    if miniSpeedDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then miniSetSpeedFromX(input.Position.X) end
-    if miniFlyDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then miniSetFlyFromX(input.Position.X) end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        miniSpeedDragging, miniFlyDragging = false, false
-    end
-end)
-
-local function enterFullMode()
-    header.Visible = true
+miniButton("FULL", function()
     miniMode = false
-    microMode = false
+    miniPanel.Visible = false
     tabsBar.Visible = true
     content.Visible = true
-    miniPanel.Visible = false
-    microPanel.Visible = false
     main.Size = UDim2.fromOffset(350, 430)
     fitPanel()
     miniModeButton.Text = "▣"
-    microModeButton.Text = "· · ·"
-end
-
-local function enterMiniMode()
-    header.Visible = true
-    miniMode = true
-    microMode = false
-    tabsBar.Visible = false
-    content.Visible = false
-    miniPanel.Visible = true
-    microPanel.Visible = false
-    miniModeButton.Text = "□"
-    microModeButton.Text = "· · ·"
-    layoutMiniControls()
-end
-
-local function enterMicroMode()
-    miniMode = false
-    microMode = true
-    tabsBar.Visible = false
-    content.Visible = false
-    miniPanel.Visible = false
-    microPanel.Visible = true
-    main.Size = UDim2.fromOffset(178, 34)
-    main.Position = UDim2.new(0.5, -89, 0, 12)
-    header.Visible = false
-    tabsBar.Visible = false
-    content.Visible = false
-    miniModeButton.Text = "▣"
-    microModeButton.Text = "•••"
-end
-
-miniModeButton.Activated:Connect(function()
     playUIClick()
-    if miniMode then enterFullMode() else enterMiniMode() end
-    updateFlyButton()
 end)
-
-microModeButton.Activated:Connect(function()
+miniModeButton.Activated:Connect(function()
+    miniMode = not miniMode
     playUIClick()
-    if microMode then enterFullMode() else enterMicroMode() end
-    updateFlyButton()
+    if miniMode then
+        tabsBar.Visible = false
+        content.Visible = false
+        miniPanel.Visible = true
+        main.Size = UDim2.fromOffset(350, 170)
+        miniModeButton.Text = "□"
+    else
+        miniPanel.Visible = false
+        tabsBar.Visible = true
+        content.Visible = true
+        main.Size = UDim2.fromOffset(350, 430)
+        fitPanel()
+        miniModeButton.Text = "▣"
+    end
 end)
 
 -- Keep the live status panel current without depending on a particular tab.
@@ -1482,9 +1268,6 @@ task.spawn(function()
         if miniStatus and miniStatus.Parent then
             miniStatus.Text = string.format("SPD %d  |  SPEED %s  |  FLY %s  |  NC %s",
                 actualSpeed, flag(speedEnabled), flag(flyEnabled), flag(noclipEnabled))
-        end
-        if microStatus and microStatus.Parent then
-            microStatus.Text = string.format("RH  •  SPD %d  •  %s  •  %s", actualSpeed, speedEnabled and "SPD ON" or "SPD OFF", flyEnabled and "FLY ON" or "FLY OFF")
         end
         task.wait(0.25)
     end
@@ -1508,7 +1291,7 @@ for _, button in pairs(tabButtons) do button.Activated:Connect(function() task.d
 minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
-main.GroupTransparency = 0
+main.GroupTransparency = 1
 mainScale.Scale = 0.94
 TweenService:Create(main, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
 TweenService:Create(mainScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
