@@ -1,6 +1,6 @@
--- RAHERHUB 0.1
--- Для собственной игры или разрешённого тестирования.
--- Без регистрации и внешних HTTP-запросов.
+-- RAHERHUB 0.1 | Private testing UI
+-- Intended for use in your own Roblox place / authorized test environment.
+-- No registration, license checks, accounts, or external HTTP requests.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,17 +10,15 @@ local LocalPlayer = Players.LocalPlayer
 
 local VERSION = "0.1"
 local SETTINGS_KEY = "RAHERHUB_01_SETTINGS"
-
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or {}
 local savedUI = _G[SETTINGS_KEY]
-
 savedUI.flySize = savedUI.flySize or 66
 savedUI.flyOpacity = savedUI.flyOpacity or 0.12
 savedUI.flyPosition = savedUI.flyPosition or {x = -24, y = -150}
 savedUI.rhPosition = savedUI.rhPosition or {x = 18, y = 300}
-
 local POINTS_FILE = "raherhub_teleport_points.json"
 
+-- Remove an older copy if the script is re-run.
 pcall(function()
     local old = game:GetService("CoreGui"):FindFirstChild("RAHERHUB_01")
     if old then old:Destroy() end
@@ -28,11 +26,9 @@ end)
 
 local function make(className, props, parent)
     local obj = Instance.new(className)
-
     for key, value in pairs(props or {}) do
         obj[key] = value
     end
-
     obj.Parent = parent
     return obj
 end
@@ -51,13 +47,13 @@ local function stroke(parent, color, thickness, transparency)
     }, parent)
 end
 
-local function safeParentGui(screenGui)
+local function safeParentGui(gui)
     local ok = pcall(function()
-        screenGui.Parent = game:GetService("CoreGui")
+        gui.Parent = game:GetService("CoreGui")
     end)
 
-    if not ok or not screenGui.Parent then
-        screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    if not ok or not gui.Parent then
+        gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
 end
 
@@ -70,8 +66,7 @@ local gui = make("ScreenGui", {
 
 safeParentGui(gui)
 
--- ЗАГРУЗКА: 5 секунд, RGB-анимация.
-
+-- Five-second animated loading screen
 local loadingFrame = make("Frame", {
     Name = "LoadingScreen",
     Size = UDim2.fromScale(1, 1),
@@ -91,11 +86,11 @@ local loadingTitle = make("TextLabel", {
     ZIndex = 1001
 }, loadingFrame)
 
-make("TextLabel", {
+local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24),
     Position = UDim2.new(0, 0, 0.36, 45),
     BackgroundTransparency = 1,
-    Text = "ВЕРСИЯ 0.1 • ЗАПУСК",
+    Text = "NEON SYSTEM  •  VERSION 0.1",
     TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12,
     Font = Enum.Font.GothamMedium,
@@ -132,7 +127,7 @@ local loadingPercent = make("TextLabel", {
     ZIndex = 1001
 }, loadingFrame)
 
-make("TextLabel", {
+local loadingHint = make("TextLabel", {
     Size = UDim2.new(1, -30, 0, 26),
     Position = UDim2.new(0, 15, 0.68, 0),
     BackgroundTransparency = 1,
@@ -168,42 +163,62 @@ if loadingFrame then
     loadingFrame:Destroy()
 end
 
--- ЦВЕТА.
-
 local COLORS = {
-    background = Color3.fromRGB(13, 15, 22),
-    panel = Color3.fromRGB(21, 24, 34),
-    panel2 = Color3.fromRGB(29, 33, 46),
-    button = Color3.fromRGB(37, 42, 57),
-    text = Color3.fromRGB(244, 246, 255),
-    muted = Color3.fromRGB(155, 163, 184),
-    accent = Color3.fromRGB(105, 115, 255),
-    green = Color3.fromRGB(48, 170, 112),
-    red = Color3.fromRGB(220, 75, 88)
+    background = Color3.fromRGB(8, 10, 18),
+    panel = Color3.fromRGB(16, 19, 31),
+    panel2 = Color3.fromRGB(24, 28, 44),
+    button = Color3.fromRGB(28, 33, 51),
+    text = Color3.fromRGB(245, 248, 255),
+    muted = Color3.fromRGB(142, 153, 180),
+    accent = Color3.fromRGB(0, 220, 255),
+    green = Color3.fromRGB(58, 235, 164),
+    red = Color3.fromRGB(255, 77, 119)
 }
-
--- ГЛАВНОЕ ОКНО.
 
 local main = make("Frame", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(390, 540),
+    Size = UDim2.new(0.92, 0, 0.78, 0),
     BackgroundColor3 = COLORS.background,
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
 
-corner(main, 18)
-stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
+main.Size = UDim2.new(0, 350, 0, 430)
+main.Position = UDim2.new(0.5, 0, 0.5, 0)
 
+corner(main, 18)
+
+local mainStroke = stroke(
+    main,
+    Color3.fromRGB(0, 220, 255),
+    1.5,
+    0.08
+)
+
+make("UIGradient", {
+    Rotation = 115,
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 16, 29)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(9, 12, 21)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 10, 31))
+    })
+}, main)
+
+-- Fit the panel to small screens while keeping a comfortable touch layout.
 local function fitPanel()
     local camera = workspace.CurrentCamera
-    if not camera then return end
+
+    if not camera then
+        return
+    end
 
     local viewport = camera.ViewportSize
-    local width = math.clamp(viewport.X - 24, 300, 430)
-    local height = math.clamp(viewport.Y - 80, 390, 620)
+
+    -- Compact by default: never occupy almost the entire phone screen.
+    local width = math.clamp(viewport.X - 36, 280, 370)
+    local height = math.clamp(viewport.Y - 150, 300, 470)
 
     main.Size = UDim2.fromOffset(width, height)
 end
@@ -216,30 +231,50 @@ end
 
 local header = make("Frame", {
     Name = "Header",
-    Size = UDim2.new(1, 0, 0, 76),
+    Size = UDim2.new(1, 0, 0, 60),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, main)
 
 corner(header, 18)
 
+local rgbStrip = make("Frame", {
+    Name = "RGBAccent",
+    Position = UDim2.new(0, 12, 0, 59),
+    Size = UDim2.new(1, -24, 0, 2),
+    BackgroundColor3 = COLORS.accent,
+    BorderSizePixel = 0,
+    ZIndex = 5
+}, main)
+
+corner(rgbStrip, 2)
+
+local rgbGradient = make("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(150, 70, 255)),
+        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(255, 55, 190)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 160))
+    })
+}, rgbStrip)
+
 local title = make("TextLabel", {
     Name = "Title",
-    Position = UDim2.new(0, 16, 0, 9),
-    Size = UDim2.new(1, -100, 0, 34),
+    Position = UDim2.new(0, 15, 0, 5),
+    Size = UDim2.new(1, -92, 0, 30),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 25,
+    TextSize = 22,
     Font = Enum.Font.GothamBlack,
     TextXAlignment = Enum.TextXAlignment.Left
 }, header)
 
-make("TextLabel", {
-    Position = UDim2.new(0, 17, 0, 43),
-    Size = UDim2.new(1, -95, 0, 20),
+local subtitle = make("TextLabel", {
+    Position = UDim2.new(0, 16, 0, 34),
+    Size = UDim2.new(1, -95, 0, 16),
     BackgroundTransparency = 1,
-    Text = "ЛИЧНАЯ СБОРКА • версия " .. VERSION,
+    Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
     TextColor3 = COLORS.muted,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -249,32 +284,49 @@ make("TextLabel", {
 local minimize = make("TextButton", {
     Name = "Minimize",
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -12, 0, 13),
-    Size = UDim2.fromOffset(42, 42),
+    Position = UDim2.new(1, -10, 0, 9),
+    Size = UDim2.fromOffset(38, 38),
     BackgroundColor3 = COLORS.button,
     BorderSizePixel = 0,
     Text = "—",
     TextColor3 = COLORS.text,
     TextSize = 22,
-    Font = Enum.Font.GothamBold
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true
 }, header)
 
 corner(minimize, 12)
 
+-- Rainbow title animation.
 local hue = 0
+local rgbConnection
+local openButtonStroke
 
-RunService.RenderStepped:Connect(function(dt)
-    if not title.Parent then return end
+rgbConnection = RunService.RenderStepped:Connect(function(dt)
+    if not title.Parent then
+        if rgbConnection then
+            rgbConnection:Disconnect()
+        end
+
+        return
+    end
 
     hue = (hue + dt * 0.22) % 1
+
     title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
+    mainStroke.Color = Color3.fromHSV((hue + 0.12) % 1, 0.82, 1)
+
+    if openButtonStroke then
+        openButtonStroke.Color = Color3.fromHSV((hue + 0.3) % 1, 0.82, 1)
+    end
+
+    if rgbGradient then
+        rgbGradient.Rotation = (rgbGradient.Rotation + dt * 38) % 360
+    end
 end)
 
--- ПЕРЕМЕЩЕНИЕ ГЛАВНОГО ОКНА.
-
-local dragging = false
-local dragStart
-local startPos
+-- Drag by the header on mouse or touch.
+local dragging, dragStart, startPos = false, nil, nil
 
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -293,10 +345,10 @@ header.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging
-        and (input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch) then
-
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
         local delta = input.Position - dragStart
 
         main.Position = UDim2.new(
@@ -307,8 +359,6 @@ UserInputService.InputChanged:Connect(function(input)
         )
     end
 end)
-
--- ПЛАВАЮЩАЯ КНОПКА RH.
 
 local openButton = make("TextButton", {
     Name = "OpenButton",
@@ -328,17 +378,21 @@ local openButton = make("TextButton", {
 
 corner(openButton, 29)
 
+openButtonStroke = stroke(
+    openButton,
+    Color3.fromRGB(0, 220, 255),
+    2,
+    0.05
+)
+
 minimize.Activated:Connect(function()
     main.Visible = false
     openButton.Visible = true
 end)
 
 do
-    local rhDragging = false
-    local rhStart
-    local rhStartPos
-    local rhInput
-    local rhMoved = false
+    local rhDragging, rhStart, rhStartPos, rhInput, rhMoved =
+        false, nil, nil, nil, false
 
     openButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch
@@ -359,11 +413,11 @@ do
     end)
 
     UserInputService.InputChanged:Connect(function(input)
-        if rhDragging and rhStart
-            and (input == rhInput
+        if rhDragging and rhStart and (
+            input == rhInput
             or input.UserInputType == Enum.UserInputType.Touch
-            or input.UserInputType == Enum.UserInputType.MouseMovement) then
-
+            or input.UserInputType == Enum.UserInputType.MouseMovement
+        ) then
             local delta = input.Position - rhStart
 
             if math.abs(delta.X) > 4 or math.abs(delta.Y) > 4 then
@@ -404,19 +458,17 @@ do
     end)
 end
 
--- ВКЛАДКИ.
-
 local tabsBar = make("Frame", {
-    Position = UDim2.new(0, 12, 0, 86),
-    Size = UDim2.new(1, -24, 0, 44),
+    Position = UDim2.new(0, 10, 0, 69),
+    Size = UDim2.new(1, -20, 0, 34),
     BackgroundTransparency = 1
 }, main)
 
-make("UIListLayout", {
+local tabLayout = make("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
     VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 7),
+    Padding = UDim.new(0, 5),
     SortOrder = Enum.SortOrder.LayoutOrder
 }, tabsBar)
 
@@ -425,10 +477,18 @@ local tabButtons = {}
 local activeTab = "MAIN"
 
 local content = make("Frame", {
-    Position = UDim2.new(0, 12, 0, 138),
-    Size = UDim2.new(1, -24, 1, -150),
+    Position = UDim2.new(0, 10, 0, 112),
+    Size = UDim2.new(1, -20, 1, -122),
     BackgroundTransparency = 1
 }, main)
+
+local tabCaptions = {
+    MAIN = "HOME",
+    FUNCTIONS = "FUNCS",
+    TELEPORT = "TP",
+    SETTINGS = "STYLE",
+    ["COMING SOON"] = "MORE"
+}
 
 for _, tabName in ipairs({
     "MAIN",
@@ -437,16 +497,16 @@ for _, tabName in ipairs({
     "SETTINGS",
     "COMING SOON"
 }) do
-
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
-        Size = UDim2.new(1/5, -6, 1, 0),
+        Size = UDim2.new(1 / 5, -6, 1, 0),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
-        Text = tabName,
+        Text = tabCaptions[tabName] or tabName,
         TextColor3 = COLORS.muted,
         TextSize = 9,
         Font = Enum.Font.GothamBold,
+        AutoButtonColor = true,
         LayoutOrder = #tabButtons + 1
     }, tabsBar)
 
@@ -487,10 +547,14 @@ local function selectTab(name)
         page.Visible = tabName == name
 
         tabButtons[tabName].BackgroundColor3 =
-            tabName == name and COLORS.accent or COLORS.button
+            tabName == name
+            and Color3.fromRGB(44, 57, 83)
+            or COLORS.button
 
         tabButtons[tabName].TextColor3 =
-            tabName == name and Color3.new(1, 1, 1) or COLORS.muted
+            tabName == name
+            and Color3.fromRGB(0, 230, 255)
+            or COLORS.muted
     end
 end
 
@@ -514,7 +578,7 @@ end
 
 local function infoCard(parent, heading, body)
     local card = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 86),
+        Size = UDim2.new(1, -2, 0, 76),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
@@ -522,24 +586,24 @@ local function infoCard(parent, heading, body)
     corner(card, 13)
 
     make("TextLabel", {
-        Position = UDim2.new(0, 13, 0, 10),
-        Size = UDim2.new(1, -26, 0, 22),
+        Position = UDim2.new(0, 12, 0, 8),
+        Size = UDim2.new(1, -24, 0, 20),
         BackgroundTransparency = 1,
         Text = heading,
         TextColor3 = COLORS.text,
-        TextSize = 15,
+        TextSize = 14,
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left
     }, card)
 
     make("TextLabel", {
-        Position = UDim2.new(0, 13, 0, 35),
-        Size = UDim2.new(1, -26, 0, 40),
+        Position = UDim2.new(0, 12, 0, 30),
+        Size = UDim2.new(1, -24, 0, 38),
         BackgroundTransparency = 1,
         Text = body,
         TextWrapped = true,
         TextColor3 = COLORS.muted,
-        TextSize = 12,
+        TextSize = 11,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top
@@ -562,14 +626,26 @@ local statusLabel = make("TextLabel", {
 corner(statusLabel, 11)
 
 section(pages["MAIN"], "OVERVIEW")
-infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
-infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте FUNCTIONS для управления персонажем или TELEPORT для сохранения мест.")
-infoCard(pages["MAIN"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
--- КНОПКИ И ПЕРЕКЛЮЧАТЕЛИ.
--- Исправлено: переменная button объявляется заранее,
--- поэтому callback больше не обращается к глобальной переменной.
+infoCard(
+    pages["MAIN"],
+    "RAHERHUB 0.1",
+    "Личная сборка с интерфейсом для телефона и сохранением точек телепорта."
+)
 
+infoCard(
+    pages["MAIN"],
+    "БЫСТРЫЙ СТАРТ",
+    "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест."
+)
+
+infoCard(
+    pages["MAIN"],
+    "ХРАНЕНИЕ ТОЧЕК",
+    "Точки сохраняются на устройстве, если среда поддерживает работу с файлами."
+)
+
+-- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
         Size = UDim2.new(1, -2, 0, height or 46),
@@ -583,6 +659,7 @@ local function makeActionButton(parent, text, callback, height)
     }, parent)
 
     corner(button, 12)
+
     button.Activated:Connect(callback)
 
     return button
@@ -618,8 +695,6 @@ local function makeToggle(parent, label, initial, callback)
     end
 end
 
--- SPEED HACK.
-
 section(pages["FUNCTIONS"], "УПРАВЛЕНИЕ ПЕРСОНАЖЕМ")
 
 infoCard(
@@ -628,6 +703,7 @@ infoCard(
     "Используйте инструменты только в своей игре или там, где у вас есть разрешение."
 )
 
+-- Скорость ходьбы: диапазон 16–1000
 local speedEnabled = false
 local walkSpeed = 16
 
@@ -640,10 +716,15 @@ local function applyWalkSpeed()
     end
 end
 
-makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
-    speedEnabled = value
-    applyWalkSpeed()
-end)
+makeToggle(
+    pages["FUNCTIONS"],
+    "Ускорение ходьбы",
+    false,
+    function(value)
+        speedEnabled = value
+        applyWalkSpeed()
+    end
+)
 
 local walkSpeedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24),
@@ -721,10 +802,10 @@ walkSpeedKnob.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if walkSpeedDragging
-        and (input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement) then
-
+    if walkSpeedDragging and (
+        input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement
+    ) then
         setWalkSpeedFromX(input.Position.X)
     end
 end)
@@ -745,8 +826,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
--- ESP.
-
+-- ESP highlight state.
 local espEnabled = false
 local espObjects = {}
 
@@ -767,6 +847,7 @@ local function createESP(player)
         or player == LocalPlayer
         or not player.Character
         or espObjects[player] then
+
         return
     end
 
@@ -801,15 +882,17 @@ end)
 
 Players.PlayerRemoving:Connect(removeESP)
 
-makeToggle(pages["FUNCTIONS"], "Подсветка игроков (ESP)", false, function(value)
-    espEnabled = value
-    updateESP()
-end)
+makeToggle(
+    pages["FUNCTIONS"],
+    "Подсветка игроков (ESP)",
+    false,
+    function(value)
+        espEnabled = value
+        updateESP()
+    end
+)
 
--- FLY: ОДНА КНОПКА.
--- Удержание = подъём.
--- Отпускание = прекращение подъёма и начало падения.
-
+-- FLY: one floating button. Hold to rise; release to fall. Drag it in edit mode.
 local flyTouch
 local flyEditMode = false
 local flyHeld = false
@@ -823,18 +906,24 @@ local flyDragState = {
     input = nil
 }
 
-makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
-    flyEnabled = value
+makeToggle(
+    pages["FUNCTIONS"],
+    "Полёт (удерживать для подъёма)",
+    false,
+    function(value)
+        flyEnabled = value
 
-    if not value then
-        flyHeld = false
-    end
+        if not value then
+            flyHeld = false
+        end
 
-    if flyTouch then
-        flyTouch.Visible = flyEditMode
-            or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+        if flyTouch then
+            flyTouch.Visible =
+                flyEditMode
+                or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+        end
     end
-end)
+)
 
 local speedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24),
@@ -908,10 +997,10 @@ speedKnob.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if speedDragging
-        and (input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement) then
-
+    if speedDragging and (
+        input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement
+    ) then
         setFlySpeedFromX(input.Position.X)
     end
 end)
@@ -923,8 +1012,6 @@ UserInputService.InputEnded:Connect(function(input)
         speedDragging = false
     end
 end)
-
--- ОДНА ПЛАВАЮЩАЯ КНОПКА FLY.
 
 local flyPos = savedUI.flyPosition
 
@@ -946,7 +1033,13 @@ flyTouch = make("TextButton", {
 }, gui)
 
 corner(flyTouch, 100)
-stroke(flyTouch, Color3.fromRGB(255, 255, 255), 1, 0.35)
+
+stroke(
+    flyTouch,
+    Color3.fromRGB(255, 255, 255),
+    1,
+    0.35
+)
 
 local _, setFlyEditToggle = makeToggle(
     pages["FUNCTIONS"],
@@ -958,7 +1051,8 @@ local _, setFlyEditToggle = makeToggle(
 
         if flyTouch then
             flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
-            flyTouch.Visible = value
+            flyTouch.Visible =
+                value
                 or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
         end
 
@@ -973,6 +1067,7 @@ local _, setFlyEditToggle = makeToggle(
 flyTouch.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Touch
         and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+
         return
     end
 
@@ -999,7 +1094,6 @@ local function releaseFly()
     if root then
         local velocity = root.AssemblyLinearVelocity
 
-        -- Прекращаем подъём: персонаж начинает падать.
         root.AssemblyLinearVelocity = Vector3.new(
             velocity.X,
             -2,
@@ -1074,28 +1168,29 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- NOCLIP.
-
 local noclipEnabled = false
 local originalCollision = {}
 
-makeToggle(pages["FUNCTIONS"], "Проход сквозь объекты (Noclip)", false, function(value)
-    noclipEnabled = value
+makeToggle(
+    pages["FUNCTIONS"],
+    "Проход сквозь объекты (Noclip)",
+    false,
+    function(value)
+        noclipEnabled = value
 
-    if not value then
-        for part, oldValue in pairs(originalCollision) do
-            if part and part.Parent then
-                pcall(function()
-                    part.CanCollide = oldValue
-                end)
+        if not value then
+            for part, oldValue in pairs(originalCollision) do
+                if part and part.Parent then
+                    pcall(function()
+                        part.CanCollide = oldValue
+                    end)
+                end
             end
+
+            table.clear(originalCollision)
         end
-
-        table.clear(originalCollision)
     end
-end)
-
--- ОСНОВНОЙ ЦИКЛ.
+)
 
 RunService.Stepped:Connect(function()
     if speedEnabled then
@@ -1135,12 +1230,14 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+-- Show the single FLY button while the feature is enabled or being edited.
 local function updateFlyButton()
     if not flyTouch then
         return
     end
 
-    flyTouch.Visible = flyEditMode
+    flyTouch.Visible =
+        flyEditMode
         or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
 end
 
@@ -1153,8 +1250,7 @@ end
 minimize.Activated:Connect(updateFlyButton)
 openButton.Activated:Connect(updateFlyButton)
 
--- TELEPORT: СОХРАНЁННЫЕ ТОЧКИ.
-
+-- Saved teleport points.
 local teleportPoints = {}
 
 local function canUseFiles()
@@ -1205,8 +1301,11 @@ end
 
 local function savePoints()
     if not canUseFiles() then
-        statusLabel.Text = "Файловое сохранение недоступно: точки останутся до конца сессии."
+        statusLabel.Text =
+            "Файловое сохранение недоступно: точки останутся до конца сессии."
+
         statusLabel.TextColor3 = Color3.fromRGB(255, 190, 90)
+
         return false
     end
 
@@ -1282,6 +1381,7 @@ local function refreshPoints()
         }, pointsList)
 
         corner(empty, 10)
+
         return
     end
 
@@ -1346,6 +1446,7 @@ local function refreshPoints()
                 return
             end
 
+            -- Local character movement: use only in your own place / authorized tests.
             root.CFrame = CFrame.new(point.x, point.y + 3, point.z)
 
             statusLabel.Text = "Перемещение к точке: " .. point.name
@@ -1374,70 +1475,77 @@ local function refreshPoints()
     end
 end
 
-makeActionButton(pages["TELEPORT"], "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕСТО", function()
-    local character = LocalPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
+makeActionButton(
+    pages["TELEPORT"],
+    "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕСТО",
+    function()
+        local character = LocalPlayer.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
 
-    if not root then
-        statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
-        statusLabel.TextColor3 = COLORS.red
-        return
-    end
-
-    local name = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
-
-    if name == "" then
-        name = "Точка " .. tostring(#teleportPoints + 1)
-    end
-
-    for _, point in ipairs(teleportPoints) do
-        if point.name:lower() == name:lower() then
-            statusLabel.Text = "Точка с таким названием уже существует."
+        if not root then
+            statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
             statusLabel.TextColor3 = COLORS.red
             return
         end
+
+        local name = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+
+        if name == "" then
+            name = "Точка " .. tostring(#teleportPoints + 1)
+        end
+
+        for _, point in ipairs(teleportPoints) do
+            if point.name:lower() == name:lower() then
+                statusLabel.Text = "Точка с таким названием уже существует."
+                statusLabel.TextColor3 = COLORS.red
+                return
+            end
+        end
+
+        local pos = root.Position
+
+        table.insert(teleportPoints, {
+            name = name,
+            x = pos.X,
+            y = pos.Y,
+            z = pos.Z
+        })
+
+        local saved = savePoints()
+
+        pointNameBox.Text = ""
+        refreshPoints()
+
+        statusLabel.Text = saved
+            and ("Точка сохранена: " .. name)
+            or ("Точка создана: " .. name .. " (session only)")
+
+        statusLabel.TextColor3 = saved
+            and COLORS.green
+            or Color3.fromRGB(255, 190, 90)
     end
+)
 
-    local pos = root.Position
+makeActionButton(
+    pages["TELEPORT"],
+    "УДАЛИТЬ ВСЕ ТОЧКИ",
+    function()
+        table.clear(teleportPoints)
+        savePoints()
+        refreshPoints()
 
-    table.insert(teleportPoints, {
-        name = name,
-        x = pos.X,
-        y = pos.Y,
-        z = pos.Z
-    })
+        statusLabel.Text = "Все сохранённые точки удалены."
+        statusLabel.TextColor3 = COLORS.muted
+    end
+)
 
-    local saved = savePoints()
-
-    pointNameBox.Text = ""
-    refreshPoints()
-
-    statusLabel.Text = saved
-        and ("Точка сохранена: " .. name)
-        or ("Точка создана: " .. name .. " (session only)")
-
-    statusLabel.TextColor3 = saved
-        and COLORS.green
-        or Color3.fromRGB(255, 190, 90)
-end)
-
-makeActionButton(pages["TELEPORT"], "УДАЛИТЬ ВСЕ ТОЧКИ", function()
-    table.clear(teleportPoints)
-    savePoints()
-    refreshPoints()
-
-    statusLabel.Text = "Все сохранённые точки удалены."
-    statusLabel.TextColor3 = COLORS.muted
-end)
-
--- SETTINGS: размер, прозрачность и расположение кнопки FLY.
-
+-- SETTINGS: customize independently draggable flight controls.
 section(pages["SETTINGS"], "INTERFACE SETTINGS")
 
 infoCard(
     pages["SETTINGS"],
-    "Настройка кнопки FLY",
-    "Изменяйте размер и прозрачность кнопки. Положение сохраняется отдельно."
+    "Настройка кнопок FLY",
+    "Изменяйте размер и прозрачность обеих кнопок. Позиции кнопок сохраняются отдельно."
 )
 
 local function createSettingSlider(
@@ -1499,7 +1607,7 @@ local function createSettingSlider(
 
     corner(knob, 11)
 
-    local draggingSlider = false
+    local dragging = false
 
     local function setValueFromX(x)
         local left = track.AbsolutePosition.X
@@ -1521,7 +1629,7 @@ local function createSettingSlider(
         if input.UserInputType == Enum.UserInputType.Touch
             or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-            draggingSlider = true
+            dragging = true
             setValueFromX(input.Position.X)
         end
     end
@@ -1530,10 +1638,10 @@ local function createSettingSlider(
     knob.InputBegan:Connect(begin)
 
     UserInputService.InputChanged:Connect(function(input)
-        if draggingSlider
-            and (input.UserInputType == Enum.UserInputType.Touch
-            or input.UserInputType == Enum.UserInputType.MouseMovement) then
-
+        if dragging and (
+            input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseMovement
+        ) then
             setValueFromX(input.Position.X)
         end
     end)
@@ -1542,7 +1650,7 @@ local function createSettingSlider(
         if input.UserInputType == Enum.UserInputType.Touch
             or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-            draggingSlider = false
+            dragging = false
         end
     end)
 
@@ -1561,8 +1669,8 @@ createSettingSlider(
     44,
     110,
     savedUI.flySize,
-    function(value)
-        return tostring(value) .. " px"
+    function(v)
+        return tostring(v) .. " px"
     end,
     function(value)
         savedUI.flySize = value
@@ -1576,8 +1684,8 @@ createSettingSlider(
     0,
     85,
     math.floor(savedUI.flyOpacity * 100 + 0.5),
-    function(value)
-        return tostring(value) .. "%"
+    function(v)
+        return tostring(v) .. "%"
     end,
     function(value)
         savedUI.flyOpacity = value / 100
@@ -1585,35 +1693,45 @@ createSettingSlider(
     end
 )
 
-makeActionButton(pages["SETTINGS"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
-    savedUI.flyPosition = {x = -24, y = -150}
-    flyTouch.Position = UDim2.new(1, -24, 1, -150)
+makeActionButton(
+    pages["SETTINGS"],
+    "СБРОСИТЬ ПОЗИЦИЮ FLY",
+    function()
+        savedUI.flyPosition = {x = -24, y = -150}
+        flyTouch.Position = UDim2.new(1, -24, 1, -150)
 
-    statusLabel.Text = "Позиция кнопки FLY сброшена."
-    statusLabel.TextColor3 = COLORS.green
-end)
+        statusLabel.Text = "Позиция кнопки FLY сброшена."
+        statusLabel.TextColor3 = COLORS.green
+    end
+)
 
-makeActionButton(pages["SETTINGS"], "СБРОСИТЬ РАЗМЕР И ПРОЗРАЧНОСТЬ", function()
-    savedUI.flySize = 66
-    savedUI.flyOpacity = 0.12
+makeActionButton(
+    pages["SETTINGS"],
+    "СБРОСИТЬ РАЗМЕР И ПРОЗРАЧНОСТЬ",
+    function()
+        savedUI.flySize = 66
+        savedUI.flyOpacity = 0.12
 
-    applyFlyAppearance()
+        applyFlyAppearance()
 
-    statusLabel.Text = "Размер и прозрачность кнопки сброшены."
-    statusLabel.TextColor3 = COLORS.green
-end)
+        statusLabel.Text = "Размер и прозрачность кнопок сброшены."
+        statusLabel.TextColor3 = COLORS.green
+    end
+)
 
-makeActionButton(pages["SETTINGS"], "ГОТОВО / ВЫЙТИ ИЗ РЕДАКТИРОВАНИЯ", function()
-    flyEditMode = false
-    flyTouch.Text = "FLY"
+makeActionButton(
+    pages["SETTINGS"],
+    "ГОТОВО / ВЫЙТИ ИЗ РЕДАКТИРОВАНИЯ",
+    function()
+        flyEditMode = false
+        flyTouch.Text = "FLY"
 
-    statusLabel.Text = "Настройки применены."
-    statusLabel.TextColor3 = COLORS.green
+        statusLabel.Text = "Настройки применены."
+        statusLabel.TextColor3 = COLORS.green
 
-    updateFlyButton()
-end)
-
--- COMING SOON.
+        updateFlyButton()
+    end
+)
 
 section(pages["COMING SOON"], "COMING SOON")
 
@@ -1632,6 +1750,7 @@ infoCard(
 refreshPoints()
 selectTab("MAIN")
 
+-- Keep touch fly control visibility in sync with the selected page and minimized state.
 local function syncFlyButton()
     updateFlyButton()
 end
