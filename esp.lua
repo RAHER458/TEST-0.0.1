@@ -1,12 +1,12 @@
--- RAHERHUB 0.1 | Compact RGB + Micro FPS/PING UI
+-- RAHERHUB 0.1 | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local VERSION = "0.1"
@@ -123,6 +123,8 @@ local COLORS = {
     red = Color3.fromRGB(220, 75, 88)
 }
 
+local compactMode = false
+
 local main = make("Frame", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -135,7 +137,7 @@ local main = make("Frame", {
 main.Size = UDim2.new(0, 390, 0, 540)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
-local mainStroke = stroke(main, Color3.fromRGB(74, 80, 115), 1.6, 0.05)
+stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
 
 -- Fit the panel to small screens while keeping a comfortable touch layout.
 local function fitPanel()
@@ -144,7 +146,9 @@ local function fitPanel()
     local viewport = camera.ViewportSize
     local width = math.clamp(viewport.X - 24, 300, 430)
     local height = math.clamp(viewport.Y - 80, 390, 620)
-    main.Size = UDim2.fromOffset(width, height)
+    if not compactMode then
+        main.Size = UDim2.fromOffset(width, height)
+    end
 end
 fitPanel()
 if workspace.CurrentCamera then
@@ -197,42 +201,33 @@ local minimize = make("TextButton", {
 }, header)
 corner(minimize, 12)
 
--- Rainbow title, border and HUD animation.
+-- Compact-layout control sits immediately to the left of the existing minimize button.
+local compactButton = make("TextButton", {
+    Name = "CompactModeButton",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -62, 0, 13),
+    Size = UDim2.fromOffset(42, 42),
+    BackgroundColor3 = COLORS.button,
+    BorderSizePixel = 0,
+    Text = "▣",
+    TextColor3 = COLORS.text,
+    TextSize = 19,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true
+}, header)
+corner(compactButton, 12)
+local compactButtonStroke = stroke(compactButton, COLORS.accent, 1.2, 0.15)
+
+-- Rainbow title animation.
 local hue = 0
 local rgbConnection
-local statsHud
-local hudStroke
-local fpsValue = 0
-local frameCounter, fpsTimer, hudTimer = 0, 0, 0
 rgbConnection = RunService.RenderStepped:Connect(function(dt)
     if not title.Parent then
         if rgbConnection then rgbConnection:Disconnect() end
         return
     end
-    hue = (hue + dt * 0.32) % 1
-    title.TextColor3 = Color3.fromHSV(hue, 0.78, 1)
-    if mainStroke then
-        mainStroke.Color = Color3.fromHSV(hue, 0.9, 1)
-        mainStroke.Thickness = 1.6 + (math.sin(os.clock() * 3) + 1) * 0.7
-    end
-    frameCounter = frameCounter + 1
-    fpsTimer = fpsTimer + dt
-    hudTimer = hudTimer + dt
-    if fpsTimer >= 0.5 then
-        fpsValue = math.floor(frameCounter / fpsTimer + 0.5)
-        frameCounter, fpsTimer = 0, 0
-    end
-    if statsHud and hudTimer >= 0.25 then
-        hudTimer = 0
-        local pingText = "--"
-        pcall(function()
-            local item = Stats.Network.ServerStatsItem["Data Ping"]
-            if item then pingText = item:GetValueString():gsub(" ms", "") end
-        end)
-        statsHud.Text = "FPS " .. tostring(fpsValue) .. "  •  PING " .. pingText
-        statsHud.TextColor3 = Color3.fromHSV(hue, 0.65, 1)
-        if hudStroke then hudStroke.Color = Color3.fromHSV((hue + 0.18) % 1, 0.9, 1) end
-    end
+    hue = (hue + dt * 0.22) % 1
+    title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
 end)
 
 -- Drag by the header on mouse or touch.
@@ -267,28 +262,85 @@ local openButton = make("TextButton", {
     Font = Enum.Font.GothamBlack
 }, gui)
 corner(openButton, 29)
-local hudEnabled = false
-statsHud = make("TextButton", {
+
+-- Small FPS/PING indicator: fixed colors (not RGB) and draggable on touch/mouse.
+local statsHud = make("TextButton", {
     Name = "MicroFpsPing",
     Visible = false,
-    Position = UDim2.fromOffset(12, 90),
-    Size = UDim2.fromOffset(150, 28),
-    BackgroundColor3 = COLORS.panel,
-    BackgroundTransparency = 0.12,
+    Position = UDim2.fromOffset(savedUI.hudPosition and savedUI.hudPosition.x or 12, savedUI.hudPosition and savedUI.hudPosition.y or 90),
+    Size = UDim2.fromOffset(142, 30),
+    BackgroundColor3 = Color3.fromRGB(24, 29, 40),
+    BackgroundTransparency = 0.06,
     BorderSizePixel = 0,
     Text = "FPS --  •  PING --",
-    TextColor3 = COLORS.text,
+    TextColor3 = Color3.fromRGB(235, 240, 250),
     TextSize = 11,
-    Font = Enum.Font.GothamBold,
-    AutoButtonColor = true,
+    Font = Enum.Font.GothamSemibold,
+    AutoButtonColor = false,
     ZIndex = 50
 }, gui)
-corner(statsHud, 10)
-hudStroke = stroke(statsHud, COLORS.accent, 1.5, 0.05)
-statsHud.Activated:Connect(function()
-    main.Visible = true
-    openButton.Visible = false
+corner(statsHud, 8)
+local hudStroke = stroke(statsHud, Color3.fromRGB(105, 115, 135), 1, 0.05)
+local hudEnabled = false
+local hudDragging, hudMoved = false, false
+local fpsFrames, fpsElapsed, displayedFPS, pingElapsed = 0, 0, 0, 0
+RunService.RenderStepped:Connect(function(dt)
+    fpsFrames = fpsFrames + 1
+    fpsElapsed = fpsElapsed + dt
+    pingElapsed = pingElapsed + dt
+    if fpsElapsed >= 0.5 then
+        displayedFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
+        fpsFrames, fpsElapsed = 0, 0
+    end
+    if pingElapsed >= 0.5 then
+        pingElapsed = 0
+        local ping = "--"
+        pcall(function()
+            local item = Stats.Network.ServerStatsItem["Data Ping"]
+            if item then ping = item:GetValueString():gsub(" ms", "") end
+        end)
+        statsHud.Text = "FPS " .. tostring(displayedFPS) .. "  •  PING " .. ping
+    end
 end)
+statsHud.Activated:Connect(function()
+    if not hudDragging and not hudMoved then
+        main.Visible = true
+        openButton.Visible = false
+    end
+end)
+do
+    local hudStart, hudStartPos, hudInput = nil, nil, nil
+    statsHud.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            hudDragging, hudMoved = true, false
+            hudStart, hudStartPos, hudInput = input.Position, statsHud.Position, input
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then hudDragging = false end
+            end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if hudDragging and hudStart and (input == hudInput or input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - hudStart
+            if math.abs(delta.X) > 3 or math.abs(delta.Y) > 3 then hudMoved = true end
+            local camera = workspace.CurrentCamera
+            local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+            local x = math.clamp(hudStartPos.X.Offset + delta.X, 0, viewport.X - statsHud.AbsoluteSize.X)
+            local y = math.clamp(hudStartPos.Y.Offset + delta.Y, 0, viewport.Y - statsHud.AbsoluteSize.Y)
+            statsHud.Position = UDim2.fromOffset(x, y)
+            savedUI.hudPosition = {x = x, y = y}
+        end
+    end)
+    statsHud.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if not hudMoved then
+                main.Visible = true
+                openButton.Visible = false
+            end
+            hudDragging = false
+        end
+    end)
+end
 
 minimize.Activated:Connect(function()
     main.Visible = false
@@ -451,6 +503,82 @@ local statusLabel = make("TextLabel", {
 }, pages["MAIN"])
 corner(statusLabel, 11)
 
+-- Compact mode compresses the whole layout rather than making a tall, narrow window.
+local originalGuiSizes = {}
+local originalTextSizes = {}
+local originalLayoutPaddings = {}
+local function cacheCompactDefaults()
+    for _, page in pairs(pages) do
+        for _, object in ipairs(page:GetDescendants()) do
+            if object:IsA("GuiObject") then
+                if object:IsA("TextButton") or object:IsA("TextLabel") then
+                    originalTextSizes[object] = object.TextSize
+                end
+                if object:IsA("TextButton") then
+                    originalGuiSizes[object] = object.Size
+                end
+            elseif object:IsA("UIListLayout") then
+                originalLayoutPaddings[object] = object.Padding
+            end
+        end
+    end
+end
+local function applyCompactMode(enabled)
+    compactMode = enabled
+    compactButton.BackgroundColor3 = enabled and COLORS.accent or COLORS.button
+    compactButton.Text = enabled and "▣" or "▣"
+    if enabled then
+        main.Size = UDim2.fromOffset(370, 470)
+        header.Size = UDim2.new(1, 0, 0, 66)
+        title.Position = UDim2.new(0, 12, 0, 7)
+        title.Size = UDim2.new(1, -145, 0, 29)
+        title.TextSize = 21
+        subtitle.Visible = false
+        minimize.Position = UDim2.new(1, -10, 0, 12)
+        minimize.Size = UDim2.fromOffset(38, 38)
+        compactButton.Position = UDim2.new(1, -54, 0, 12)
+        compactButton.Size = UDim2.fromOffset(38, 38)
+        tabsBar.Position = UDim2.new(0, 8, 0, 72)
+        tabsBar.Size = UDim2.new(1, -16, 0, 37)
+        tabLayout.Padding = UDim.new(0, 3)
+        content.Position = UDim2.new(0, 9, 0, 116)
+        content.Size = UDim2.new(1, -18, 1, -125)
+        for _, tab in pairs(tabButtons) do tab.TextSize = 8 end
+        for object, size in pairs(originalGuiSizes) do
+            if object.Parent then
+                object.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, math.max(30, math.floor(size.Y.Offset * 0.84)))
+            end
+        end
+        for object, size in pairs(originalTextSizes) do
+            if object.Parent then object.TextSize = math.max(8, math.floor(size * 0.9)) end
+        end
+        for layout, padding in pairs(originalLayoutPaddings) do
+            if layout.Parent then layout.Padding = UDim.new(padding.Scale, math.max(3, math.floor(padding.Offset * 0.65))) end
+        end
+    else
+        fitPanel()
+        main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 414) - 24, 300, 430), math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 844) - 80, 390, 620))
+        header.Size = UDim2.new(1, 0, 0, 76)
+        title.Position = UDim2.new(0, 16, 0, 9)
+        title.Size = UDim2.new(1, -150, 0, 34)
+        title.TextSize = 25
+        subtitle.Visible = true
+        minimize.Position = UDim2.new(1, -12, 0, 13)
+        minimize.Size = UDim2.fromOffset(42, 42)
+        compactButton.Position = UDim2.new(1, -62, 0, 13)
+        compactButton.Size = UDim2.fromOffset(42, 42)
+        tabsBar.Position = UDim2.new(0, 12, 0, 86)
+        tabsBar.Size = UDim2.new(1, -24, 0, 44)
+        tabLayout.Padding = UDim.new(0, 7)
+        content.Position = UDim2.new(0, 12, 0, 138)
+        content.Size = UDim2.new(1, -24, 1, -150)
+        for tabName, tab in pairs(tabButtons) do tab.TextSize = 9 end
+        for object, size in pairs(originalGuiSizes) do if object.Parent then object.Size = size end end
+        for object, size in pairs(originalTextSizes) do if object.Parent then object.TextSize = size end end
+        for layout, padding in pairs(originalLayoutPaddings) do if layout.Parent then layout.Padding = padding end end
+    end
+end
+
 section(pages["MAIN"], "OVERVIEW")
 infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
 infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест.")
@@ -492,56 +620,6 @@ local function makeToggle(parent, label, initial, callback)
         if callback then callback(enabled) end
     end
 end
-
-
--- Compact and micro display modes.
-local miniMode = false
-local function applyMenuMode(enabled)
-    miniMode = enabled
-    if enabled then
-        main.Size = UDim2.fromOffset(310, 440)
-        header.Size = UDim2.new(1, 0, 0, 58)
-        title.Position = UDim2.new(0, 12, 0, 5)
-        title.Size = UDim2.new(1, -82, 0, 29)
-        title.TextSize = 21
-        subtitle.Visible = false
-        minimize.Position = UDim2.new(1, -9, 0, 8)
-        minimize.Size = UDim2.fromOffset(36, 36)
-        tabsBar.Position = UDim2.new(0, 8, 0, 64)
-        tabsBar.Size = UDim2.new(1, -16, 0, 36)
-        tabLayout.Padding = UDim.new(0, 3)
-        content.Position = UDim2.new(0, 9, 0, 108)
-        content.Size = UDim2.new(1, -18, 1, -117)
-        for _, tab in pairs(tabButtons) do tab.TextSize = 8 end
-    else
-        fitPanel()
-        header.Size = UDim2.new(1, 0, 0, 76)
-        title.Position = UDim2.new(0, 16, 0, 9)
-        title.Size = UDim2.new(1, -100, 0, 34)
-        title.TextSize = 25
-        subtitle.Visible = true
-        minimize.Position = UDim2.new(1, -12, 0, 13)
-        minimize.Size = UDim2.fromOffset(42, 42)
-        tabsBar.Position = UDim2.new(0, 12, 0, 86)
-        tabsBar.Size = UDim2.new(1, -24, 0, 44)
-        tabLayout.Padding = UDim.new(0, 7)
-        content.Position = UDim2.new(0, 12, 0, 138)
-        content.Size = UDim2.new(1, -24, 1, -150)
-        for _, tab in pairs(tabButtons) do tab.TextSize = 9 end
-    end
-end
-
-makeActionButton(pages["MAIN"], "КОМПАКТНОЕ МЕНЮ: ВКЛ / ВЫКЛ", function()
-    applyMenuMode(not miniMode)
-    statusLabel.Text = miniMode and "Компактное меню включено." or "Обычный размер меню восстановлен."
-    statusLabel.TextColor3 = COLORS.green
-end, 42)
-makeActionButton(pages["MAIN"], "МИКРО HUD: FPS + PING: ВКЛ / ВЫКЛ", function()
-    hudEnabled = not hudEnabled
-    statsHud.Visible = hudEnabled
-    statusLabel.Text = hudEnabled and "Микро HUD FPS/PING включён. Нажми на него, чтобы открыть меню." or "Микро HUD выключен."
-    statusLabel.TextColor3 = COLORS.green
-end, 42)
 
 section(pages["FUNCTIONS"], "УПРАВЛЕНИЕ ПЕРСОНАЖЕМ")
 infoCard(pages["FUNCTIONS"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
@@ -1166,6 +1244,18 @@ end)
 section(pages["COMING SOON"], "COMING SOON")
 infoCard(pages["COMING SOON"], "В разработке", "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования.")
 infoCard(pages["COMING SOON"], "Следующие улучшения", "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования.")
+
+makeActionButton(pages["MAIN"], "МИКРО FPS / PING: ВКЛ / ВЫКЛ", function()
+    hudEnabled = not hudEnabled
+    statsHud.Visible = hudEnabled
+    statusLabel.Text = hudEnabled and "FPS/PING включён: перетащи индикатор в удобное место." or "FPS/PING выключен."
+    statusLabel.TextColor3 = COLORS.green
+end, 38)
+
+cacheCompactDefaults()
+compactButton.Activated:Connect(function()
+    applyCompactMode(not compactMode)
+end)
 
 refreshPoints()
 selectTab("MAIN")
