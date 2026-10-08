@@ -73,7 +73,7 @@ local loadingTitle = make("TextLabel", {
 }, loadingFrame)
 local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1, Text = "NEON SYSTEM  •  VERSION 0.1", TextColor3 = Color3.fromRGB(160, 165, 190),
+    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.1 • ЗАПУСК", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
 local loadingTrack = make("Frame", {
@@ -111,15 +111,15 @@ task.wait(5)
 if loadingFrame then loadingFrame:Destroy() end
 
 local COLORS = {
-    background = Color3.fromRGB(8, 10, 18),
-    panel = Color3.fromRGB(16, 19, 31),
-    panel2 = Color3.fromRGB(24, 28, 44),
-    button = Color3.fromRGB(28, 33, 51),
-    text = Color3.fromRGB(245, 248, 255),
-    muted = Color3.fromRGB(142, 153, 180),
-    accent = Color3.fromRGB(0, 220, 255),
-    green = Color3.fromRGB(58, 235, 164),
-    red = Color3.fromRGB(255, 77, 119)
+    background = Color3.fromRGB(13, 15, 22),
+    panel = Color3.fromRGB(21, 24, 34),
+    panel2 = Color3.fromRGB(29, 33, 46),
+    button = Color3.fromRGB(37, 42, 57),
+    text = Color3.fromRGB(244, 246, 255),
+    muted = Color3.fromRGB(155, 163, 184),
+    accent = Color3.fromRGB(105, 115, 255),
+    green = Color3.fromRGB(48, 170, 112),
+    red = Color3.fromRGB(220, 75, 88)
 }
 
 local main = make("Frame", {
@@ -131,27 +131,18 @@ local main = make("Frame", {
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
-main.Size = UDim2.new(0, 350, 0, 430)
+main.Size = UDim2.new(0, 390, 0, 540)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
-local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
-make("UIGradient", {
-    Rotation = 115,
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 16, 29)),
-        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(9, 12, 21)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 10, 31))
-    })
-}, main)
+stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
 
 -- Fit the panel to small screens while keeping a comfortable touch layout.
 local function fitPanel()
     local camera = workspace.CurrentCamera
     if not camera then return end
     local viewport = camera.ViewportSize
-    -- Compact by default: never occupy almost the entire phone screen.
-    local width = math.clamp(viewport.X - 36, 280, 370)
-    local height = math.clamp(viewport.Y - 150, 300, 470)
+    local width = math.clamp(viewport.X - 24, 300, 430)
+    local height = math.clamp(viewport.Y - 80, 390, 620)
     main.Size = UDim2.fromOffset(width, height)
 end
 fitPanel()
@@ -161,46 +152,29 @@ end
 
 local header = make("Frame", {
     Name = "Header",
-    Size = UDim2.new(1, 0, 0, 60),
+    Size = UDim2.new(1, 0, 0, 76),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, main)
 corner(header, 18)
-local rgbStrip = make("Frame", {
-    Name = "RGBAccent",
-    Position = UDim2.new(0, 12, 0, 59),
-    Size = UDim2.new(1, -24, 0, 2),
-    BackgroundColor3 = COLORS.accent,
-    BorderSizePixel = 0,
-    ZIndex = 5
-}, main)
-corner(rgbStrip, 2)
-local rgbGradient = make("UIGradient", {
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
-        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(150, 70, 255)),
-        ColorSequenceKeypoint.new(0.66, Color3.fromRGB(255, 55, 190)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 160))
-    })
-}, rgbStrip)
 
 local title = make("TextLabel", {
     Name = "Title",
-    Position = UDim2.new(0, 15, 0, 5),
-    Size = UDim2.new(1, -92, 0, 30),
+    Position = UDim2.new(0, 16, 0, 9),
+    Size = UDim2.new(1, -100, 0, 34),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 22,
+    TextSize = 25,
     Font = Enum.Font.GothamBlack,
     TextXAlignment = Enum.TextXAlignment.Left
 }, header)
 
 local subtitle = make("TextLabel", {
-    Position = UDim2.new(0, 16, 0, 34),
-    Size = UDim2.new(1, -95, 0, 16),
+    Position = UDim2.new(0, 17, 0, 43),
+    Size = UDim2.new(1, -95, 0, 20),
     BackgroundTransparency = 1,
-    Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
+    Text = "ЛИЧНАЯ СБОРКА  •  версия " .. VERSION,
     TextColor3 = COLORS.muted,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -210,8 +184,8 @@ local subtitle = make("TextLabel", {
 local minimize = make("TextButton", {
     Name = "Minimize",
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -10, 0, 9),
-    Size = UDim2.fromOffset(38, 38),
+    Position = UDim2.new(1, -12, 0, 13),
+    Size = UDim2.fromOffset(42, 42),
     BackgroundColor3 = COLORS.button,
     BorderSizePixel = 0,
     Text = "—",
@@ -232,9 +206,6 @@ rgbConnection = RunService.RenderStepped:Connect(function(dt)
     end
     hue = (hue + dt * 0.22) % 1
     title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
-    mainStroke.Color = Color3.fromHSV((hue + 0.12) % 1, 0.82, 1)
-    if openButtonStroke then openButtonStroke.Color = Color3.fromHSV((hue + 0.3) % 1, 0.82, 1) end
-    if rgbGradient then rgbGradient.Rotation = (rgbGradient.Rotation + dt * 38) % 360 end
 end)
 
 -- Drag by the header on mouse or touch.
@@ -269,7 +240,6 @@ local openButton = make("TextButton", {
     Font = Enum.Font.GothamBlack
 }, gui)
 corner(openButton, 29)
-local openButtonStroke = stroke(openButton, Color3.fromRGB(0, 220, 255), 2, 0.05)
 
 minimize.Activated:Connect(function()
     main.Visible = false
@@ -304,15 +274,15 @@ do
 end
 
 local tabsBar = make("Frame", {
-    Position = UDim2.new(0, 10, 0, 69),
-    Size = UDim2.new(1, -20, 0, 34),
+    Position = UDim2.new(0, 12, 0, 86),
+    Size = UDim2.new(1, -24, 0, 44),
     BackgroundTransparency = 1
 }, main)
 local tabLayout = make("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
     VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 5),
+    Padding = UDim.new(0, 7),
     SortOrder = Enum.SortOrder.LayoutOrder
 }, tabsBar)
 
@@ -320,19 +290,18 @@ local pages = {}
 local tabButtons = {}
 local activeTab = "MAIN"
 local content = make("Frame", {
-    Position = UDim2.new(0, 10, 0, 112),
-    Size = UDim2.new(1, -20, 1, -122),
+    Position = UDim2.new(0, 12, 0, 138),
+    Size = UDim2.new(1, -24, 1, -150),
     BackgroundTransparency = 1
 }, main)
 
-local tabCaptions = {MAIN = "HOME", FUNCTIONS = "FUNCS", TELEPORT = "TP", SETTINGS = "STYLE", ["COMING SOON"] = "MORE"}
 for _, tabName in ipairs({"MAIN", "FUNCTIONS", "TELEPORT", "SETTINGS", "COMING SOON"}) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
         Size = UDim2.new(1/5, -6, 1, 0),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
-        Text = tabCaptions[tabName] or tabName,
+        Text = tabName,
         TextColor3 = COLORS.muted,
         TextSize = 9,
         Font = Enum.Font.GothamBold,
@@ -369,8 +338,8 @@ local function selectTab(name)
     activeTab = name
     for tabName, page in pairs(pages) do
         page.Visible = tabName == name
-        tabButtons[tabName].BackgroundColor3 = tabName == name and Color3.fromRGB(44, 57, 83) or COLORS.button
-        tabButtons[tabName].TextColor3 = tabName == name and Color3.fromRGB(0, 230, 255) or COLORS.muted
+        tabButtons[tabName].BackgroundColor3 = tabName == name and COLORS.accent or COLORS.button
+        tabButtons[tabName].TextColor3 = tabName == name and Color3.new(1,1,1) or COLORS.muted
     end
 end
 for name, button in pairs(tabButtons) do
@@ -391,29 +360,29 @@ end
 
 local function infoCard(parent, heading, body)
     local card = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 76),
+        Size = UDim2.new(1, -2, 0, 86),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
     corner(card, 13)
     make("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 8),
-        Size = UDim2.new(1, -24, 0, 20),
+        Position = UDim2.new(0, 13, 0, 10),
+        Size = UDim2.new(1, -26, 0, 22),
         BackgroundTransparency = 1,
         Text = heading,
         TextColor3 = COLORS.text,
-        TextSize = 14,
+        TextSize = 15,
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left
     }, card)
     make("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 30),
-        Size = UDim2.new(1, -24, 0, 38),
+        Position = UDim2.new(0, 13, 0, 35),
+        Size = UDim2.new(1, -26, 0, 40),
         BackgroundTransparency = 1,
         Text = body,
         TextWrapped = true,
         TextColor3 = COLORS.muted,
-        TextSize = 11,
+        TextSize = 12,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top
