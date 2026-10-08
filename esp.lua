@@ -1,459 +1,1005 @@
-repeat task.wait() until game:IsLoaded()
+--[[
+    RAHERHUB V0.1 💗
+    Modern Mobile Interface
+    No activation password
+]]
 
---// SERVICES
+if getgenv and getgenv().RAHERHUB_LOADED then
+    warn("RAHERHUB is already running!")
+    return
+end
+
+if getgenv then
+    getgenv().RAHERHUB_LOADED = true
+end
+
+--==================================================
+-- SERVICES
+--==================================================
+
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 --==================================================
--- GUI
+-- SETTINGS
 --==================================================
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RAHERHUB"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local VERSION = "V0.1"
 
-pcall(function()
-    ScreenGui.Parent = CoreGui
-end)
-
-if not ScreenGui.Parent then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
-
---==================================================
--- LOADING
---==================================================
-
-local loading = Instance.new("Frame")
-loading.Size = UDim2.fromScale(1, 1)
-loading.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-loading.BorderSizePixel = 0
-loading.Parent = ScreenGui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 50)
-title.Position = UDim2.new(0, 0, 0.35, 0)
-title.BackgroundTransparency = 1
-title.Text = "RAHERHUB"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 32
-title.Font = Enum.Font.GothamBold
-title.Parent = loading
-
-local subtitle = Instance.new("TextLabel")
-subtitle.Size = UDim2.new(1, 0, 0, 30)
-subtitle.Position = UDim2.new(0, 0, 0.44, 0)
-subtitle.BackgroundTransparency = 1
-subtitle.Text = "Loading..."
-subtitle.TextColor3 = Color3.fromRGB(170, 170, 180)
-subtitle.TextSize = 15
-subtitle.Font = Enum.Font.Gotham
-subtitle.Parent = loading
-
-local barBack = Instance.new("Frame")
-barBack.Size = UDim2.new(0.55, 0, 0, 8)
-barBack.Position = UDim2.new(0.225, 0, 0.53, 0)
-barBack.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-barBack.BorderSizePixel = 0
-barBack.Parent = loading
-
-Instance.new("UICorner", barBack).CornerRadius = UDim.new(1, 0)
-
-local bar = Instance.new("Frame")
-bar.Size = UDim2.new(0, 0, 1, 0)
-bar.BackgroundColor3 = Color3.fromRGB(90, 150, 255)
-bar.BorderSizePixel = 0
-bar.Parent = barBack
-
-Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-
-local stages = {
-    "Initializing...",
-    "Loading interface...",
-    "Preparing modules...",
-    "Loading features...",
-    "Almost ready..."
+local COLORS = {
+    Background = Color3.fromRGB(12, 13, 20),
+    Panel = Color3.fromRGB(20, 22, 33),
+    PanelLight = Color3.fromRGB(29, 32, 46),
+    Border = Color3.fromRGB(48, 52, 70),
+    Text = Color3.fromRGB(240, 242, 255),
+    Muted = Color3.fromRGB(140, 146, 168),
+    Accent = Color3.fromRGB(157, 91, 255),
+    Accent2 = Color3.fromRGB(64, 190, 255),
+    Green = Color3.fromRGB(74, 224, 151),
+    Red = Color3.fromRGB(255, 89, 115),
 }
 
-for i = 1, 100 do
-    bar.Size = UDim2.new(i / 100, 0, 1, 0)
+local ACCENT_GRADIENT = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, COLORS.Accent),
+    ColorSequenceKeypoint.new(1, COLORS.Accent2)
+})
 
-    local stageIndex = math.clamp(
-        math.floor((i - 1) / 20) + 1,
-        1,
-        #stages
+--==================================================
+-- STATE
+--==================================================
+
+local State = {
+    ESP = false,
+    Noclip = false,
+    Speed = false,
+    SpeedValue = 32,
+
+    Fly = false,
+    FlyHolding = false,
+    FlyMoveMode = false,
+
+    Points = {},
+    NextPointId = 0,
+
+    CurrentTab = "MAIN",
+    WindowOpen = true,
+    Destroyed = false,
+}
+
+local ESPObjects = {}
+local SavedCollision = {}
+
+local function getCharacter()
+    return LocalPlayer.Character
+end
+
+local function getHumanoid()
+    local character = getCharacter()
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot()
+    local character = getCharacter()
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+--==================================================
+-- GUI HELPERS
+--==================================================
+
+local function create(className, properties, parent)
+    local obj = Instance.new(className)
+
+    for property, value in pairs(properties or {}) do
+        obj[property] = value
+    end
+
+    obj.Parent = parent
+    return obj
+end
+
+local function corner(parent, radius)
+    return create("UICorner", {
+        CornerRadius = UDim.new(0, radius or 10)
+    }, parent)
+end
+
+local function stroke(parent, color, thickness, transparency)
+    return create("UIStroke", {
+        Color = color or COLORS.Border,
+        Thickness = thickness or 1,
+        Transparency = transparency or 0,
+    }, parent)
+end
+
+local function padding(parent, left, right, top, bottom)
+    return create("UIPadding", {
+        PaddingLeft = UDim.new(0, left or 0),
+        PaddingRight = UDim.new(0, right or 0),
+        PaddingTop = UDim.new(0, top or 0),
+        PaddingBottom = UDim.new(0, bottom or 0),
+    }, parent)
+end
+
+local function tween(object, properties, duration)
+    local info = TweenInfo.new(
+        duration or 0.2,
+        Enum.EasingStyle.Quart,
+        Enum.EasingDirection.Out
     )
 
-    subtitle.Text = stages[stageIndex]
+    local animation = TweenService:Create(object, info, properties)
+    animation:Play()
 
-    task.wait(0.05)
+    return animation
 end
 
-TweenService:Create(
-    loading,
-    TweenInfo.new(0.5),
-    {BackgroundTransparency = 1}
-):Play()
-
-for _, obj in ipairs(loading:GetDescendants()) do
-    if obj:IsA("TextLabel") then
-        TweenService:Create(
-            obj,
-            TweenInfo.new(0.4),
-            {TextTransparency = 1}
-        ):Play()
-    elseif obj:IsA("Frame") then
-        TweenService:Create(
-            obj,
-            TweenInfo.new(0.4),
-            {BackgroundTransparency = 1}
-        ):Play()
-    end
+local function makeLabel(parent, text, size, position, textSize, color)
+    return create("TextLabel", {
+        BackgroundTransparency = 1,
+        Text = text or "",
+        Size = size,
+        Position = position,
+        Font = Enum.Font.Gotham,
+        TextSize = textSize or 13,
+        TextColor3 = color or COLORS.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextWrapped = true,
+    }, parent)
 end
 
-task.wait(0.55)
-loading:Destroy()
+local function makeButton(parent, text, size, position)
+    local button = create("TextButton", {
+        AutoButtonColor = false,
+        Text = text,
+        Size = size,
+        Position = position,
+        BackgroundColor3 = COLORS.PanelLight,
+        TextColor3 = COLORS.Text,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+    }, parent)
+
+    corner(button, 9)
+    stroke(button, COLORS.Border, 1)
+
+    button.MouseEnter:Connect(function()
+        tween(button, {
+            BackgroundColor3 = Color3.fromRGB(39, 42, 59)
+        }, 0.12)
+    end)
+
+    button.MouseLeave:Connect(function()
+        tween(button, {
+            BackgroundColor3 = COLORS.PanelLight
+        }, 0.12)
+    end)
+
+    return button
+end
 
 --==================================================
--- ACTIVATION
+-- SCREEN GUI
 --==================================================
 
-local ACTIVATION_PASSWORD = string.char(
-    49,
-    52,
-    56,
-    56
-)
+local ScreenGui = create("ScreenGui", {
+    Name = "RAHERHUB_V01",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    DisplayOrder = 999,
+}, nil)
 
-local activated = false
+local guiParent
 
-local activation = Instance.new("Frame")
-activation.Size = UDim2.new(0, 320, 0, 190)
-activation.Position = UDim2.new(0.5, -160, 0.5, -95)
-activation.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
-activation.BorderSizePixel = 0
-activation.Parent = ScreenGui
-
-Instance.new("UICorner", activation).CornerRadius = UDim.new(0, 12)
-
-local activationTitle = Instance.new("TextLabel")
-activationTitle.Size = UDim2.new(1, 0, 0, 40)
-activationTitle.Position = UDim2.new(0, 0, 0, 15)
-activationTitle.BackgroundTransparency = 1
-activationTitle.Text = "RAHERHUB"
-activationTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-activationTitle.TextSize = 24
-activationTitle.Font = Enum.Font.GothamBold
-activationTitle.Parent = activation
-
-local activationInfo = Instance.new("TextLabel")
-activationInfo.Size = UDim2.new(1, -30, 0, 25)
-activationInfo.Position = UDim2.new(0, 15, 0, 52)
-activationInfo.BackgroundTransparency = 1
-activationInfo.Text = "Enter activation password"
-activationInfo.TextColor3 = Color3.fromRGB(170, 170, 180)
-activationInfo.TextSize = 13
-activationInfo.Font = Enum.Font.Gotham
-activationInfo.Parent = activation
-
-local passwordBox = Instance.new("TextBox")
-passwordBox.Size = UDim2.new(1, -40, 0, 38)
-passwordBox.Position = UDim2.new(0, 20, 0, 82)
-passwordBox.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
-passwordBox.BorderSizePixel = 0
-passwordBox.PlaceholderText = "Password"
-passwordBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
-passwordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-passwordBox.TextSize = 15
-passwordBox.Font = Enum.Font.Gotham
-passwordBox.ClearTextOnFocus = false
-passwordBox.Text = ""
-passwordBox.Parent = activation
-
-Instance.new("UICorner", passwordBox).CornerRadius = UDim.new(0, 8)
-
-local activateButton = Instance.new("TextButton")
-activateButton.Size = UDim2.new(1, -40, 0, 38)
-activateButton.Position = UDim2.new(0, 20, 0, 128)
-activateButton.BackgroundColor3 = Color3.fromRGB(70, 120, 220)
-activateButton.BorderSizePixel = 0
-activateButton.Text = "ACTIVATE"
-activateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-activateButton.TextSize = 14
-activateButton.Font = Enum.Font.GothamBold
-activateButton.Parent = activation
-
-Instance.new("UICorner", activateButton).CornerRadius = UDim.new(0, 8)
-
-local errorLabel = Instance.new("TextLabel")
-errorLabel.Size = UDim2.new(1, -30, 0, 20)
-errorLabel.Position = UDim2.new(0, 15, 1, -23)
-errorLabel.BackgroundTransparency = 1
-errorLabel.Text = ""
-errorLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-errorLabel.TextSize = 12
-errorLabel.Font = Enum.Font.Gotham
-errorLabel.Parent = activation
-
-activateButton.MouseButton1Click:Connect(function()
-    local entered = passwordBox.Text
-
-    entered = entered:gsub("^%s+", "")
-    entered = entered:gsub("%s+$", "")
-
-    if entered == ACTIVATION_PASSWORD then
-        activated = true
-        activation.Visible = false
-    else
-        errorLabel.Text = "Invalid password"
+pcall(function()
+    if gethui then
+        guiParent = gethui()
     end
 end)
 
-repeat task.wait() until activated
+if not guiParent then
+    guiParent = CoreGui
+end
+
+local parentSuccess = pcall(function()
+    ScreenGui.Parent = guiParent
+end)
+
+if not parentSuccess then
+    ScreenGui.Parent = PlayerGui
+end
+
+--==================================================
+-- RGB LOGO
+--==================================================
+
+local function makeRGBLogo(parent, position, size, textSize)
+    local holder = create("Frame", {
+        BackgroundTransparency = 1,
+        Position = position,
+        Size = size,
+    }, parent)
+
+    local layout = create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 0),
+    }, holder)
+
+    local letters = {}
+    local title = "RAHERHUB"
+
+    for i = 1, #title do
+        local character = title:sub(i, i)
+
+        local label = create("TextLabel", {
+            BackgroundTransparency = 1,
+            Text = character,
+            Font = Enum.Font.GothamBlack,
+            TextSize = textSize or 24,
+            TextColor3 = Color3.new(1, 1, 1),
+            AutomaticSize = Enum.AutomaticSize.X,
+            Size = UDim2.new(0, 0, 1, 0),
+            LayoutOrder = i,
+        }, holder)
+
+        table.insert(letters, {
+            Label = label,
+            Offset = i / #title,
+        })
+    end
+
+    task.spawn(function()
+        while holder.Parent and not State.Destroyed do
+            local timeNow = os.clock()
+
+            for _, item in ipairs(letters) do
+                local hue = (timeNow * 0.18 + item.Offset) % 1
+
+                item.Label.TextColor3 = Color3.fromHSV(
+                    hue,
+                    0.75,
+                    1
+                )
+            end
+
+            RunService.RenderStepped:Wait()
+        end
+    end)
+
+    return holder
+end
+
+--==================================================
+-- LOADING SCREEN
+--==================================================
+
+local Loading = create("Frame", {
+    Name = "LoadingScreen",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = COLORS.Background,
+    BorderSizePixel = 0,
+    ZIndex = 100,
+}, ScreenGui)
+
+local backgroundGradient = create("UIGradient", {
+    Rotation = 35,
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 11, 21)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 17, 45)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 20, 32)),
+    }),
+}, Loading)
+
+local orb1 = create("Frame", {
+    Size = UDim2.fromOffset(250, 250),
+    Position = UDim2.new(0.5, -125, 0.5, -180),
+    BackgroundColor3 = COLORS.Accent,
+    BackgroundTransparency = 0.88,
+    BorderSizePixel = 0,
+    ZIndex = 101,
+}, Loading)
+corner(orb1, 125)
+
+local orb2 = create("Frame", {
+    Size = UDim2.fromOffset(200, 200),
+    Position = UDim2.new(0.5, -100, 0.5, 25),
+    BackgroundColor3 = COLORS.Accent2,
+    BackgroundTransparency = 0.91,
+    BorderSizePixel = 0,
+    ZIndex = 101,
+}, Loading)
+corner(orb2, 100)
+
+local loadingCard = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.new(0.88, 0, 0, 270),
+    BackgroundColor3 = Color3.fromRGB(16, 18, 29),
+    BackgroundTransparency = 0.08,
+    BorderSizePixel = 0,
+    ZIndex = 102,
+}, Loading)
+
+create("UISizeConstraint", {
+    MinSize = Vector2.new(260, 270),
+    MaxSize = Vector2.new(390, 270),
+}, loadingCard)
+
+corner(loadingCard, 20)
+stroke(loadingCard, Color3.fromRGB(93, 76, 145), 1, 0.2)
+
+makeRGBLogo(
+    loadingCard,
+    UDim2.new(0, 0, 0, 25),
+    UDim2.new(1, 0, 0, 45),
+    28
+)
+
+local loadingVersion = makeLabel(
+    loadingCard,
+    VERSION .. "  |  ALPHA",
+    UDim2.new(1, 0, 0, 20),
+    UDim2.new(0, 0, 0, 73),
+    11,
+    COLORS.Muted
+)
+loadingVersion.TextXAlignment = Enum.TextXAlignment.Center
+
+local loadingStatus = makeLabel(
+    loadingCard,
+    "Initializing interface...",
+    UDim2.new(1, -36, 0, 32),
+    UDim2.new(0, 18, 0, 119),
+    13,
+    COLORS.Text
+)
+loadingStatus.TextXAlignment = Enum.TextXAlignment.Center
+
+local percentLabel = makeLabel(
+    loadingCard,
+    "0%",
+    UDim2.new(1, -36, 0, 22),
+    UDim2.new(0, 18, 0, 157),
+    12,
+    COLORS.Accent2
+)
+percentLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+local barBack = create("Frame", {
+    Position = UDim2.new(0, 18, 0, 187),
+    Size = UDim2.new(1, -36, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(37, 39, 54),
+    BorderSizePixel = 0,
+}, loadingCard)
+corner(barBack, 5)
+
+local barFill = create("Frame", {
+    Size = UDim2.new(0, 0, 1, 0),
+    BackgroundColor3 = COLORS.Accent,
+    BorderSizePixel = 0,
+}, barBack)
+corner(barFill, 5)
+
+create("UIGradient", {
+    Color = ACCENT_GRADIENT,
+}, barFill)
+
+local loadingFooter = makeLabel(
+    loadingCard,
+    "RAHERHUB  •  MOBILE INTERFACE",
+    UDim2.new(1, -30, 0, 22),
+    UDim2.new(0, 15, 1, -32),
+    9,
+    COLORS.Muted
+)
+loadingFooter.TextXAlignment = Enum.TextXAlignment.Center
+
+local loadingStages = {
+    {0.15, "Initializing interface..."},
+    {0.32, "Preparing visual modules..."},
+    {0.50, "Loading movement controls..."},
+    {0.68, "Preparing teleport panel..."},
+    {0.85, "Finishing setup..."},
+    {1.00, "Ready!"},
+}
+
+task.spawn(function()
+    local duration = 5
+    local startTime = os.clock()
+    local stageIndex = 1
+
+    while true do
+        local elapsed = os.clock() - startTime
+        local progress = math.clamp(elapsed / duration, 0, 1)
+
+        tween(barFill, {
+            Size = UDim2.new(progress, 0, 1, 0)
+        }, 0.08)
+
+        percentLabel.Text = tostring(math.floor(progress * 100)) .. "%"
+
+        if stageIndex < #loadingStages then
+            if progress >= loadingStages[stageIndex][1] then
+                stageIndex += 1
+            end
+        end
+
+        loadingStatus.Text = loadingStages[stageIndex][2]
+
+        if progress >= 1 then
+            break
+        end
+
+        RunService.RenderStepped:Wait()
+    end
+
+    task.wait(0.25)
+
+    tween(loadingCard, {
+        BackgroundTransparency = 1,
+    }, 0.3)
+
+    tween(Loading, {
+        BackgroundTransparency = 1,
+    }, 0.4)
+
+    tween(orb1, {
+        BackgroundTransparency = 1,
+    }, 0.3)
+
+    tween(orb2, {
+        BackgroundTransparency = 1,
+    }, 0.3)
+
+    task.wait(0.45)
+
+    if Loading then
+        Loading:Destroy()
+    end
+end)
 
 --==================================================
 -- MAIN WINDOW
 --==================================================
 
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 350, 0, 420)
-main.Position = UDim2.new(0.5, -175, 0.5, -210)
-main.BackgroundColor3 = Color3.fromRGB(18, 18, 25)
-main.BorderSizePixel = 0
-main.Parent = ScreenGui
+local Window = create("Frame", {
+    Name = "MainWindow",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.new(0.92, 0, 0.78, 0),
+    BackgroundColor3 = COLORS.Background,
+    BorderSizePixel = 0,
+    Visible = false,
+    ClipsDescendants = true,
+}, ScreenGui)
 
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
+create("UISizeConstraint", {
+    MinSize = Vector2.new(290, 360),
+    MaxSize = Vector2.new(470, 650),
+}, Window)
+
+corner(Window, 16)
+stroke(Window, COLORS.Border, 1)
+
+local windowScale = create("UIScale", {
+    Scale = 1,
+}, Window)
+
+local function updateScale()
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return
+    end
+
+    local viewport = camera.ViewportSize
+
+    if viewport.X < 500 then
+        windowScale.Scale = 0.95
+    else
+        windowScale.Scale = 1
+    end
+end
+
+updateScale()
+
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+end
 
 --==================================================
 -- TITLE BAR
 --==================================================
 
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 52)
-titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 34)
-titleBar.BorderSizePixel = 0
-titleBar.Parent = main
+local TitleBar = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 60),
+    BackgroundColor3 = COLORS.Panel,
+    BorderSizePixel = 0,
+}, Window)
 
-Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 14)
+local titleAccent = create("Frame", {
+    Position = UDim2.new(0, 0, 1, -2),
+    Size = UDim2.new(1, 0, 0, 2),
+    BackgroundColor3 = COLORS.Accent,
+    BorderSizePixel = 0,
+}, TitleBar)
 
-local titleText = Instance.new("TextLabel")
-titleText.Size = UDim2.new(1, -60, 1, 0)
-titleText.Position = UDim2.new(0, 18, 0, 0)
-titleText.BackgroundTransparency = 1
-titleText.Text = "RAHERHUB"
-titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleText.TextSize = 20
-titleText.TextXAlignment = Enum.TextXAlignment.Left
-titleText.Font = Enum.Font.GothamBold
-titleText.Parent = titleBar
+create("UIGradient", {
+    Color = ACCENT_GRADIENT,
+}, titleAccent)
 
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 45, 0, 45)
-closeButton.Position = UDim2.new(1, -48, 0, 3)
-closeButton.BackgroundTransparency = 1
-closeButton.Text = "×"
-closeButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-closeButton.TextSize = 30
-closeButton.Font = Enum.Font.GothamBold
-closeButton.Parent = titleBar
+makeRGBLogo(
+    TitleBar,
+    UDim2.new(0, 12, 0, 5),
+    UDim2.new(0, 185, 0, 30),
+    21
+)
+
+local versionBadge = create("TextLabel", {
+    Position = UDim2.new(0, 14, 0, 35),
+    Size = UDim2.new(0, 65, 0, 16),
+    BackgroundColor3 = COLORS.PanelLight,
+    Text = VERSION,
+    TextColor3 = COLORS.Accent2,
+    Font = Enum.Font.GothamBold,
+    TextSize = 10,
+}, TitleBar)
+corner(versionBadge, 5)
+
+local closeButton = makeButton(
+    TitleBar,
+    "×",
+    UDim2.new(0, 34, 0, 34),
+    UDim2.new(1, -44, 0, 13)
+)
+closeButton.TextSize = 24
+closeButton.BackgroundColor3 = Color3.fromRGB(45, 28, 43)
+closeButton.TextColor3 = COLORS.Red
 
 --==================================================
--- WINDOW DRAG
+-- WINDOW DRAGGING
 --==================================================
 
 local dragging = false
 local dragStart
-local startPos
+local startPosition
+local dragInput
 
-titleBar.InputBegan:Connect(function(input)
+TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
 
         dragging = true
         dragStart = input.Position
-        startPos = main.Position
+        startPosition = Window.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
     end
 end)
 
 UIS.InputChanged:Connect(function(input)
     if dragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
+        input == dragInput
+        or input.UserInputType == Enum.UserInputType.MouseMovement
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
-
         local delta = input.Position - dragStart
 
-        main.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
+        Window.Position = UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
         )
     end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        dragging = false
-    end
-end)
-
 --==================================================
--- TABS
+-- NAVIGATION
 --==================================================
 
-local tabs = Instance.new("Frame")
-tabs.Size = UDim2.new(1, -20, 0, 40)
-tabs.Position = UDim2.new(0, 10, 0, 58)
-tabs.BackgroundTransparency = 1
-tabs.Parent = main
+local Body = create("Frame", {
+    Position = UDim2.new(0, 0, 0, 60),
+    Size = UDim2.new(1, 0, 1, -60),
+    BackgroundTransparency = 1,
+}, Window)
+
+local Sidebar = create("ScrollingFrame", {
+    Position = UDim2.new(0, 0, 0, 0),
+    Size = UDim2.new(0, 112, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(16, 18, 27),
+    BorderSizePixel = 0,
+    ScrollBarThickness = 2,
+    ScrollBarImageColor3 = COLORS.Accent,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, Body)
+
+padding(Sidebar, 7, 7, 10, 10)
+
+local sidebarLayout = create("UIListLayout", {
+    Padding = UDim.new(0, 6),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+}, Sidebar)
+
+local Content = create("Frame", {
+    Position = UDim2.new(0, 112, 0, 0),
+    Size = UDim2.new(1, -112, 1, 0),
+    BackgroundTransparency = 1,
+    ClipsDescendants = true,
+}, Body)
+
+local PageHeader = makeLabel(
+    Content,
+    "MAIN",
+    UDim2.new(1, -20, 0, 32),
+    UDim2.new(0, 12, 0, 8),
+    17,
+    COLORS.Text
+)
+PageHeader.Font = Enum.Font.GothamBold
+
+local PageSubtitle = makeLabel(
+    Content,
+    "Welcome to RAHERHUB",
+    UDim2.new(1, -20, 0, 22),
+    UDim2.new(0, 12, 0, 36),
+    10,
+    COLORS.Muted
+)
+
+local PageContainer = create("ScrollingFrame", {
+    Position = UDim2.new(0, 8, 0, 65),
+    Size = UDim2.new(1, -16, 1, -73),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = COLORS.Accent,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, Content)
+
+padding(PageContainer, 1, 5, 0, 10)
+
+local pageLayout = create("UIListLayout", {
+    Padding = UDim.new(0, 9),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+}, PageContainer)
 
 local pages = {}
+local tabButtons = {}
 
-local function createTab(text, index)
-    local button = Instance.new("TextButton")
+local tabInfo = {
+    {
+        Name = "MAIN",
+        Icon = "⌂",
+        Subtitle = "Welcome to RAHERHUB",
+    },
+    {
+        Name = "VISUALS",
+        Icon = "◉",
+        Subtitle = "Visual options",
+    },
+    {
+        Name = "MOVEMENT",
+        Icon = "➤",
+        Subtitle = "Movement controls",
+    },
+    {
+        Name = "FLY",
+        Icon = "↑",
+        Subtitle = "Flight controls",
+    },
+    {
+        Name = "TELEPORT",
+        Icon = "⌖",
+        Subtitle = "Saved locations",
+    },
+    {
+        Name = "EXPLOITS",
+        Icon = "⚡",
+        Subtitle = "Experimental modules",
+    },
+    {
+        Name = "SETTINGS",
+        Icon = "⚙",
+        Subtitle = "Interface settings",
+    },
+    {
+        Name = "UPDATES",
+        Icon = "♡",
+        Subtitle = "What's new",
+    },
+}
 
-    button.Size = UDim2.new(0.25, -4, 1, 0)
-    button.Position = UDim2.new((index - 1) * 0.25, 2, 0, 0)
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = Color3.fromRGB(180, 180, 190)
-    button.TextSize = 11
-    button.Font = Enum.Font.GothamBold
-    button.Parent = tabs
+for _, tab in ipairs(tabInfo) do
+    local page = create("Frame", {
+        Name = tab.Name,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Visible = false,
+    }, PageContainer)
 
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 7)
+    local layout = create("UIListLayout", {
+        Padding = UDim.new(0, 9),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, page)
 
-    return button
-end
+    pages[tab.Name] = page
 
-local tabMain = createTab("MAIN", 1)
-local tabFeature1 = createTab("FEATURE 1", 2)
-local tabFly = createTab("FLY", 3)
-local tabFeature2 = createTab("FEATURE 2", 4)
+    local button = create("TextButton", {
+        Name = tab.Name .. "Button",
+        Size = UDim2.new(1, 0, 0, 38),
+        BackgroundColor3 = COLORS.Panel,
+        Text = "",
+        AutoButtonColor = false,
+        LayoutOrder = #tabButtons + 1,
+    }, Sidebar)
 
---==================================================
--- PAGES
---==================================================
+    corner(button, 9)
 
-local function createPage()
-    local page = Instance.new("Frame")
+    local icon = makeLabel(
+        button,
+        tab.Icon,
+        UDim2.new(0, 25, 1, 0),
+        UDim2.new(0, 5, 0, 0),
+        16,
+        COLORS.Muted
+    )
+    icon.TextXAlignment = Enum.TextXAlignment.Center
 
-    page.Size = UDim2.new(1, -20, 1, -112)
-    page.Position = UDim2.new(0, 10, 0, 108)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.Parent = main
+    local name = makeLabel(
+        button,
+        tab.Name,
+        UDim2.new(1, -32, 1, 0),
+        UDim2.new(0, 32, 0, 0),
+        9,
+        COLORS.Muted
+    )
+    name.Font = Enum.Font.GothamBold
 
-    table.insert(pages, page)
-
-    return page
-end
-
-local mainPage = createPage()
-local feature1Page = createPage()
-local flyPage = createPage()
-local feature2Page = createPage()
-
-local function showPage(index)
-    for i, page in ipairs(pages) do
-        page.Visible = (i == index)
-    end
-
-    local buttons = {
-        tabMain,
-        tabFeature1,
-        tabFly,
-        tabFeature2
+    tabButtons[tab.Name] = {
+        Button = button,
+        Icon = icon,
+        Label = name,
     }
 
-    for i, button in ipairs(buttons) do
-        if i == index then
-            button.BackgroundColor3 = Color3.fromRGB(70, 120, 220)
-            button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-            button.TextColor3 = Color3.fromRGB(180, 180, 190)
+    button.MouseButton1Click:Connect(function()
+        State.CurrentTab = tab.Name
+
+        PageHeader.Text = tab.Name
+        PageSubtitle.Text = tab.Subtitle
+
+        for pageName, pageObject in pairs(pages) do
+            pageObject.Visible = pageName == tab.Name
+        end
+
+        for buttonName, item in pairs(tabButtons) do
+            local selected = buttonName == tab.Name
+
+            tween(item.Button, {
+                BackgroundColor3 = selected
+                    and Color3.fromRGB(46, 36, 72)
+                    or COLORS.Panel
+            }, 0.15)
+
+            item.Icon.TextColor3 = selected and COLORS.Accent2 or COLORS.Muted
+            item.Label.TextColor3 = selected and COLORS.Text or COLORS.Muted
+        end
+
+        PageContainer.CanvasPosition = Vector2.zero
+    end)
+end
+
+local function openTab(name)
+    local item = tabButtons[name]
+    if item then
+        item.Button:Activate()
+        -- Explicitly select the page for environments where Activate
+        -- does not fire MouseButton1Click.
+        State.CurrentTab = name
+        PageHeader.Text = name
+
+        for pageName, page in pairs(pages) do
+            page.Visible = pageName == name
+        end
+
+        for buttonName, tab in pairs(tabButtons) do
+            local selected = buttonName == name
+
+            tab.Button.BackgroundColor3 = selected
+                and Color3.fromRGB(46, 36, 72)
+                or COLORS.Panel
+
+            tab.Icon.TextColor3 = selected and COLORS.Accent2 or COLORS.Muted
+            tab.Label.TextColor3 = selected and COLORS.Text or COLORS.Muted
+        end
+
+        for _, tab in ipairs(tabInfo) do
+            if tab.Name == name then
+                PageSubtitle.Text = tab.Subtitle
+                break
+            end
         end
     end
 end
 
-tabMain.MouseButton1Click:Connect(function()
-    showPage(1)
-end)
+--==================================================
+-- CARD / ROW HELPERS
+--==================================================
 
-tabFeature1.MouseButton1Click:Connect(function()
-    showPage(2)
-end)
+local function makeCard(parent, height, title, subtitle)
+    local card = create("Frame", {
+        Size = UDim2.new(1, 0, 0, height),
+        BackgroundColor3 = COLORS.Panel,
+        BorderSizePixel = 0,
+    }, parent)
 
-tabFly.MouseButton1Click:Connect(function()
-    showPage(3)
-end)
+    corner(card, 11)
+    stroke(card, COLORS.Border, 1)
 
-tabFeature2.MouseButton1Click:Connect(function()
-    showPage(4)
-end)
+    local titleLabel = makeLabel(
+        card,
+        title,
+        UDim2.new(1, -22, 0, 24),
+        UDim2.new(0, 11, 0, 8),
+        13,
+        COLORS.Text
+    )
+    titleLabel.Font = Enum.Font.GothamBold
+
+    if subtitle then
+        makeLabel(
+            card,
+            subtitle,
+            UDim2.new(1, -22, 0, 30),
+            UDim2.new(0, 11, 0, 31),
+            10,
+            COLORS.Muted
+        )
+    end
+
+    return card
+end
+
+local function makeToggle(parent, title, description, defaultValue, callback)
+    local card = makeCard(parent, 66, title, description)
+
+    local toggle = create("TextButton", {
+        Size = UDim2.new(0, 42, 0, 24),
+        Position = UDim2.new(1, -53, 0.5, -12),
+        BackgroundColor3 = defaultValue and COLORS.Accent or COLORS.PanelLight,
+        Text = "",
+        AutoButtonColor = false,
+    }, card)
+    corner(toggle, 12)
+
+    local knob = create("Frame", {
+        Size = UDim2.fromOffset(18, 18),
+        Position = defaultValue
+            and UDim2.new(1, -21, 0.5, -9)
+            or UDim2.new(0, 3, 0.5, -9),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+    }, toggle)
+    corner(knob, 9)
+
+    local enabled = defaultValue
+
+    local function setEnabled(value)
+        enabled = value
+
+        tween(toggle, {
+            BackgroundColor3 = enabled and COLORS.Accent or COLORS.PanelLight
+        }, 0.15)
+
+        tween(knob, {
+            Position = enabled
+                and UDim2.new(1, -21, 0.5, -9)
+                or UDim2.new(0, 3, 0.5, -9)
+        }, 0.15)
+
+        callback(enabled)
+    end
+
+    toggle.MouseButton1Click:Connect(function()
+        setEnabled(not enabled)
+    end)
+
+    return {
+        Set = setEnabled,
+        Get = function()
+            return enabled
+        end,
+        Button = toggle,
+    }
+end
+
+local function makeAction(parent, title, description, buttonText, callback)
+    local card = makeCard(parent, 75, title, description)
+
+    local button = makeButton(
+        card,
+        buttonText,
+        UDim2.new(0, 82, 0, 32),
+        UDim2.new(1, -94, 0.5, -16)
+    )
+
+    button.MouseButton1Click:Connect(callback)
+
+    return card, button
+end
 
 --==================================================
 -- ESP
 --==================================================
 
-local espEnabled = false
-local espObjects = {}
+local function removeESP(player)
+    local highlight = ESPObjects[player]
+
+    if highlight then
+        highlight:Destroy()
+        ESPObjects[player] = nil
+    end
+end
 
 local function addESP(player)
-    if player == LocalPlayer then
+    if player == LocalPlayer or not State.ESP then
         return
     end
 
     local character = player.Character
-
     if not character then
         return
     end
 
-    if espObjects[player] then
-        espObjects[player]:Destroy()
-        espObjects[player] = nil
-    end
+    removeESP(player)
 
     local highlight = Instance.new("Highlight")
-    highlight.Name = "RAHER_ESP"
+    highlight.Name = "RAHERHUB_ESP"
     highlight.Adornee = character
-    highlight.FillColor = Color3.fromRGB(255, 60, 60)
-    highlight.FillTransparency = 0.55
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillColor = COLORS.Accent
+    highlight.OutlineColor = COLORS.Accent2
+    highlight.FillTransparency = 0.65
     highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = character
 
-    espObjects[player] = highlight
+    ESPObjects[player] = highlight
 end
 
-local function removeESP(player)
-    if espObjects[player] then
-        espObjects[player]:Destroy()
-        espObjects[player] = nil
-    end
-end
+local function setESP(enabled)
+    State.ESP = enabled
 
-local function updateESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if espEnabled then
-                addESP(player)
-            else
-                removeESP(player)
-            end
+    if enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            addESP(player)
+        end
+    else
+        for player in pairs(ESPObjects) do
+            removeESP(player)
         end
     end
 end
@@ -461,8 +1007,7 @@ end
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function()
         task.wait(0.5)
-
-        if espEnabled then
+        if State.ESP then
             addESP(player)
         end
     end)
@@ -470,794 +1015,930 @@ end)
 
 Players.PlayerRemoving:Connect(removeESP)
 
-local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(1, 0, 0, 48)
-espButton.Position = UDim2.new(0, 0, 0, 5)
-espButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-espButton.BorderSizePixel = 0
-espButton.Text = "ESP: OFF"
-espButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-espButton.TextSize = 14
-espButton.TextXAlignment = Enum.TextXAlignment.Left
-espButton.Font = Enum.Font.GothamMedium
-espButton.Parent = mainPage
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if State.ESP then
+                addESP(player)
+            end
+        end)
+    end
+end
 
-local espPadding = Instance.new("UIPadding")
-espPadding.PaddingLeft = UDim.new(0, 15)
-espPadding.Parent = espButton
+--==================================================
+-- SPEED
+--==================================================
 
-Instance.new("UICorner", espButton).CornerRadius = UDim.new(0, 9)
+local function applySpeed()
+    local humanoid = getHumanoid()
 
-espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-
-    if espEnabled then
-        espButton.Text = "ESP: ON"
-        espButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-    else
-        espButton.Text = "ESP: OFF"
-        espButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    if not humanoid then
+        return
     end
 
-    updateESP()
+    if State.Speed then
+        humanoid.WalkSpeed = State.SpeedValue
+    else
+        humanoid.WalkSpeed = 16
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    applySpeed()
 end)
 
 --==================================================
 -- NOCLIP
 --==================================================
 
-local noclipEnabled = false
+local function setNoclip(enabled)
+    State.Noclip = enabled
 
-local noclipButton = Instance.new("TextButton")
-noclipButton.Size = UDim2.new(1, 0, 0, 48)
-noclipButton.Position = UDim2.new(0, 0, 0, 60)
-noclipButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-noclipButton.BorderSizePixel = 0
-noclipButton.Text = "NOCLIP: OFF"
-noclipButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-noclipButton.TextSize = 14
-noclipButton.TextXAlignment = Enum.TextXAlignment.Left
-noclipButton.Font = Enum.Font.GothamMedium
-noclipButton.Parent = mainPage
+    if not enabled then
+        for part, originalValue in pairs(SavedCollision) do
+            if part and part.Parent then
+                part.CanCollide = originalValue
+            end
+        end
 
-local noclipPadding = Instance.new("UIPadding")
-noclipPadding.PaddingLeft = UDim.new(0, 15)
-noclipPadding.Parent = noclipButton
-
-Instance.new("UICorner", noclipButton).CornerRadius = UDim.new(0, 9)
-
-noclipButton.MouseButton1Click:Connect(function()
-    noclipEnabled = not noclipEnabled
-
-    if noclipEnabled then
-        noclipButton.Text = "NOCLIP: ON"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-    else
-        noclipButton.Text = "NOCLIP: OFF"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        table.clear(SavedCollision)
     end
-end)
+end
 
 RunService.Stepped:Connect(function()
-    if noclipEnabled then
-        local character = LocalPlayer.Character
-
-        if character then
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
+    if not State.Noclip then
+        return
     end
-end)
 
---==================================================
--- SPEED
---==================================================
-
-local speedEnabled = false
-local speedValue = 16
-local normalSpeed = 16
-
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(1, 0, 0, 48)
-speedButton.Position = UDim2.new(0, 0, 0, 115)
-speedButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-speedButton.BorderSizePixel = 0
-speedButton.Text = "SPEED: OFF"
-speedButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-speedButton.TextSize = 14
-speedButton.TextXAlignment = Enum.TextXAlignment.Left
-speedButton.Font = Enum.Font.GothamMedium
-speedButton.Parent = mainPage
-
-local speedPadding = Instance.new("UIPadding")
-speedPadding.PaddingLeft = UDim.new(0, 15)
-speedPadding.Parent = speedButton
-
-Instance.new("UICorner", speedButton).CornerRadius = UDim.new(0, 9)
-
-speedButton.MouseButton1Click:Connect(function()
-    speedEnabled = not speedEnabled
-
-    if speedEnabled then
-        speedButton.Text = "SPEED: ON"
-        speedButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-    else
-        speedButton.Text = "SPEED: OFF"
-        speedButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-
-        local character = LocalPlayer.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-        if humanoid then
-            humanoid.WalkSpeed = normalSpeed
-        end
-    end
-end)
-
-local speedValueLabel = Instance.new("TextLabel")
-speedValueLabel.Size = UDim2.new(1, 0, 0, 25)
-speedValueLabel.Position = UDim2.new(0, 0, 0, 168)
-speedValueLabel.BackgroundTransparency = 1
-speedValueLabel.Text = "WalkSpeed: 16"
-speedValueLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
-speedValueLabel.TextSize = 13
-speedValueLabel.Font = Enum.Font.GothamMedium
-speedValueLabel.Parent = mainPage
-
-local sliderBack = Instance.new("Frame")
-sliderBack.Size = UDim2.new(1, -20, 0, 8)
-sliderBack.Position = UDim2.new(0, 10, 0, 202)
-sliderBack.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-sliderBack.BorderSizePixel = 0
-sliderBack.Parent = mainPage
-
-Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(1, 0)
-
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(0, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(70, 120, 220)
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBack
-
-Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
-
-local sliderKnob = Instance.new("TextButton")
-sliderKnob.Size = UDim2.new(0, 22, 0, 22)
-sliderKnob.Position = UDim2.new(0, -11, 0.5, -11)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.Text = ""
-sliderKnob.AutoButtonColor = false
-sliderKnob.Parent = sliderBack
-
-Instance.new("UICorner", sliderKnob).CornerRadius = UDim.new(1, 0)
-
-local minSpeed = 16
-local maxSpeed = 1000
-local sliderDragging = false
-
-local function updateSpeedFromPosition(x)
-    local absolutePosition = sliderBack.AbsolutePosition.X
-    local absoluteSize = sliderBack.AbsoluteSize.X
-
-    local percent = (x - absolutePosition) / absoluteSize
-    percent = math.clamp(percent, 0, 1)
-
-    speedValue = math.floor(
-        minSpeed + ((maxSpeed - minSpeed) * percent)
-    )
-
-    speedValue = math.clamp(speedValue, minSpeed, maxSpeed)
-
-    local normalized =
-        (speedValue - minSpeed) /
-        (maxSpeed - minSpeed)
-
-    sliderFill.Size = UDim2.new(normalized, 0, 1, 0)
-
-    sliderKnob.Position =
-        UDim2.new(normalized, -11, 0.5, -11)
-
-    speedValueLabel.Text =
-        "WalkSpeed: " .. tostring(speedValue)
-
-    if speedEnabled then
-        local character = LocalPlayer.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-        if humanoid then
-            humanoid.WalkSpeed = speedValue
-        end
-    end
-end
-
-sliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        sliderDragging = true
-    end
-end)
-
-sliderBack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        sliderDragging = true
-        updateSpeedFromPosition(input.Position.X)
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if sliderDragging then
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            updateSpeedFromPosition(input.Position.X)
-        end
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        sliderDragging = false
-    end
-end)
-
-local minLabel = Instance.new("TextLabel")
-minLabel.Size = UDim2.new(0, 40, 0, 20)
-minLabel.Position = UDim2.new(0, 0, 0, 215)
-minLabel.BackgroundTransparency = 1
-minLabel.Text = "16"
-minLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
-minLabel.TextSize = 11
-minLabel.Font = Enum.Font.Gotham
-minLabel.Parent = mainPage
-
-local maxLabel = Instance.new("TextLabel")
-maxLabel.Size = UDim2.new(0, 50, 0, 20)
-maxLabel.Position = UDim2.new(1, -50, 0, 215)
-maxLabel.BackgroundTransparency = 1
-maxLabel.Text = "1000"
-maxLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
-maxLabel.TextSize = 11
-maxLabel.Font = Enum.Font.Gotham
-maxLabel.TextXAlignment = Enum.TextXAlignment.Right
-maxLabel.Parent = mainPage
-
-RunService.Heartbeat:Connect(function()
-    if speedEnabled then
-        local character = LocalPlayer.Character
-
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid and humanoid.WalkSpeed ~= speedValue then
-                humanoid.WalkSpeed = speedValue
-            end
-        end
-    end
-end)
-
---==================================================
--- TELEPORT POINTS
---==================================================
-
-local teleportPoints = {}
-local pointNumber = 0
-
-local pointList = Instance.new("ScrollingFrame")
-pointList.Size = UDim2.new(1, 0, 0, 245)
-pointList.Position = UDim2.new(0, 0, 0, 105)
-pointList.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-pointList.BorderSizePixel = 0
-pointList.ScrollBarThickness = 4
-pointList.CanvasSize = UDim2.new(0, 0, 0, 0)
-pointList.Parent = feature1Page
-
-Instance.new("UICorner", pointList).CornerRadius = UDim.new(0, 9)
-
-local pointLayout = Instance.new("UIListLayout")
-pointLayout.Padding = UDim.new(0, 6)
-pointLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-pointLayout.SortOrder = Enum.SortOrder.LayoutOrder
-pointLayout.Parent = pointList
-
-local pointPadding = Instance.new("UIPadding")
-pointPadding.PaddingTop = UDim.new(0, 7)
-pointPadding.PaddingBottom = UDim.new(0, 7)
-pointPadding.PaddingLeft = UDim.new(0, 7)
-pointPadding.PaddingRight = UDim.new(0, 7)
-pointPadding.Parent = pointList
-
-local pointInfo = Instance.new("TextLabel")
-pointInfo.Size = UDim2.new(1, 0, 0, 30)
-pointInfo.Position = UDim2.new(0, 0, 0, 70)
-pointInfo.BackgroundTransparency = 1
-pointInfo.Text = "Saved points"
-pointInfo.TextColor3 = Color3.fromRGB(160, 160, 170)
-pointInfo.TextSize = 12
-pointInfo.Font = Enum.Font.GothamMedium
-pointInfo.Parent = feature1Page
-
-local createPointButton = Instance.new("TextButton")
-createPointButton.Size = UDim2.new(1, 0, 0, 48)
-createPointButton.Position = UDim2.new(0, 0, 0, 5)
-createPointButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-createPointButton.BorderSizePixel = 0
-createPointButton.Text = "+ CREATE POINT"
-createPointButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-createPointButton.TextSize = 14
-createPointButton.Font = Enum.Font.GothamBold
-createPointButton.Parent = feature1Page
-
-Instance.new("UICorner", createPointButton).CornerRadius = UDim.new(0, 9)
-
-local function updatePointCanvas()
-    task.wait()
-
-    pointList.CanvasSize = UDim2.new(
-        0,
-        0,
-        0,
-        pointLayout.AbsoluteContentSize.Y + 14
-    )
-end
-
-local function createPointEntry(pointData)
-    local entry = Instance.new("Frame")
-
-    entry.Size = UDim2.new(1, 0, 0, 52)
-    entry.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
-    entry.BorderSizePixel = 0
-    entry.LayoutOrder = pointData.id
-    entry.Parent = pointList
-
-    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 8)
-
-    local teleportButton = Instance.new("TextButton")
-    teleportButton.Size = UDim2.new(1, -70, 1, 0)
-    teleportButton.Position = UDim2.new(0, 0, 0, 0)
-    teleportButton.BackgroundTransparency = 1
-    teleportButton.Text =
-        "  Point " .. tostring(pointData.id)
-    teleportButton.TextColor3 = Color3.fromRGB(235, 235, 240)
-    teleportButton.TextSize = 13
-    teleportButton.TextXAlignment = Enum.TextXAlignment.Left
-    teleportButton.Font = Enum.Font.GothamMedium
-    teleportButton.Parent = entry
-
-    local deleteButton = Instance.new("TextButton")
-    deleteButton.Size = UDim2.new(0, 58, 0, 38)
-    deleteButton.Position = UDim2.new(1, -62, 0.5, -19)
-    deleteButton.BackgroundColor3 = Color3.fromRGB(130, 45, 50)
-    deleteButton.BorderSizePixel = 0
-    deleteButton.Text = "×"
-    deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    deleteButton.TextSize = 20
-    deleteButton.Font = Enum.Font.GothamBold
-    deleteButton.Parent = entry
-
-    Instance.new("UICorner", deleteButton).CornerRadius = UDim.new(0, 7)
-
-    teleportButton.MouseButton1Click:Connect(function()
-        local character = LocalPlayer.Character
-
-        if not character then
-            return
-        end
-
-        local root = character:FindFirstChild("HumanoidRootPart")
-
-        if not root then
-            return
-        end
-
-        root.CFrame = pointData.cframe
-    end)
-
-    deleteButton.MouseButton1Click:Connect(function()
-        for i, point in ipairs(teleportPoints) do
-            if point == pointData then
-                table.remove(teleportPoints, i)
-                break
-            end
-        end
-
-        entry:Destroy()
-        updatePointCanvas()
-    end)
-
-    return entry
-end
-
-createPointButton.MouseButton1Click:Connect(function()
-    local character = LocalPlayer.Character
-
+    local character = getCharacter()
     if not character then
         return
     end
 
-    local root = character:FindFirstChild("HumanoidRootPart")
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if SavedCollision[part] == nil then
+                SavedCollision[part] = part.CanCollide
+            end
 
-    if not root then
-        return
-    end
-
-    pointNumber += 1
-
-    local pointData = {
-        id = pointNumber,
-        cframe = root.CFrame
-    }
-
-    table.insert(teleportPoints, pointData)
-
-    createPointEntry(pointData)
-    updatePointCanvas()
-end)
-
-pointLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(
-    updatePointCanvas
-)
-
---==================================================
--- FLY
---==================================================
-
-local flyEnabled = false
-local flyHolding = false
-local flyMoveMode = false
-local flyDragging = false
-
-local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0, 60, 0, 60)
-flyButton.Position = UDim2.new(0.78, 0, 0.48, 0)
-flyButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-flyButton.BorderSizePixel = 0
-flyButton.Text = "↑"
-flyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyButton.TextSize = 28
-flyButton.Font = Enum.Font.GothamBold
-flyButton.Visible = true
-flyButton.Parent = ScreenGui
-
-Instance.new("UICorner", flyButton).CornerRadius = UDim.new(1, 0)
-
-flyButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        if flyMoveMode then
-            flyDragging = true
-        elseif flyEnabled then
-            flyHolding = true
+            part.CanCollide = false
         end
     end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        flyHolding = false
-        flyDragging = false
-    end
+LocalPlayer.CharacterAdded:Connect(function()
+    table.clear(SavedCollision)
 end)
 
+--==================================================
+-- FLY JUMP CONTROL
+--==================================================
+
+local FlyButton = create("TextButton", {
+    Name = "RAHERHUB_FlyButton",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.83, 0, 0.72, 0),
+    Size = UDim2.fromOffset(58, 58),
+    BackgroundColor3 = COLORS.Accent,
+    Text = "↑",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamBlack,
+    TextSize = 27,
+    Visible = false,
+    AutoButtonColor = false,
+    ZIndex = 20,
+}, ScreenGui)
+
+corner(FlyButton, 29)
+stroke(FlyButton, COLORS.Accent2, 2)
+
+create("UIGradient", {
+    Color = ACCENT_GRADIENT,
+    Rotation = 45,
+}, FlyButton)
+
+local flyDrag = false
 local flyDragStart
-local flyStartPos
+local flyStartPosition
+local flyMoved = false
+
+FlyButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+        flyDrag = true
+        flyMoved = false
+        flyDragStart = input.Position
+        flyStartPosition = FlyButton.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                flyDrag = false
+            end
+        end)
+    end
+end)
 
 UIS.InputChanged:Connect(function(input)
-    if flyDragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
-    ) then
+    if flyDrag and State.FlyMoveMode then
+        if input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseMovement then
 
-        if not flyDragStart then
-            flyDragStart = input.Position
-            flyStartPos = flyButton.Position
-        end
+            local delta = input.Position - flyDragStart
 
-        local delta = input.Position - flyDragStart
+            if delta.Magnitude > 5 then
+                flyMoved = true
+            end
 
-        flyButton.Position = UDim2.new(
-            flyStartPos.X.Scale,
-            flyStartPos.X.Offset + delta.X,
-            flyStartPos.Y.Scale,
-            flyStartPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        flyDragStart = nil
-        flyStartPos = nil
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if flyEnabled and flyHolding and not flyMoveMode then
-        local character = LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-
-        if root then
-            local velocity = root.AssemblyLinearVelocity
-
-            root.AssemblyLinearVelocity = Vector3.new(
-                velocity.X,
-                45,
-                velocity.Z
+            FlyButton.Position = UDim2.new(
+                flyStartPosition.X.Scale,
+                flyStartPosition.X.Offset + delta.X,
+                flyStartPosition.Y.Scale,
+                flyStartPosition.Y.Offset + delta.Y
             )
         end
     end
 end)
 
+FlyButton.Activated:Connect(function()
+    if flyMoved then
+        return
+    end
+
+    if not State.Fly then
+        return
+    end
+
+    State.FlyHolding = true
+
+    task.delay(0.18, function()
+        if State.FlyHolding then
+            local humanoid = getHumanoid()
+
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        State.FlyHolding = false
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if not State.Fly or not State.FlyHolding then
+        return
+    end
+
+    local root = getRoot()
+    if not root then
+        return
+    end
+
+    local velocity = root.AssemblyLinearVelocity
+
+    root.AssemblyLinearVelocity = Vector3.new(
+        velocity.X,
+        45,
+        velocity.Z
+    )
+end)
+
+local function setFly(enabled)
+    State.Fly = enabled
+    State.FlyHolding = false
+    FlyButton.Visible = enabled
+
+    tween(FlyButton, {
+        BackgroundTransparency = enabled and 0 or 1
+    }, 0.15)
+end
+
+--==================================================
+-- TELEPORT POINTS
+--==================================================
+
+local function teleportToPoint(point)
+    local root = getRoot()
+
+    if not root or not point or not point.CFrame then
+        return
+    end
+
+    root.CFrame = point.CFrame + Vector3.new(0, 3, 0)
+end
+
+local function makePointCard(parent, point)
+    local card = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 76),
+        BackgroundColor3 = COLORS.Panel,
+        BorderSizePixel = 0,
+    }, parent)
+
+    corner(card, 10)
+    stroke(card, COLORS.Border, 1)
+
+    local nameLabel = makeLabel(
+        card,
+        point.Name,
+        UDim2.new(1, -110, 0, 24),
+        UDim2.new(0, 10, 0, 7),
+        12,
+        COLORS.Text
+    )
+    nameLabel.Font = Enum.Font.GothamBold
+
+    makeLabel(
+        card,
+        string.format(
+            "X: %.1f   Y: %.1f   Z: %.1f",
+            point.CFrame.Position.X,
+            point.CFrame.Position.Y,
+            point.CFrame.Position.Z
+        ),
+        UDim2.new(1, -110, 0, 20),
+        UDim2.new(0, 10, 0, 33),
+        9,
+        COLORS.Muted
+    )
+
+    local goButton = makeButton(
+        card,
+        "GO",
+        UDim2.new(0, 43, 0, 29),
+        UDim2.new(1, -98, 0, 9)
+    )
+
+    goButton.BackgroundColor3 = Color3.fromRGB(42, 34, 68)
+
+    local deleteButton = makeButton(
+        card,
+        "×",
+        UDim2.new(0, 35, 0, 29),
+        UDim2.new(1, -46, 0, 9)
+    )
+    deleteButton.TextColor3 = COLORS.Red
+    deleteButton.TextSize = 20
+
+    goButton.MouseButton1Click:Connect(function()
+        teleportToPoint(point)
+    end)
+
+    deleteButton.MouseButton1Click:Connect(function()
+        for index, existing in ipairs(State.Points) do
+            if existing.Id == point.Id then
+                table.remove(State.Points, index)
+                break
+            end
+        end
+
+        card:Destroy()
+    end)
+
+    return card
+end
+
+local function refreshPointList(list)
+    for _, child in ipairs(list:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+
+    for _, point in ipairs(State.Points) do
+        makePointCard(list, point)
+    end
+end
+
+--==================================================
+-- MAIN PAGE
+--==================================================
+
+do
+    local page = pages.MAIN
+
+    local hero = makeCard(
+        page,
+        105,
+        "Welcome back!",
+        "Your personal hub is ready."
+    )
+
+    local heroVersion = makeLabel(
+        hero,
+        "RAHERHUB " .. VERSION .. "  💗",
+        UDim2.new(1, -22, 0, 25),
+        UDim2.new(0, 11, 1, -34),
+        12,
+        COLORS.Accent2
+    )
+    heroVersion.Font = Enum.Font.GothamBold
+
+    local statusCard = makeCard(
+        page,
+        82,
+        "SYSTEM STATUS",
+        "Interface initialized successfully."
+    )
+
+    local status = makeLabel(
+        statusCard,
+        "● ONLINE",
+        UDim2.new(1, -22, 0, 20),
+        UDim2.new(0, 11, 1, -28),
+        11,
+        COLORS.Green
+    )
+    status.Font = Enum.Font.GothamBold
+
+    makeAction(
+        page,
+        "VISUALS",
+        "Configure visual modules.",
+        "OPEN",
+        function()
+            openTab("VISUALS")
+        end
+    )
+
+    makeAction(
+        page,
+        "MOVEMENT",
+        "Speed and noclip controls.",
+        "OPEN",
+        function()
+            openTab("MOVEMENT")
+        end
+    )
+
+    makeAction(
+        page,
+        "TELEPORT",
+        "Manage your saved locations.",
+        "OPEN",
+        function()
+            openTab("TELEPORT")
+        end
+    )
+end
+
+--==================================================
+-- VISUALS PAGE
+--==================================================
+
+do
+    local page = pages.VISUALS
+
+    makeToggle(
+        page,
+        "PLAYER ESP",
+        "Highlight other players.",
+        false,
+        function(enabled)
+            setESP(enabled)
+        end
+    )
+
+    makeCard(
+        page,
+        82,
+        "ESP INFORMATION",
+        "Uses Roblox Highlight objects. Visibility and behavior may depend on the game."
+    )
+end
+
+--==================================================
+-- MOVEMENT PAGE
+--==================================================
+
+do
+    local page = pages.MOVEMENT
+
+    makeToggle(
+        page,
+        "SPEED",
+        "Change your local WalkSpeed.",
+        false,
+        function(enabled)
+            State.Speed = enabled
+            applySpeed()
+        end
+    )
+
+    local speedCard = makeCard(
+        page,
+        106,
+        "SPEED VALUE",
+        "Choose a value from 16 to 1000."
+    )
+
+    local speedValueLabel = makeLabel(
+        speedCard,
+        tostring(State.SpeedValue),
+        UDim2.new(0, 70, 0, 22),
+        UDim2.new(1, -82, 0, 8),
+        14,
+        COLORS.Accent2
+    )
+    speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    speedValueLabel.Font = Enum.Font.GothamBold
+
+    local sliderBack = create("Frame", {
+        Position = UDim2.new(0, 12, 0, 61),
+        Size = UDim2.new(1, -24, 0, 8),
+        BackgroundColor3 = COLORS.PanelLight,
+        BorderSizePixel = 0,
+    }, speedCard)
+    corner(sliderBack, 5)
+
+    local sliderFill = create("Frame", {
+        Size = UDim2.new(
+            (State.SpeedValue - 16) / (1000 - 16),
+            0,
+            1,
+            0
+        ),
+        BackgroundColor3 = COLORS.Accent,
+        BorderSizePixel = 0,
+    }, sliderBack)
+    corner(sliderFill, 5)
+
+    create("UIGradient", {
+        Color = ACCENT_GRADIENT,
+    }, sliderFill)
+
+    local sliderKnob = create("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(
+            (State.SpeedValue - 16) / (1000 - 16),
+            0,
+            0.5,
+            0
+        ),
+        Size = UDim2.fromOffset(17, 17),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+    }, sliderBack)
+    corner(sliderKnob, 9)
+    stroke(sliderKnob, COLORS.Accent, 2)
+
+    local sliderButton = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 32),
+        Position = UDim2.new(0, 0, 0, -12),
+        BackgroundTransparency = 1,
+        Text = "",
+        AutoButtonColor = false,
+    }, sliderBack)
+
+    local sliderDragging = false
+
+    local function updateSpeedSlider(input)
+        local width = sliderBack.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local x = input.Position.X - sliderBack.AbsolutePosition.X
+        local alpha = math.clamp(x / width, 0, 1)
+
+        State.SpeedValue = math.floor(16 + alpha * (1000 - 16))
+        speedValueLabel.Text = tostring(State.SpeedValue)
+
+        sliderFill.Size = UDim2.new(alpha, 0, 1, 0)
+        sliderKnob.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+        if State.Speed then
+            applySpeed()
+        end
+    end
+
+    sliderButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            sliderDragging = true
+            updateSpeedSlider(input)
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if sliderDragging and (
+            input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        ) then
+            updateSpeedSlider(input)
+        end
+    end)
+
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            sliderDragging = false
+        end
+    end)
+
+    makeToggle(
+        page,
+        "NOCLIP",
+        "Disable character part collisions locally.",
+        false,
+        function(enabled)
+            setNoclip(enabled)
+        end
+    )
+end
+
 --==================================================
 -- FLY PAGE
 --==================================================
 
-local flyJumpButton = Instance.new("TextButton")
-flyJumpButton.Size = UDim2.new(1, 0, 0, 48)
-flyJumpButton.Position = UDim2.new(0, 0, 0, 5)
-flyJumpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-flyJumpButton.BorderSizePixel = 0
-flyJumpButton.Text = "FLY JUMP: OFF"
-flyJumpButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-flyJumpButton.TextSize = 14
-flyJumpButton.TextXAlignment = Enum.TextXAlignment.Left
-flyJumpButton.Font = Enum.Font.GothamMedium
-flyJumpButton.Parent = flyPage
+do
+    local page = pages.FLY
 
-local flyJumpPadding = Instance.new("UIPadding")
-flyJumpPadding.PaddingLeft = UDim.new(0, 15)
-flyJumpPadding.Parent = flyJumpButton
+    makeToggle(
+        page,
+        "FLY JUMP",
+        "Hold the floating arrow to move upward.",
+        false,
+        function(enabled)
+            setFly(enabled)
+        end
+    )
 
-Instance.new("UICorner", flyJumpButton).CornerRadius = UDim.new(0, 9)
+    makeToggle(
+        page,
+        "MOVE BUTTON MODE",
+        "Drag the floating button to reposition it.",
+        false,
+        function(enabled)
+            State.FlyMoveMode = enabled
+        end
+    )
 
-flyJumpButton.MouseButton1Click:Connect(function()
-    flyEnabled = not flyEnabled
+    makeAction(
+        page,
+        "BUTTON SIZE",
+        "Increase the floating button size.",
+        "+",
+        function()
+            FlyButton.Size = UDim2.fromOffset(
+                math.clamp(FlyButton.AbsoluteSize.X + 5, 40, 100),
+                math.clamp(FlyButton.AbsoluteSize.Y + 5, 40, 100)
+            )
+        end
+    )
 
-    if flyEnabled then
-        flyJumpButton.Text = "FLY JUMP: ON"
-        flyJumpButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-    else
-        flyJumpButton.Text = "FLY JUMP: OFF"
-        flyJumpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        flyHolding = false
-    end
-end)
+    makeAction(
+        page,
+        "BUTTON SIZE",
+        "Decrease the floating button size.",
+        "−",
+        function()
+            FlyButton.Size = UDim2.fromOffset(
+                math.clamp(FlyButton.AbsoluteSize.X - 5, 40, 100),
+                math.clamp(FlyButton.AbsoluteSize.Y - 5, 40, 100)
+            )
+        end
+    )
 
-local moveFlyButton = Instance.new("TextButton")
-moveFlyButton.Size = UDim2.new(1, 0, 0, 48)
-moveFlyButton.Position = UDim2.new(0, 0, 0, 60)
-moveFlyButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-moveFlyButton.BorderSizePixel = 0
-moveFlyButton.Text = "MOVE FLY BUTTON: OFF"
-moveFlyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-moveFlyButton.TextSize = 14
-moveFlyButton.TextXAlignment = Enum.TextXAlignment.Left
-moveFlyButton.Font = Enum.Font.GothamMedium
-moveFlyButton.Parent = flyPage
+    makeAction(
+        page,
+        "BUTTON POSITION",
+        "Return the arrow to its default location.",
+        "RESET",
+        function()
+            FlyButton.Position = UDim2.new(0.83, 0, 0.72, 0)
+        end
+    )
 
-local moveFlyPadding = Instance.new("UIPadding")
-moveFlyPadding.PaddingLeft = UDim.new(0, 15)
-moveFlyPadding.Parent = moveFlyButton
-
-Instance.new("UICorner", moveFlyButton).CornerRadius = UDim.new(0, 9)
-
-moveFlyButton.MouseButton1Click:Connect(function()
-    flyMoveMode = not flyMoveMode
-
-    if flyMoveMode then
-        moveFlyButton.Text = "MOVE FLY BUTTON: ON"
-        moveFlyButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-        flyHolding = false
-    else
-        moveFlyButton.Text = "MOVE FLY BUTTON: OFF"
-        moveFlyButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    end
-end)
-
---==================================================
--- FLY SIZE
---==================================================
-
-local flySize = 60
-
-local sizeLabel = Instance.new("TextLabel")
-sizeLabel.Size = UDim2.new(1, 0, 0, 30)
-sizeLabel.Position = UDim2.new(0, 0, 0, 118)
-sizeLabel.BackgroundTransparency = 1
-sizeLabel.Text = "FLY BUTTON SIZE: 60"
-sizeLabel.TextColor3 = Color3.fromRGB(210, 210, 220)
-sizeLabel.TextSize = 13
-sizeLabel.Font = Enum.Font.GothamMedium
-sizeLabel.Parent = flyPage
-
-local minusButton = Instance.new("TextButton")
-minusButton.Size = UDim2.new(0.48, -5, 0, 42)
-minusButton.Position = UDim2.new(0, 0, 0, 150)
-minusButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-minusButton.BorderSizePixel = 0
-minusButton.Text = "−"
-minusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minusButton.TextSize = 22
-minusButton.Font = Enum.Font.GothamBold
-minusButton.Parent = flyPage
-
-Instance.new("UICorner", minusButton).CornerRadius = UDim.new(0, 8)
-
-local plusButton = Instance.new("TextButton")
-plusButton.Size = UDim2.new(0.48, -5, 0, 42)
-plusButton.Position = UDim2.new(0.52, 5, 0, 150)
-plusButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-plusButton.BorderSizePixel = 0
-plusButton.Text = "+"
-plusButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-plusButton.TextSize = 22
-plusButton.Font = Enum.Font.GothamBold
-plusButton.Parent = flyPage
-
-Instance.new("UICorner", plusButton).CornerRadius = UDim.new(0, 8)
-
-local function updateFlySize()
-    flyButton.Size = UDim2.new(0, flySize, 0, flySize)
-    sizeLabel.Text = "FLY BUTTON SIZE: " .. tostring(flySize)
+    makeCard(
+        page,
+        80,
+        "HOW TO USE",
+        "Enable FLY JUMP, then hold the floating arrow. This is an upward-jump control, not a full directional flight system."
+    )
 end
 
-minusButton.MouseButton1Click:Connect(function()
-    flySize = math.clamp(flySize - 10, 40, 100)
-    updateFlySize()
-end)
-
-plusButton.MouseButton1Click:Connect(function()
-    flySize = math.clamp(flySize + 10, 40, 100)
-    updateFlySize()
-end)
-
 --==================================================
--- RESET FLY
+-- TELEPORT PAGE
 --==================================================
 
-local resetFlyButton = Instance.new("TextButton")
-resetFlyButton.Size = UDim2.new(1, 0, 0, 45)
-resetFlyButton.Position = UDim2.new(0, 0, 0, 205)
-resetFlyButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-resetFlyButton.BorderSizePixel = 0
-resetFlyButton.Text = "RESET FLY POSITION"
-resetFlyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-resetFlyButton.TextSize = 13
-resetFlyButton.Font = Enum.Font.GothamBold
-resetFlyButton.Parent = flyPage
+do
+    local page = pages.TELEPORT
 
-Instance.new("UICorner", resetFlyButton).CornerRadius = UDim.new(0, 9)
+    local createCard = makeCard(
+        page,
+        120,
+        "CREATE LOCATION",
+        "Save your current position for this session."
+    )
 
-resetFlyButton.MouseButton1Click:Connect(function()
-    flyButton.Position = UDim2.new(0.78, 0, 0.48, 0)
+    local pointNameBox = create("TextBox", {
+        Position = UDim2.new(0, 10, 0, 65),
+        Size = UDim2.new(0.57, -8, 0, 34),
+        BackgroundColor3 = COLORS.PanelLight,
+        Text = "",
+        PlaceholderText = "Location name",
+        PlaceholderColor3 = COLORS.Muted,
+        TextColor3 = COLORS.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        ClearTextOnFocus = false,
+    }, createCard)
+    corner(pointNameBox, 8)
+    stroke(pointNameBox, COLORS.Border, 1)
 
-    flySize = 60
-    updateFlySize()
-end)
+    local savePointButton = makeButton(
+        createCard,
+        "SAVE POINT",
+        UDim2.new(0.43, -8, 0, 34),
+        UDim2.new(0.57, 0, 0, 65)
+    )
+    savePointButton.BackgroundColor3 = Color3.fromRGB(43, 34, 70)
 
-local flyInfo = Instance.new("TextLabel")
-flyInfo.Size = UDim2.new(1, 0, 0, 60)
-flyInfo.Position = UDim2.new(0, 0, 0, 260)
-flyInfo.BackgroundTransparency = 1
-flyInfo.Text = "Hold ↑ to rise.\nRelease to stop forcing upward movement."
-flyInfo.TextColor3 = Color3.fromRGB(145, 145, 155)
-flyInfo.TextSize = 12
-flyInfo.Font = Enum.Font.Gotham
-flyInfo.TextWrapped = true
-flyInfo.Parent = flyPage
+    local pointList = create("Frame", {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+    }, page)
+
+    create("UIListLayout", {
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, pointList)
+
+    savePointButton.MouseButton1Click:Connect(function()
+        local root = getRoot()
+
+        if not root then
+            pointNameBox.PlaceholderText = "Character not ready"
+            return
+        end
+
+        State.NextPointId += 1
+
+        local name = pointNameBox.Text
+        if name == "" then
+            name = "Location " .. tostring(State.NextPointId)
+        end
+
+        local point = {
+            Id = State.NextPointId,
+            Name = name,
+            CFrame = root.CFrame,
+        }
+
+        table.insert(State.Points, point)
+
+        pointNameBox.Text = ""
+        refreshPointList(pointList)
+    end)
+
+    local emptyState = makeCard(
+        page,
+        70,
+        "SAVED LOCATIONS",
+        "Create a point to see it here."
+    )
+
+    local function updateEmptyState()
+        emptyState.Visible = #State.Points == 0
+    end
+
+    savePointButton.MouseButton1Click:Connect(function()
+        task.defer(updateEmptyState)
+    end)
+
+    local originalRefresh = refreshPointList
+
+    refreshPointList = function(list)
+        originalRefresh(list)
+        updateEmptyState()
+    end
+end
 
 --==================================================
--- FEATURE 2
+-- EXPLOITS PAGE
 --==================================================
 
-local feature2Text = Instance.new("TextLabel")
-feature2Text.Size = UDim2.new(1, 0, 0, 100)
-feature2Text.Position = UDim2.new(0, 0, 0, 30)
-feature2Text.BackgroundTransparency = 1
-feature2Text.Text = "FEATURE 2\nReserved for future testing"
-feature2Text.TextColor3 = Color3.fromRGB(170, 170, 180)
-feature2Text.TextSize = 15
-feature2Text.Font = Enum.Font.GothamMedium
-feature2Text.TextWrapped = true
-feature2Text.Parent = feature2Page
+do
+    local page = pages.EXPLOITS
+
+    local card = makeCard(
+        page,
+        110,
+        "EXPERIMENTAL MODULES",
+        "New experimental options will appear here in future versions."
+    )
+
+    local badge = makeLabel(
+        card,
+        "COMING SOON  ♡",
+        UDim2.new(1, -22, 0, 24),
+        UDim2.new(0, 11, 1, -32),
+        12,
+        COLORS.Accent2
+    )
+    badge.Font = Enum.Font.GothamBold
+end
+
+--==================================================
+-- SETTINGS PAGE
+--==================================================
+
+do
+    local page = pages.SETTINGS
+
+    makeAction(
+        page,
+        "RESET WINDOW",
+        "Return the menu to the screen center.",
+        "RESET",
+        function()
+            Window.Position = UDim2.fromScale(0.5, 0.5)
+        end
+    )
+
+    makeAction(
+        page,
+        "RESET FLY BUTTON",
+        "Return the floating arrow to its original position.",
+        "RESET",
+        function()
+            FlyButton.Position = UDim2.new(0.83, 0, 0.72, 0)
+            FlyButton.Size = UDim2.fromOffset(58, 58)
+        end
+    )
+
+    makeCard(
+        page,
+        100,
+        "ABOUT",
+        "RAHERHUB " .. VERSION .. " 💗\nMobile interface • RGB theme"
+    )
+end
+
+--==================================================
+-- UPDATES PAGE
+--==================================================
+
+do
+    local page = pages.UPDATES
+
+    local current = makeCard(
+        page,
+        110,
+        "RAHERHUB V0.1",
+        "Initial interface release."
+    )
+
+    local list = makeLabel(
+        current,
+        "• New animated loading screen\n• RGB logo\n• Mobile-friendly layout\n• Organized function tabs\n• Teleport point list",
+        UDim2.new(1, -22, 0, 65),
+        UDim2.new(0, 11, 1, -72),
+        10,
+        COLORS.Muted
+    )
+
+    local future = makeCard(
+        page,
+        90,
+        "NEXT",
+        "Additional modules and interface improvements."
+    )
+
+    local futureBadge = makeLabel(
+        future,
+        "PLANNED  ♡",
+        UDim2.new(1, -22, 0, 20),
+        UDim2.new(0, 11, 1, -28),
+        11,
+        COLORS.Accent2
+    )
+end
 
 --==================================================
 -- FLOATING OPEN BUTTON
 --==================================================
 
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(0, 55, 0, 55)
-openButton.Position = UDim2.new(0.05, 0, 0.5, 0)
-openButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-openButton.BorderSizePixel = 0
-openButton.Text = "R"
-openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-openButton.TextSize = 22
-openButton.Font = Enum.Font.GothamBold
-openButton.Visible = false
-openButton.Parent = ScreenGui
+local OpenButton = create("TextButton", {
+    Name = "RAHERHUB_Open",
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.new(0, 15, 0.5, -25),
+    Size = UDim2.fromOffset(52, 52),
+    BackgroundColor3 = COLORS.Panel,
+    Text = "R",
+    TextColor3 = COLORS.Accent2,
+    Font = Enum.Font.GothamBlack,
+    TextSize = 25,
+    Visible = false,
+    AutoButtonColor = false,
+    ZIndex = 30,
+}, ScreenGui)
 
-Instance.new("UICorner", openButton).CornerRadius = UDim.new(1, 0)
+corner(OpenButton, 18)
+stroke(OpenButton, COLORS.Accent, 2)
 
---==================================================
--- CLOSE / OPEN
---==================================================
+create("UIGradient", {
+    Color = ACCENT_GRADIENT,
+    Rotation = 45,
+}, OpenButton)
 
-closeButton.MouseButton1Click:Connect(function()
-    main.Visible = false
-    openButton.Visible = true
-end)
+local openButtonDragging = false
+local openButtonStart
+local openButtonPosition
+local openButtonMoved = false
 
-local openDragging = false
-local openDragStart
-local openStartPos
-local openMoved = false
+OpenButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-openButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+        openButtonDragging = true
+        openButtonMoved = false
+        openButtonStart = input.Position
+        openButtonPosition = OpenButton.Position
 
-        openDragging = true
-        openMoved = false
-        openDragStart = input.Position
-        openStartPos = openButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                openButtonDragging = false
+            end
+        end)
     end
 end)
 
 UIS.InputChanged:Connect(function(input)
-    if openDragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
+    if openButtonDragging and (
+        input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement
     ) then
+        local delta = input.Position - openButtonStart
 
-        local delta = input.Position - openDragStart
-
-        if math.abs(delta.X) > 8 or math.abs(delta.Y) > 8 then
-            openMoved = true
+        if delta.Magnitude > 5 then
+            openButtonMoved = true
         end
 
-        openButton.Position = UDim2.new(
-            openStartPos.X.Scale,
-            openStartPos.X.Offset + delta.X,
-            openStartPos.Y.Scale,
-            openStartPos.Y.Offset + delta.Y
+        OpenButton.Position = UDim2.new(
+            openButtonPosition.X.Scale,
+            openButtonPosition.X.Offset + delta.X,
+            openButtonPosition.Y.Scale,
+            openButtonPosition.Y.Offset + delta.Y
         )
     end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        if openDragging and not openMoved then
-            main.Visible = true
-            openButton.Visible = false
-        end
-
-        openDragging = false
+OpenButton.Activated:Connect(function()
+    if openButtonMoved then
+        return
     end
+
+    Window.Visible = true
+    OpenButton.Visible = false
+    State.WindowOpen = true
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    Window.Visible = false
+    OpenButton.Visible = true
+    State.WindowOpen = false
 end)
 
 --==================================================
--- START
+-- STARTUP
 --==================================================
 
-showPage(1)
+openTab("MAIN")
 
-main.Visible = true
-openButton.Visible = false
+task.delay(5.15, function()
+    if State.Destroyed then
+        return
+    end
 
-print("RAHERHUB loaded successfully")
+    Window.Visible = true
+    Window.BackgroundTransparency = 1
+
+    tween(Window, {
+        BackgroundTransparency = 0,
+    }, 0.35)
+
+    local originalSize = Window.Size
+
+    Window.Size = UDim2.new(
+        originalSize.X.Scale,
+        originalSize.X.Offset,
+        originalSize.Y.Scale,
+        originalSize.Y.Offset - 14
+    )
+
+    tween(Window, {
+        Size = originalSize,
+    }, 0.35)
+end)
+
+print("RAHERHUB " .. VERSION .. " loaded 💗")
