@@ -4,8 +4,6 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
@@ -124,7 +122,7 @@ local COLORS = {
     red = Color3.fromRGB(255, 77, 119)
 }
 
-local main = make("CanvasGroup", {
+local main = make("Frame", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
@@ -135,7 +133,6 @@ local main = make("CanvasGroup", {
 }, gui)
 main.Size = UDim2.new(0, 350, 0, 430)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
-main.GroupTransparency = 0
 corner(main, 18)
 local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
 make("UIGradient", {
@@ -190,7 +187,7 @@ local rgbGradient = make("UIGradient", {
 local title = make("TextLabel", {
     Name = "Title",
     Position = UDim2.new(0, 15, 0, 5),
-    Size = UDim2.new(1, -132, 0, 30),
+    Size = UDim2.new(1, -92, 0, 30),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
@@ -201,7 +198,7 @@ local title = make("TextLabel", {
 
 local subtitle = make("TextLabel", {
     Position = UDim2.new(0, 16, 0, 34),
-    Size = UDim2.new(1, -132, 0, 16),
+    Size = UDim2.new(1, -95, 0, 16),
     BackgroundTransparency = 1,
     Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
     TextColor3 = COLORS.muted,
@@ -224,43 +221,6 @@ local minimize = make("TextButton", {
     AutoButtonColor = true
 }, header)
 corner(minimize, 12)
-
-local miniModeButton = make("TextButton", {
-    Name = "MiniMode",
-    AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -54, 0, 9),
-    Size = UDim2.fromOffset(32, 38),
-    BackgroundColor3 = COLORS.button,
-    BorderSizePixel = 0,
-    Text = "▣",
-    TextColor3 = COLORS.text,
-    TextSize = 17,
-    Font = Enum.Font.GothamBold,
-    AutoButtonColor = true
-}, header)
-corner(miniModeButton, 10)
-local miniMode = false
-local miniPanel
-local mainScale = make("UIScale", {Scale = 1}, main)
-local openCloseTween
-local function animateMain(show)
-    if openCloseTween then pcall(function() openCloseTween:Cancel() end) end
-    if show then
-        main.Visible = true
-        main.GroupTransparency = 1
-        mainScale.Scale = 0.92
-        openCloseTween = TweenService:Create(main, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {GroupTransparency = 0})
-        TweenService:Create(mainScale, TweenInfo.new(0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-        openCloseTween:Play()
-    else
-        openCloseTween = TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {GroupTransparency = 1})
-        TweenService:Create(mainScale, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0.92}):Play()
-        openCloseTween:Play()
-        openCloseTween.Completed:Once(function()
-            if main and main.Parent and main.GroupTransparency >= 0.99 then main.Visible = false end
-        end)
-    end
-end
 
 -- Rainbow title animation.
 local hue = 0
@@ -312,8 +272,8 @@ corner(openButton, 29)
 local openButtonStroke = stroke(openButton, Color3.fromRGB(0, 220, 255), 2, 0.05)
 
 minimize.Activated:Connect(function()
-    animateMain(false)
-    task.delay(0.2, function() if openButton and openButton.Parent then openButton.Visible = true end end)
+    main.Visible = false
+    openButton.Visible = true
 end)
 do
     local rhDragging, rhStart, rhStartPos, rhInput, rhMoved = false, nil, nil, nil, false
@@ -337,7 +297,7 @@ do
     end)
     openButton.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not rhMoved then animateMain(true); openButton.Visible = false end
+            if not rhMoved then main.Visible = true; openButton.Visible = false end
             rhDragging = false
         end
     end)
@@ -478,22 +438,6 @@ infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интер
 infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест.")
 infoCard(pages["MAIN"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
-local liveStatus = make("TextLabel", {
-    Name = "LiveStatusPanel",
-    Size = UDim2.new(1, -2, 0, 58),
-    BackgroundColor3 = COLORS.panel2,
-    BorderSizePixel = 0,
-    Text = "СТАТУС  •  Загрузка...",
-    TextColor3 = COLORS.text,
-    TextSize = 11,
-    Font = Enum.Font.GothamBold,
-    TextWrapped = true,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Center
-}, pages["MAIN"])
-corner(liveStatus, 11)
-make("UIPadding", {PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 8)}, liveStatus)
-
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
@@ -542,7 +486,7 @@ local function applyWalkSpeed()
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if humanoid then humanoid.WalkSpeed = speedEnabled and walkSpeed or 16 end
 end
-local _, setSpeedToggle = makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
+makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
     speedEnabled = value
     applyWalkSpeed()
 end)
@@ -632,7 +576,7 @@ Players.PlayerAdded:Connect(function(player)
     end)
 end)
 Players.PlayerRemoving:Connect(removeESP)
-local _, setESPToggle = makeToggle(pages["FUNCTIONS"], "Подсветка игроков (ESP)", false, function(value)
+makeToggle(pages["FUNCTIONS"], "Подсветка игроков (ESP)", false, function(value)
     espEnabled = value
     updateESP()
 end)
@@ -645,11 +589,11 @@ local flyEnabled = false
 local flySpeed = 4
 local flyDragState = {dragging = false, start = nil, startPos = nil, input = nil}
 
-local _, setFlyToggle = makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
+makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
     flyEnabled = value
     if not value then flyHeld = false end
     if flyTouch then
-        flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
+        flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
     end
 end)
 
@@ -806,7 +750,7 @@ end)
 
 local noclipEnabled = false
 local originalCollision = {}
-local _, setNoclipToggle = makeToggle(pages["FUNCTIONS"], "Проход сквозь объекты (Noclip)", false, function(value)
+makeToggle(pages["FUNCTIONS"], "Проход сквозь объекты (Noclip)", false, function(value)
     noclipEnabled = value
     if not value then
         for part, oldValue in pairs(originalCollision) do
@@ -840,7 +784,7 @@ end)
 -- Show the single FLY button while the feature is enabled or being edited.
 local function updateFlyButton()
     if not flyTouch then return end
-    flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
+    flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
 end
 for _, button in pairs(tabButtons) do
     button.Activated:Connect(function() task.defer(updateFlyButton) end)
@@ -1155,131 +1099,6 @@ section(pages["COMING SOON"], "COMING SOON")
 infoCard(pages["COMING SOON"], "В разработке", "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования.")
 infoCard(pages["COMING SOON"], "Следующие улучшения", "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования.")
 
--- Optional UI click sounds. Sound playback is guarded because some launch environments block asset audio.
-local uiSoundsEnabled = false
-local uiClickSound = make("Sound", {
-    Name = "RAHERHUB_UIClick",
-    SoundId = "rbxassetid://6895079853",
-    Volume = 0.25
-}, SoundService)
-local function playUIClick()
-    if not uiSoundsEnabled then return end
-    pcall(function()
-        uiClickSound:Stop()
-        uiClickSound.TimePosition = 0
-        SoundService:PlayLocalSound(uiClickSound)
-    end)
-end
-makeToggle(pages["SETTINGS"], "Звуки интерфейса", false, function(value)
-    uiSoundsEnabled = value
-    statusLabel.Text = value and "Звуки интерфейса включены (если доступны)." or "Звуки интерфейса выключены."
-    statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
-    playUIClick()
-end)
-
--- Compact mini mode: core toggles remain reachable without opening the full menu.
-miniPanel = make("Frame", {
-    Name = "MiniPanel",
-    Position = UDim2.new(0, 10, 0, 68),
-    Size = UDim2.new(1, -20, 0, 92),
-    BackgroundTransparency = 1,
-    Visible = false
-}, main)
-local miniStatus = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 24),
-    BackgroundTransparency = 1,
-    Text = "SPD 16  |  SPEED OFF  |  FLY OFF",
-    TextColor3 = COLORS.muted,
-    TextSize = 10,
-    Font = Enum.Font.GothamBold,
-    TextXAlignment = Enum.TextXAlignment.Left
-}, miniPanel)
-local miniButtonsRow = make("Frame", {
-    Position = UDim2.new(0, 0, 0, 29),
-    Size = UDim2.new(1, 0, 0, 40),
-    BackgroundTransparency = 1
-}, miniPanel)
-make("UIListLayout", {
-    FillDirection = Enum.FillDirection.Horizontal,
-    HorizontalAlignment = Enum.HorizontalAlignment.Center,
-    VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 6),
-    SortOrder = Enum.SortOrder.LayoutOrder
-}, miniButtonsRow)
-local function miniButton(label, callback)
-    local button = make("TextButton", {
-        Size = UDim2.new(1/4, -5, 1, 0),
-        BackgroundColor3 = COLORS.button,
-        BorderSizePixel = 0,
-        Text = label,
-        TextColor3 = COLORS.text,
-        TextSize = 10,
-        Font = Enum.Font.GothamBold,
-        AutoButtonColor = true
-    }, miniButtonsRow)
-    corner(button, 10)
-    button.Activated:Connect(function() playUIClick(); callback() end)
-    return button
-end
-miniButton("SPEED", function() setSpeedToggle(not speedEnabled) end)
-miniButton("FLY", function() setFlyToggle(not flyEnabled) end)
-miniButton("NOCLIP", function() setNoclipToggle(not noclipEnabled) end)
-miniButton("FULL", function()
-    miniMode = false
-    miniPanel.Visible = false
-    tabsBar.Visible = true
-    content.Visible = true
-    main.Size = UDim2.fromOffset(350, 430)
-    fitPanel()
-    miniModeButton.Text = "▣"
-    playUIClick()
-end)
-miniModeButton.Activated:Connect(function()
-    miniMode = not miniMode
-    playUIClick()
-    if miniMode then
-        tabsBar.Visible = false
-        content.Visible = false
-        miniPanel.Visible = true
-        main.Size = UDim2.fromOffset(350, 170)
-        miniModeButton.Text = "□"
-    else
-        miniPanel.Visible = false
-        tabsBar.Visible = true
-        content.Visible = true
-        main.Size = UDim2.fromOffset(350, 430)
-        fitPanel()
-        miniModeButton.Text = "▣"
-    end
-end)
-
--- Keep the live status panel current without depending on a particular tab.
-task.spawn(function()
-    while gui.Parent do
-        local actualSpeed = 16
-        local character = LocalPlayer.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if humanoid then actualSpeed = math.floor(humanoid.WalkSpeed + 0.5) end
-        local function flag(value) return value and "ON" or "OFF" end
-        if liveStatus and liveStatus.Parent then
-            liveStatus.Text = string.format("СТАТУС\nSPEED %s  •  %d\nFLY %s  •  NOCLIP %s  •  ESP %s",
-                flag(speedEnabled), actualSpeed, flag(flyEnabled), flag(noclipEnabled), flag(espEnabled))
-        end
-        if miniStatus and miniStatus.Parent then
-            miniStatus.Text = string.format("SPD %d  |  SPEED %s  |  FLY %s  |  NC %s",
-                actualSpeed, flag(speedEnabled), flag(flyEnabled), flag(noclipEnabled))
-        end
-        task.wait(0.25)
-    end
-end)
-
--- Route common button presses through the optional click sound.
-for _, obj in ipairs(gui:GetDescendants()) do
-    if obj:IsA("TextButton") and obj ~= openButton then
-        obj.Activated:Connect(playUIClick)
-    end
-end
-
 refreshPoints()
 selectTab("MAIN")
 
@@ -1291,8 +1110,4 @@ for _, button in pairs(tabButtons) do button.Activated:Connect(function() task.d
 minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
-main.GroupTransparency = 1
-mainScale.Scale = 0.94
-TweenService:Create(main, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
-TweenService:Create(mainScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 print("RAHERHUB " .. VERSION .. " запущен.")
