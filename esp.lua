@@ -1,6 +1,6 @@
 -- RAHERHUB | TEST MENU
--- Ekisde KeyAuth + ESP + FLY JUMP + NOCLIP
--- Own Roblox map / testing
+-- Ekisde authentication + ESP + FLY JUMP + NOCLIP
+-- Для собственной Roblox-карты / тестирования
 
 local OWNER_ID = "Y46MQF2C3L"
 local PUBLIC_KEY = "ZsvsuSaR3FMEEiv4L9krgsZBLLdZhrlmb9iHUlVsjxo="
@@ -29,32 +29,49 @@ if not httpRequest then
 end
 
 local function httpPost(path, body)
-    local response = httpRequest({
-        Url = BASE_URL .. path,
-        Method = "POST",
-        Headers = {
-            ["Content-Type"] = "application/json",
-            ["User-Agent"] = "RaherHUB/1.0"
-        },
-        Body = HttpService:JSONEncode(body)
-    })
-
-    if not response then
-        return nil, "No response"
-    end
-
-    local raw = response.Body or response.body
-
-    if not raw then
-        return nil, "Empty response"
-    end
-
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(raw)
+    local ok, response = pcall(function()
+        return httpRequest({
+            Url = BASE_URL .. path,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["User-Agent"] = "RaherHUB/1.0"
+            },
+            Body = HttpService:JSONEncode(body)
+        })
     end)
 
-    if not ok then
+    if not ok or not response then
+        return nil, "HTTP request failed"
+    end
+
+    local statusCode =
+        response.StatusCode
+        or response.status_code
+
+    local raw =
+        response.Body
+        or response.body
+
+    if not raw or raw == "" then
+        return nil, "Empty server response"
+    end
+
+    local decodeOK, data =
+        pcall(function()
+            return HttpService:JSONDecode(raw)
+        end)
+
+    if not decodeOK then
         return nil, "Invalid JSON response"
+    end
+
+    if type(data) ~= "table" then
+        return nil, "Invalid server data"
+    end
+
+    if statusCode and tonumber(statusCode) and tonumber(statusCode) >= 400 then
+        return nil, data.message or data.error or ("HTTP " .. tostring(statusCode))
     end
 
     return data
@@ -89,8 +106,8 @@ local function safeRead(path)
         return readfile(path)
     end)
 
-    if ok and result and #result > 0 then
-        return result
+    if ok and result and tostring(result) ~= "" then
+        return tostring(result)
     end
 
     return nil
@@ -102,11 +119,31 @@ local function safeWrite(path, value)
     end
 
     local ok = pcall(function()
-        writefile(path, value)
+        writefile(path, tostring(value))
     end)
 
     return ok
 end
+
+local function safeDelete(path)
+    if not delfile then
+        return false
+    end
+
+    if not safeIsFile(path) then
+        return true
+    end
+
+    local ok = pcall(function()
+        delfile(path)
+    end)
+
+    return ok
+end
+
+--------------------------------------------------
+-- DEVICE ID
+--------------------------------------------------
 
 local function getInstallId()
     local saved = safeRead(DEVICE_FILE)
@@ -116,12 +153,17 @@ local function getInstallId()
     end
 
     local newId = HttpService:GenerateGUID(false)
+
     safeWrite(DEVICE_FILE, newId)
 
     return newId
 end
 
 local hwid = getInstallId()
+
+--------------------------------------------------
+-- SAVED ACCOUNT
+--------------------------------------------------
 
 local function getSavedAccount()
     local username = safeRead(USER_FILE)
@@ -135,31 +177,45 @@ local function getSavedAccount()
 end
 
 local function saveAccount(username, password)
-    local userOK = safeWrite(USER_FILE, username)
-    local passOK = safeWrite(PASS_FILE, password)
+    local a = safeWrite(USER_FILE, username)
+    local b = safeWrite(PASS_FILE, password)
 
-    return userOK and passOK
+    return a and b
+end
+
+local function clearSavedAccount()
+    safeDelete(USER_FILE)
+    safeDelete(PASS_FILE)
 end
 
 --------------------------------------------------
--- KEYAUTH
+-- RANDOM
 --------------------------------------------------
 
-local session = ""
+math.randomseed(
+    os.time()
+    + math.floor(os.clock() * 100000)
+)
 
 local function randomString(length)
     local chars =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
-    local result = ""
+    local result = {}
 
     for i = 1, length do
         local n = math.random(1, #chars)
-        result = result .. chars:sub(n, n)
+        result[i] = chars:sub(n, n)
     end
 
-    return result
+    return table.concat(result)
 end
+
+--------------------------------------------------
+-- EKISDE API
+--------------------------------------------------
+
+local session = ""
 
 local function ekisdeCall(name, fields)
     local payload = {
@@ -180,11 +236,14 @@ local function ekisdeCall(name, fields)
     end
 
     if data.session then
-        session = data.session
+        session = tostring(data.session)
     end
 
     if data.success == false then
-        return false, data.message or "Request failed"
+        return false,
+            data.message
+            or data.error
+            or "Request failed"
     end
 
     return true, data
@@ -194,111 +253,269 @@ end
 -- AUTH GUI
 --------------------------------------------------
 
-local authGui = Instance.new("ScreenGui")
+local authGui =
+    Instance.new("ScreenGui")
+
 authGui.Name = "RaherAuth"
 authGui.ResetOnSpawn = false
 authGui.Parent = game:GetService("CoreGui")
 
-local authFrame = Instance.new("Frame")
-authFrame.Size = UDim2.new(0, 330, 0, 190)
-authFrame.Position = UDim2.new(0.5, -165, 0.5, -95)
-authFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+local authFrame =
+    Instance.new("Frame")
+
+authFrame.Size =
+    UDim2.new(0, 330, 0, 220)
+
+authFrame.Position =
+    UDim2.new(0.5, -165, 0.5, -110)
+
+authFrame.BackgroundColor3 =
+    Color3.fromRGB(20, 20, 25)
+
 authFrame.BorderSizePixel = 0
 authFrame.Parent = authGui
 
-local authCorner = Instance.new("UICorner")
-authCorner.CornerRadius = UDim.new(0, 14)
+local authCorner =
+    Instance.new("UICorner")
+
+authCorner.CornerRadius =
+    UDim.new(0, 14)
+
 authCorner.Parent = authFrame
 
-local authTitle = Instance.new("TextLabel")
-authTitle.Size = UDim2.new(1, 0, 0, 45)
+--------------------------------------------------
+-- TITLE
+--------------------------------------------------
+
+local authTitle =
+    Instance.new("TextLabel")
+
+authTitle.Size =
+    UDim2.new(1, 0, 0, 45)
+
 authTitle.BackgroundTransparency = 1
 authTitle.Text = "RAHERHUB"
-authTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+authTitle.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
 authTitle.TextSize = 24
-authTitle.Font = Enum.Font.GothamBold
+authTitle.Font =
+    Enum.Font.GothamBold
+
 authTitle.Parent = authFrame
 
-local authSub = Instance.new("TextLabel")
-authSub.Size = UDim2.new(1, -20, 0, 25)
-authSub.Position = UDim2.new(0, 10, 0, 40)
-authSub.BackgroundTransparency = 1
-authSub.Text = "Enter your license key"
-authSub.TextColor3 = Color3.fromRGB(170, 170, 170)
-authSub.TextSize = 14
-authSub.Font = Enum.Font.Gotham
-authSub.Parent = authFrame
+--------------------------------------------------
+-- STATUS
+--------------------------------------------------
 
-local keyBox = Instance.new("TextBox")
-keyBox.Size = UDim2.new(1, -30, 0, 42)
-keyBox.Position = UDim2.new(0, 15, 0, 72)
-keyBox.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
-keyBox.BorderSizePixel = 0
-keyBox.PlaceholderText = "Enter license key"
-keyBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
-keyBox.Text = ""
-keyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-keyBox.TextSize = 15
-keyBox.Font = Enum.Font.Gotham
-keyBox.ClearTextOnFocus = false
-keyBox.Parent = authFrame
+local statusLabel =
+    Instance.new("TextLabel")
 
-local keyCorner = Instance.new("UICorner")
-keyCorner.CornerRadius = UDim.new(0, 9)
-keyCorner.Parent = keyBox
+statusLabel.Size =
+    UDim2.new(1, -20, 0, 28)
 
-local checkButton = Instance.new("TextButton")
-checkButton.Size = UDim2.new(1, -30, 0, 40)
-checkButton.Position = UDim2.new(0, 15, 0, 122)
-checkButton.BackgroundColor3 = Color3.fromRGB(55, 125, 255)
-checkButton.BorderSizePixel = 0
-checkButton.Text = "CHECK KEY"
-checkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-checkButton.TextSize = 15
-checkButton.Font = Enum.Font.GothamBold
-checkButton.Parent = authFrame
+statusLabel.Position =
+    UDim2.new(0, 10, 0, 40)
 
-local buttonCorner = Instance.new("UICorner")
-buttonCorner.CornerRadius = UDim.new(0, 9)
-buttonCorner.Parent = checkButton
-
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 22)
-statusLabel.Position = UDim2.new(0, 10, 1, -25)
 statusLabel.BackgroundTransparency = 1
-statusLabel.Text = ""
-statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-statusLabel.TextSize = 12
-statusLabel.Font = Enum.Font.Gotham
+statusLabel.Text = "Checking saved account..."
+
+statusLabel.TextColor3 =
+    Color3.fromRGB(170, 170, 170)
+
+statusLabel.TextSize = 13
+statusLabel.Font =
+    Enum.Font.Gotham
+
 statusLabel.Parent = authFrame
 
 --------------------------------------------------
--- AUTHENTICATION
+-- KEY BOX
+--------------------------------------------------
+
+local keyBox =
+    Instance.new("TextBox")
+
+keyBox.Size =
+    UDim2.new(1, -30, 0, 42)
+
+keyBox.Position =
+    UDim2.new(0, 15, 0, 73)
+
+keyBox.BackgroundColor3 =
+    Color3.fromRGB(32, 32, 40)
+
+keyBox.BorderSizePixel = 0
+
+keyBox.PlaceholderText =
+    "License key — first activation only"
+
+keyBox.PlaceholderColor3 =
+    Color3.fromRGB(100, 100, 110)
+
+keyBox.Text = ""
+
+keyBox.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+keyBox.TextSize = 14
+keyBox.Font =
+    Enum.Font.Gotham
+
+keyBox.ClearTextOnFocus = false
+
+keyBox.Parent = authFrame
+
+local keyCorner =
+    Instance.new("UICorner")
+
+keyCorner.CornerRadius =
+    UDim.new(0, 9)
+
+keyCorner.Parent = keyBox
+
+--------------------------------------------------
+-- LOGIN / ACTIVATE BUTTON
+--------------------------------------------------
+
+local checkButton =
+    Instance.new("TextButton")
+
+checkButton.Size =
+    UDim2.new(1, -150, 0, 40)
+
+checkButton.Position =
+    UDim2.new(0, 15, 0, 124)
+
+checkButton.BackgroundColor3 =
+    Color3.fromRGB(55, 125, 255)
+
+checkButton.BorderSizePixel = 0
+
+checkButton.Text =
+    "LOGIN"
+
+checkButton.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+checkButton.TextSize = 14
+
+checkButton.Font =
+    Enum.Font.GothamBold
+
+checkButton.Parent = authFrame
+
+local checkCorner =
+    Instance.new("UICorner")
+
+checkCorner.CornerRadius =
+    UDim.new(0, 9)
+
+checkCorner.Parent = checkButton
+
+--------------------------------------------------
+-- RESET BUTTON
+--------------------------------------------------
+
+local resetButton =
+    Instance.new("TextButton")
+
+resetButton.Size =
+    UDim2.new(0, 115, 0, 40)
+
+resetButton.Position =
+    UDim2.new(1, -130, 0, 124)
+
+resetButton.BackgroundColor3 =
+    Color3.fromRGB(70, 70, 80)
+
+resetButton.BorderSizePixel = 0
+
+resetButton.Text =
+    "RESET ACCOUNT"
+
+resetButton.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+resetButton.TextSize = 11
+
+resetButton.Font =
+    Enum.Font.GothamBold
+
+resetButton.Parent = authFrame
+
+local resetCorner =
+    Instance.new("UICorner")
+
+resetCorner.CornerRadius =
+    UDim.new(0, 9)
+
+resetCorner.Parent = resetButton
+
+--------------------------------------------------
+-- DEVICE INFO
+--------------------------------------------------
+
+local deviceLabel =
+    Instance.new("TextLabel")
+
+deviceLabel.Size =
+    UDim2.new(1, -20, 0, 18)
+
+deviceLabel.Position =
+    UDim2.new(0, 10, 1, -22)
+
+deviceLabel.BackgroundTransparency = 1
+
+deviceLabel.Text =
+    "Device ID: " .. hwid:sub(1, 8) .. "..."
+
+deviceLabel.TextColor3 =
+    Color3.fromRGB(100, 100, 110)
+
+deviceLabel.TextSize = 10
+
+deviceLabel.Font =
+    Enum.Font.Gotham
+
+deviceLabel.Parent = authFrame
+
+--------------------------------------------------
+-- AUTH STATE
 --------------------------------------------------
 
 local authenticated = false
 local authenticating = false
+local hasSavedAccount = false
 
-local function setStatus(text, good)
-    statusLabel.Text = tostring(text)
+local function setStatus(message, good)
+    statusLabel.Text =
+        tostring(message)
 
     if good then
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 130)
+        statusLabel.TextColor3 =
+            Color3.fromRGB(100, 255, 130)
     else
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        statusLabel.TextColor3 =
+            Color3.fromRGB(255, 100, 100)
     end
 end
 
+--------------------------------------------------
+-- LOGIN
+--------------------------------------------------
+
 local function tryLogin(username, password)
     if not username or not password then
-        return false, "No saved account"
+        return false, "Saved account is incomplete"
     end
 
-    local ok, result = ekisdeCall("login", {
-        username = username,
-        password = password,
-        hwid = hwid
-    })
+    local ok, result =
+        ekisdeCall("login", {
+            username = username,
+            password = password,
+            hwid = hwid
+        })
 
     if ok then
         return true, result
@@ -307,89 +524,190 @@ local function tryLogin(username, password)
     return false, result
 end
 
+--------------------------------------------------
+-- AUTHENTICATE
+--------------------------------------------------
+
 local function authenticate()
     if authenticating or authenticated then
         return
     end
 
     authenticating = true
-    checkButton.Text = "CHECKING..."
-    setStatus("Connecting...", false)
+
+    checkButton.Text =
+        "CHECKING..."
 
     --------------------------------------------------
     -- INIT
     --------------------------------------------------
 
-    local ok, initResult =
+    setStatus(
+        "Connecting to server...",
+        false
+    )
+
+    local initOK, initResult =
         ekisdeCall("init", {
             version = VERSION
         })
 
-    if not ok then
-        setStatus(initResult, false)
-        checkButton.Text = "CHECK KEY"
+    if not initOK then
+        setStatus(
+            "Init error: " .. tostring(initResult),
+            false
+        )
+
+        checkButton.Text =
+            hasSavedAccount
+            and "LOGIN"
+            or "ACTIVATE"
+
         authenticating = false
         return
     end
 
     --------------------------------------------------
-    -- 1. TRY SAVED ACCOUNT FIRST
+    -- SAVED ACCOUNT
     --------------------------------------------------
 
-    local savedUsername, savedPassword =
+    local savedUsername,
+          savedPassword =
         getSavedAccount()
 
     if savedUsername and savedPassword then
-        setStatus("Logging in...", false)
 
-        local loginOK, loginResult =
-            tryLogin(savedUsername, savedPassword)
+        hasSavedAccount = true
+
+        keyBox.Visible = false
+
+        resetButton.Visible = true
+
+        checkButton.Text =
+            "LOGIN"
+
+        setStatus(
+            "Saved account found. Logging in...",
+            false
+        )
+
+        local loginOK,
+              loginResult =
+            tryLogin(
+                savedUsername,
+                savedPassword
+            )
 
         if loginOK then
+
             authenticated = true
-            setStatus("Access granted", true)
-            checkButton.Text = "ACCESS GRANTED"
+
+            setStatus(
+                "Access granted",
+                true
+            )
+
+            checkButton.Text =
+                "ACCESS GRANTED"
 
             task.wait(0.5)
 
-            if authGui then
-                authGui:Destroy()
-            end
+            authGui:Destroy()
 
             return
         end
 
+        --------------------------------------------------
+        -- IMPORTANT:
+        -- DO NOT ASK FOR A NEW KEY AUTOMATICALLY.
+        --------------------------------------------------
+
         setStatus(
-            "Saved account login failed. Enter a new license.",
+            "Login failed: "
+            .. tostring(loginResult),
             false
         )
+
+        checkButton.Text =
+            "LOGIN"
+
+        authenticating = false
+
+        return
     end
 
     --------------------------------------------------
-    -- 2. NEW REGISTRATION ONLY
+    -- NO ACCOUNT YET
     --------------------------------------------------
+
+    hasSavedAccount = false
+
+    keyBox.Visible = true
+
+    resetButton.Visible = false
+
+    checkButton.Text =
+        "ACTIVATE"
 
     local license =
         keyBox.Text:gsub("%s+", "")
 
     if license == "" then
-        checkButton.Text = "CHECK KEY"
+
+        setStatus(
+            "Enter your license key",
+            false
+        )
+
+        checkButton.Text =
+            "ACTIVATE"
+
+        authenticating = false
+
+        return
+    end
+
+    --------------------------------------------------
+    -- CREATE ACCOUNT
+    --------------------------------------------------
+
+    setStatus(
+        "Activating license...",
+        false
+    )
+
+    local username =
+        "rah_" .. randomString(12)
+
+    local password =
+        randomString(32)
+
+    --------------------------------------------------
+    -- SAVE BEFORE REGISTER
+    --------------------------------------------------
+
+    local saved =
+        saveAccount(
+            username,
+            password
+        )
+
+    if not saved then
+        setStatus(
+            "Could not save local account files",
+            false
+        )
+
         authenticating = false
         return
     end
 
-    setStatus("Activating license...", false)
+    --------------------------------------------------
+    -- REGISTER
+    --------------------------------------------------
 
-    local username =
-        savedUsername or ("rah_" .. randomString(12))
-
-    local password =
-        savedPassword or randomString(32)
-
-    -- Save BEFORE register.
-    saveAccount(username, password)
-
-    local registerOK, registerResult =
+    local registerOK,
+          registerResult =
         ekisdeCall("register", {
             username = username,
             password = password,
@@ -398,79 +716,197 @@ local function authenticate()
         })
 
     if registerOK then
+
         authenticated = true
 
-        setStatus("License accepted", true)
-        checkButton.Text = "ACCESS GRANTED"
+        setStatus(
+            "License activated",
+            true
+        )
 
-        task.wait(0.8)
+        checkButton.Text =
+            "ACCESS GRANTED"
 
-        if authGui then
-            authGui:Destroy()
-        end
+        task.wait(0.7)
+
+        authGui:Destroy()
 
         return
     end
 
     --------------------------------------------------
-    -- 3. RECOVERY
+    -- REGISTER FAILED
     --------------------------------------------------
 
-    local registerError =
+    local errorText =
         tostring(registerResult)
 
-    if registerError:lower():find("already been used", 1, true)
-        or registerError:lower():find("already used", 1, true)
-        or registerError:lower():find("used", 1, true) then
+    local lowerError =
+        errorText:lower()
+
+    --------------------------------------------------
+    -- KEY ALREADY USED
+    --------------------------------------------------
+
+    if lowerError:find(
+        "already been used",
+        1,
+        true
+    )
+    or lowerError:find(
+        "already used",
+        1,
+        true
+    )
+    or lowerError:find(
+        "used",
+        1,
+        true
+    ) then
 
         setStatus(
-            "Key already activated. Recovering account...",
+            "Key already used. Trying saved account...",
             false
         )
 
-        local recoveryOK, recoveryResult =
-            tryLogin(username, password)
+        local recoveryOK,
+              recoveryResult =
+            tryLogin(
+                username,
+                password
+            )
 
         if recoveryOK then
+
             authenticated = true
 
-            setStatus("Account recovered", true)
-            checkButton.Text = "ACCESS GRANTED"
+            setStatus(
+                "Account recovered",
+                true
+            )
 
-            task.wait(0.8)
+            checkButton.Text =
+                "ACCESS GRANTED"
 
-            if authGui then
-                authGui:Destroy()
-            end
+            task.wait(0.7)
+
+            authGui:Destroy()
 
             return
         end
 
         setStatus(
-            "Key is already used and saved login failed. Do not generate another key yet.",
+            "Key used. Login failed: "
+            .. tostring(recoveryResult),
             false
         )
 
-        checkButton.Text = "CHECK KEY"
+        checkButton.Text =
+            "ACTIVATE"
+
         authenticating = false
+
         return
     end
 
     --------------------------------------------------
-    -- OTHER REGISTER ERROR
+    -- OTHER ERROR
     --------------------------------------------------
 
-    setStatus(registerError, false)
-    checkButton.Text = "CHECK KEY"
+    setStatus(
+        errorText,
+        false
+    )
+
+    checkButton.Text =
+        "ACTIVATE"
+
     authenticating = false
 end
 
-checkButton.MouseButton1Click:Connect(authenticate)
+--------------------------------------------------
+-- RESET ACCOUNT
+--------------------------------------------------
 
-keyBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        authenticate()
+resetButton.MouseButton1Click:Connect(function()
+
+    if authenticating then
+        return
     end
+
+    clearSavedAccount()
+
+    hasSavedAccount = false
+
+    keyBox.Visible = true
+    keyBox.Text = ""
+
+    resetButton.Visible = false
+
+    checkButton.Text =
+        "ACTIVATE"
+
+    setStatus(
+        "Local account reset. Enter a license.",
+        false
+    )
+end)
+
+--------------------------------------------------
+-- LOGIN BUTTON
+--------------------------------------------------
+
+checkButton.MouseButton1Click:Connect(
+    authenticate
+)
+
+keyBox.FocusLost:Connect(
+    function(enterPressed)
+
+        if enterPressed then
+            authenticate()
+        end
+
+    end
+)
+
+--------------------------------------------------
+-- AUTOMATIC FIRST AUTH CHECK
+--------------------------------------------------
+
+task.spawn(function()
+
+    task.wait(0.2)
+
+    local username,
+          password =
+        getSavedAccount()
+
+    if username and password then
+
+        hasSavedAccount = true
+
+        keyBox.Visible = false
+        resetButton.Visible = true
+
+        authenticate()
+
+    else
+
+        hasSavedAccount = false
+
+        keyBox.Visible = true
+        resetButton.Visible = false
+
+        setStatus(
+            "Enter your license key",
+            false
+        )
+
+        checkButton.Text =
+            "ACTIVATE"
+    end
+
 end)
 
 --------------------------------------------------
@@ -485,59 +921,251 @@ until authenticated
 -- MAIN GUI
 --------------------------------------------------
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "RaherHUB"
-gui.ResetOnSpawn = false
-gui.Parent = game:GetService("CoreGui")
+local gui =
+    Instance.new("ScreenGui")
 
-local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 300, 0, 280)
-main.Position = UDim2.new(0.5, -150, 0.5, -140)
-main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+gui.Name =
+    "RaherHUB"
+
+gui.ResetOnSpawn = false
+gui.Parent =
+    game:GetService("CoreGui")
+
+--------------------------------------------------
+-- MAIN FRAME
+--------------------------------------------------
+
+local main =
+    Instance.new("Frame")
+
+main.Size =
+    UDim2.new(0, 300, 0, 280)
+
+main.Position =
+    UDim2.new(
+        0.5,
+        -150,
+        0.5,
+        -140
+    )
+
+main.BackgroundColor3 =
+    Color3.fromRGB(18, 18, 24)
+
 main.BorderSizePixel = 0
 main.Parent = gui
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 14)
+local mainCorner =
+    Instance.new("UICorner")
+
+mainCorner.CornerRadius =
+    UDim.new(0, 14)
+
 mainCorner.Parent = main
 
 --------------------------------------------------
 -- HEADER
 --------------------------------------------------
 
-local header = Instance.new("Frame")
-header.Size = UDim2.new(1, 0, 0, 48)
-header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+local header =
+    Instance.new("Frame")
+
+header.Size =
+    UDim2.new(1, 0, 0, 48)
+
+header.BackgroundColor3 =
+    Color3.fromRGB(30, 30, 40)
+
 header.BorderSizePixel = 0
 header.Parent = main
 
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 14)
+local headerCorner =
+    Instance.new("UICorner")
+
+headerCorner.CornerRadius =
+    UDim.new(0, 14)
+
 headerCorner.Parent = header
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -55, 1, 0)
-title.Position = UDim2.new(0, 15, 0, 0)
+local title =
+    Instance.new("TextLabel")
+
+title.Size =
+    UDim2.new(1, -60, 1, 0)
+
+title.Position =
+    UDim2.new(0, 15, 0, 0)
+
 title.BackgroundTransparency = 1
-title.Text = "RAHERHUB"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 20
-title.Font = Enum.Font.GothamBold
-title.TextXAlignment = Enum.TextXAlignment.Left
+
+title.Text =
+    "RAHERHUB"
+
+title.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+title.TextSize = 19
+
+title.Font =
+    Enum.Font.GothamBold
+
+title.TextXAlignment =
+    Enum.TextXAlignment.Left
+
 title.Parent = header
 
-local hideButton = Instance.new("TextButton")
-hideButton.Size = UDim2.new(0, 45, 0, 45)
-hideButton.Position = UDim2.new(1, -47, 0, 1)
-hideButton.BackgroundTransparency = 1
-hideButton.Text = "×"
-hideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-hideButton.TextSize = 28
-hideButton.Font = Enum.Font.GothamBold
+--------------------------------------------------
+-- HIDE BUTTON
+--------------------------------------------------
+
+local hideButton =
+    Instance.new("TextButton")
+
+hideButton.Size =
+    UDim2.new(0, 42, 0, 34)
+
+hideButton.Position =
+    UDim2.new(1, -48, 0, 7)
+
+hideButton.BackgroundColor3 =
+    Color3.fromRGB(50, 50, 60)
+
+hideButton.BorderSizePixel = 0
+
+hideButton.Text =
+    "×"
+
+hideButton.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+hideButton.TextSize = 23
+
+hideButton.Font =
+    Enum.Font.GothamBold
+
 hideButton.Parent = header
 
+local hideCorner =
+    Instance.new("UICorner")
+
+hideCorner.CornerRadius =
+    UDim.new(0, 8)
+
+hideCorner.Parent = hideButton
+
 --------------------------------------------------
--- DRAG MAIN
+-- TABS
+--------------------------------------------------
+
+local tabs =
+    Instance.new("Frame")
+
+tabs.Size =
+    UDim2.new(1, -20, 0, 38)
+
+tabs.Position =
+    UDim2.new(0, 10, 0, 58)
+
+tabs.BackgroundTransparency = 1
+
+tabs.Parent = main
+
+local function makeTab(text, x)
+    local b =
+        Instance.new("TextButton")
+
+    b.Size =
+        UDim2.new(0, 85, 0, 34)
+
+    b.Position =
+        UDim2.new(0, x, 0, 0)
+
+    b.BackgroundColor3 =
+        Color3.fromRGB(42, 42, 52)
+
+    b.BorderSizePixel = 0
+
+    b.Text = text
+
+    b.TextColor3 =
+        Color3.fromRGB(230, 230, 230)
+
+    b.TextSize = 12
+
+    b.Font =
+        Enum.Font.GothamBold
+
+    b.Parent = tabs
+
+    local c =
+        Instance.new("UICorner")
+
+    c.CornerRadius =
+        UDim.new(0, 8)
+
+    c.Parent = b
+
+    return b
+end
+
+local mainTab =
+    makeTab("MAIN", 0)
+
+local feature1Tab =
+    makeTab("FEATURE 1", 92)
+
+local feature2Tab =
+    makeTab("FEATURE 2", 184)
+
+--------------------------------------------------
+-- PAGE CONTAINERS
+--------------------------------------------------
+
+local mainPage =
+    Instance.new("Frame")
+
+mainPage.Size =
+    UDim2.new(1, -20, 1, -108)
+
+mainPage.Position =
+    UDim2.new(0, 10, 0, 102)
+
+mainPage.BackgroundTransparency = 1
+
+mainPage.Parent = main
+
+local feature1Page =
+    Instance.new("Frame")
+
+feature1Page.Size =
+    mainPage.Size
+
+feature1Page.Position =
+    mainPage.Position
+
+feature1Page.BackgroundTransparency = 1
+
+feature1Page.Visible = false
+
+feature1Page.Parent = main
+
+local feature2Page =
+    Instance.new("Frame")
+
+feature2Page.Size =
+    mainPage.Size
+
+feature2Page.Position =
+    mainPage.Position
+
+feature2Page.BackgroundTransparency = 1
+
+feature2Page.Visible = false
+
+feature2Page.Parent = main
+
+--------------------------------------------------
+-- DRAG MAIN WINDOW
 --------------------------------------------------
 
 local dragging = false
@@ -545,100 +1173,97 @@ local dragStart
 local startPos
 
 header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
+
+    if input.UserInputType ==
+        Enum.UserInputType.MouseButton1
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
 
         dragging = true
         dragStart = input.Position
         startPos = main.Position
 
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
-    ) then
 
-        local delta = input.Position - dragStart
+    if not dragging then
+        return
+    end
 
-        main.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
+    if input.UserInputType ==
+        Enum.UserInputType.MouseMovement
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
+
+        local delta =
+            input.Position - dragStart
+
+        main.Position =
+            UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+    if input.UserInputType ==
+        Enum.UserInputType.MouseButton1
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
+
+        dragging = false
+
     end
 end)
 
 --------------------------------------------------
--- TABS
---------------------------------------------------
-
-local tabs = Instance.new("Frame")
-tabs.Size = UDim2.new(1, -20, 0, 38)
-tabs.Position = UDim2.new(0, 10, 0, 55)
-tabs.BackgroundTransparency = 1
-tabs.Parent = main
-
-local function makeTab(text, x)
-    local button = Instance.new("TextButton")
-
-    button.Size = UDim2.new(0, 85, 1, 0)
-    button.Position = UDim2.new(0, x, 0, 0)
-    button.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = Color3.fromRGB(220, 220, 220)
-    button.TextSize = 13
-    button.Font = Enum.Font.GothamBold
-    button.Parent = tabs
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = button
-
-    return button
-end
-
-local mainTab = makeTab("Main", 0)
-local feature1Tab = makeTab("Feature 1", 90)
-local feature2Tab = makeTab("Feature 2", 180)
-
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -20, 1, -105)
-content.Position = UDim2.new(0, 10, 0, 100)
-content.BackgroundTransparency = 1
-content.Parent = main
-
---------------------------------------------------
--- BUTTON FACTORY
+-- TOGGLE CREATOR
 --------------------------------------------------
 
 local function makeToggle(text, y)
-    local button = Instance.new("TextButton")
 
-    button.Size = UDim2.new(1, 0, 0, 42)
-    button.Position = UDim2.new(0, 0, 0, y)
-    button.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    button.BorderSizePixel = 0
-    button.Text = text .. "  [OFF]"
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextSize = 15
-    button.Font = Enum.Font.GothamBold
-    button.Parent = content
+    local b =
+        Instance.new("TextButton")
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 9)
-    corner.Parent = button
+    b.Size =
+        UDim2.new(1, 0, 0, 42)
 
-    return button
+    b.Position =
+        UDim2.new(0, 0, 0, y)
+
+    b.BackgroundColor3 =
+        Color3.fromRGB(38, 38, 48)
+
+    b.BorderSizePixel = 0
+
+    b.Text =
+        text .. "  [OFF]"
+
+    b.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
+    b.TextSize = 14
+
+    b.Font =
+        Enum.Font.GothamBold
+
+    b.Parent = mainPage
+
+    local c =
+        Instance.new("UICorner")
+
+    c.CornerRadius =
+        UDim.new(0, 9)
+
+    c.Parent = b
+
+    return b
 end
 
 --------------------------------------------------
@@ -646,21 +1271,26 @@ end
 --------------------------------------------------
 
 local espEnabled = false
-local espObjects = {}
 
 local function removeESP(player)
-    if espObjects[player] then
-        espObjects[player]:Destroy()
-        espObjects[player] = nil
+
+    if not player.Character then
+        return
+    end
+
+    local highlight =
+        player.Character:FindFirstChild(
+            "RaherESP"
+        )
+
+    if highlight then
+        highlight:Destroy()
     end
 end
 
 local function createESP(player)
-    if player == LocalPlayer then
-        return
-    end
 
-    if not espEnabled then
+    if player == LocalPlayer then
         return
     end
 
@@ -668,109 +1298,239 @@ local function createESP(player)
         return
     end
 
-    if espObjects[player] then
+    if player.Character:FindFirstChild(
+        "RaherESP"
+    ) then
         return
     end
 
-    local highlight = Instance.new("Highlight")
+    local highlight =
+        Instance.new("Highlight")
 
-    highlight.Name = "RaherESP"
-    highlight.FillColor = Color3.fromRGB(255, 70, 70)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.FillTransparency = 0.45
-    highlight.OutlineTransparency = 0
-    highlight.Adornee = player.Character
-    highlight.Parent = player.Character
+    highlight.Name =
+        "RaherESP"
 
-    espObjects[player] = highlight
+    highlight.FillTransparency =
+        0.55
+
+    highlight.OutlineTransparency =
+        0
+
+    highlight.Parent =
+        player.Character
 end
 
 local function updateESP()
-    for _, player in ipairs(Players:GetPlayers()) do
+
+    for _, player in ipairs(
+        Players:GetPlayers()
+    ) do
+
         if espEnabled then
             createESP(player)
         else
             removeESP(player)
         end
+
     end
 end
 
 Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(1)
-        createESP(player)
-    end)
+
+    player.CharacterAdded:Connect(
+        function()
+
+            task.wait(0.5)
+
+            if espEnabled then
+                createESP(player)
+            end
+
+        end
+    )
+
 end)
 
-Players.PlayerRemoving:Connect(removeESP)
+Players.PlayerRemoving:Connect(
+    removeESP
+)
 
-local espButton = makeToggle("ESP", 0)
+local espButton =
+    makeToggle(
+        "ESP",
+        0
+    )
 
-espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
+espButton.MouseButton1Click:Connect(
+    function()
 
-    if espEnabled then
-        espButton.Text = "ESP  [ON]"
-        espButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
-    else
-        espButton.Text = "ESP  [OFF]"
-        espButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        espEnabled =
+            not espEnabled
+
+        if espEnabled then
+
+            espButton.Text =
+                "ESP  [ON]"
+
+        else
+
+            espButton.Text =
+                "ESP  [OFF]"
+
+        end
+
+        updateESP()
+
     end
-
-    updateESP()
-end)
+)
 
 --------------------------------------------------
 -- FLY JUMP
 --------------------------------------------------
 
 local flyEnabled = false
-local flySpeed = 4
-local flyTouchHeld = false
+local flyUp = false
 
-local flyButton = makeToggle("FLY JUMP", 52)
+local flyButton =
+    makeToggle(
+        "FLY JUMP",
+        52
+    )
 
-flyButton.MouseButton1Click:Connect(function()
-    flyEnabled = not flyEnabled
+flyButton.MouseButton1Click:Connect(
+    function()
 
-    if flyEnabled then
-        flyButton.Text = "FLY JUMP  [ON]"
-        flyButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
-    else
-        flyButton.Text = "FLY JUMP  [OFF]"
-        flyButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        flyEnabled =
+            not flyEnabled
+
+        if flyEnabled then
+
+            flyButton.Text =
+                "FLY JUMP  [ON]"
+
+        else
+
+            flyButton.Text =
+                "FLY JUMP  [OFF]"
+
+            flyUp = false
+
+        end
+
     end
-end)
+)
 
-local flyTouch = Instance.new("TextButton")
-flyTouch.Size = UDim2.new(0, 62, 0, 62)
-flyTouch.Position = UDim2.new(1, -85, 1, -150)
-flyTouch.BackgroundColor3 = Color3.fromRGB(45, 125, 255)
-flyTouch.BorderSizePixel = 0
-flyTouch.Text = "↑"
-flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTouch.TextSize = 30
-flyTouch.Font = Enum.Font.GothamBold
-flyTouch.Visible = true
-flyTouch.Parent = gui
+--------------------------------------------------
+-- FLY BUTTON
+--------------------------------------------------
 
-local flyCorner = Instance.new("UICorner")
-flyCorner.CornerRadius = UDim.new(1, 0)
-flyCorner.Parent = flyTouch
+local flyFloat =
+    Instance.new("TextButton")
 
-flyTouch.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        flyTouchHeld = true
+flyFloat.Size =
+    UDim2.new(0, 55, 0, 55)
+
+flyFloat.Position =
+    UDim2.new(
+        1,
+        -75,
+        0.65,
+        0
+    )
+
+flyFloat.BackgroundColor3 =
+    Color3.fromRGB(50, 130, 255)
+
+flyFloat.BorderSizePixel = 0
+
+flyFloat.Text =
+    "↑"
+
+flyFloat.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
+flyFloat.TextSize = 28
+
+flyFloat.Font =
+    Enum.Font.GothamBold
+
+flyFloat.Visible = true
+
+flyFloat.Parent = gui
+
+local flyCorner =
+    Instance.new("UICorner")
+
+flyCorner.CornerRadius =
+    UDim.new(1, 0)
+
+flyCorner.Parent = flyFloat
+
+flyFloat.MouseButton1Down:Connect(
+    function()
+
+        if flyEnabled then
+            flyUp = true
+        end
+
     end
-end)
+)
 
-flyTouch.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        flyTouchHeld = false
+flyFloat.MouseButton1Up:Connect(
+    function()
+        flyUp = false
     end
-end)
+)
+
+flyFloat.InputEnded:Connect(
+    function(input)
+
+        if input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            flyUp = false
+
+        end
+
+    end
+)
+
+RunService.RenderStepped:Connect(
+    function()
+
+        if not flyEnabled then
+            return
+        end
+
+        if not flyUp then
+            return
+        end
+
+        local character =
+            LocalPlayer.Character
+
+        if not character then
+            return
+        end
+
+        local root =
+            character:FindFirstChild(
+                "HumanoidRootPart"
+            )
+
+        if not root then
+            return
+        end
+
+        root.AssemblyLinearVelocity =
+            Vector3.new(
+                root.AssemblyLinearVelocity.X,
+                35,
+                root.AssemblyLinearVelocity.Z
+            )
+
+    end
+)
 
 --------------------------------------------------
 -- NOCLIP
@@ -778,100 +1538,200 @@ end)
 
 local noclipEnabled = false
 
-local noclipButton = makeToggle("NOCLIP", 104)
+local noclipButton =
+    makeToggle(
+        "NOCLIP",
+        104
+    )
 
-noclipButton.MouseButton1Click:Connect(function()
-    noclipEnabled = not noclipEnabled
+noclipButton.MouseButton1Click:Connect(
+    function()
 
-    if noclipEnabled then
-        noclipButton.Text = "NOCLIP  [ON]"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
-    else
-        noclipButton.Text = "NOCLIP  [OFF]"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        noclipEnabled =
+            not noclipEnabled
+
+        if noclipEnabled then
+
+            noclipButton.Text =
+                "NOCLIP  [ON]"
+
+        else
+
+            noclipButton.Text =
+                "NOCLIP  [OFF]"
+
+        end
+
     end
-end)
+)
 
---------------------------------------------------
--- MOVEMENT LOOP
---------------------------------------------------
+RunService.Stepped:Connect(
+    function()
 
-RunService.Stepped:Connect(function()
-    local character = LocalPlayer.Character
+        if not noclipEnabled then
+            return
+        end
 
-    if not character then
-        return
-    end
+        local character =
+            LocalPlayer.Character
 
-    if noclipEnabled then
-        for _, part in ipairs(character:GetDescendants()) do
+        if not character then
+            return
+        end
+
+        for _, part in ipairs(
+            character:GetDescendants()
+        ) do
+
             if part:IsA("BasePart") then
                 part.CanCollide = false
             end
-        end
-    end
 
-    if flyEnabled and flyTouchHeld then
-        local root = character:FindFirstChild("HumanoidRootPart")
-
-        if root then
-            root.Velocity = Vector3.new(
-                root.Velocity.X,
-                flySpeed * 10,
-                root.Velocity.Z
-            )
         end
+
     end
-end)
+)
+
+--------------------------------------------------
+-- EMPTY FEATURE PAGES
+--------------------------------------------------
+
+local empty1 =
+    Instance.new("TextLabel")
+
+empty1.Size =
+    UDim2.new(1, 0, 0, 40)
+
+empty1.BackgroundTransparency = 1
+
+empty1.Text =
+    "FEATURE 1"
+
+empty1.TextColor3 =
+    Color3.fromRGB(150, 150, 160)
+
+empty1.TextSize = 15
+
+empty1.Font =
+    Enum.Font.GothamBold
+
+empty1.Parent =
+    feature1Page
+
+local empty2 =
+    Instance.new("TextLabel")
+
+empty2.Size =
+    UDim2.new(1, 0, 0, 40)
+
+empty2.BackgroundTransparency = 1
+
+empty2.Text =
+    "FEATURE 2"
+
+empty2.TextColor3 =
+    Color3.fromRGB(150, 150, 160)
+
+empty2.TextSize = 15
+
+empty2.Font =
+    Enum.Font.GothamBold
+
+empty2.Parent =
+    feature2Page
 
 --------------------------------------------------
 -- TABS
 --------------------------------------------------
 
-local function clearContent()
-    for _, child in ipairs(content:GetChildren()) do
-        child.Visible = false
+mainTab.MouseButton1Click:Connect(
+    function()
+
+        mainPage.Visible = true
+        feature1Page.Visible = false
+        feature2Page.Visible = false
+
     end
-end
+)
 
-mainTab.MouseButton1Click:Connect(function()
-    for _, child in ipairs(content:GetChildren()) do
-        child.Visible = true
+feature1Tab.MouseButton1Click:Connect(
+    function()
+
+        mainPage.Visible = false
+        feature1Page.Visible = true
+        feature2Page.Visible = false
+
     end
-end)
+)
 
-feature1Tab.MouseButton1Click:Connect(function()
-    clearContent()
-end)
+feature2Tab.MouseButton1Click:Connect(
+    function()
 
-feature2Tab.MouseButton1Click:Connect(function()
-    clearContent()
-end)
+        mainPage.Visible = false
+        feature1Page.Visible = false
+        feature2Page.Visible = true
+
+    end
+)
 
 --------------------------------------------------
--- HIDE / OPEN
+-- FLOATING OPEN BUTTON
 --------------------------------------------------
 
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(0, 58, 0, 58)
-openButton.Position = UDim2.new(0, 20, 0.5, -29)
-openButton.BackgroundColor3 = Color3.fromRGB(35, 105, 230)
+local openButton =
+    Instance.new("TextButton")
+
+openButton.Size =
+    UDim2.new(0, 58, 0, 58)
+
+openButton.Position =
+    UDim2.new(
+        0,
+        20,
+        0.5,
+        -29
+    )
+
+openButton.BackgroundColor3 =
+    Color3.fromRGB(35, 105, 230)
+
 openButton.BorderSizePixel = 0
-openButton.Text = "≡"
-openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+openButton.Text =
+    "≡"
+
+openButton.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
 openButton.TextSize = 30
-openButton.Font = Enum.Font.GothamBold
+
+openButton.Font =
+    Enum.Font.GothamBold
+
 openButton.Visible = false
+
 openButton.Parent = gui
 
-local openCorner = Instance.new("UICorner")
-openCorner.CornerRadius = UDim.new(1, 0)
+local openCorner =
+    Instance.new("UICorner")
+
+openCorner.CornerRadius =
+    UDim.new(1, 0)
+
 openCorner.Parent = openButton
 
-hideButton.MouseButton1Click:Connect(function()
-    main.Visible = false
-    openButton.Visible = true
-end)
+--------------------------------------------------
+-- HIDE
+--------------------------------------------------
+
+hideButton.MouseButton1Click:Connect(
+    function()
+
+        main.Visible = false
+        openButton.Visible = true
+
+    end
+)
 
 --------------------------------------------------
 -- DRAG OPEN BUTTON
@@ -881,42 +1741,128 @@ local openDragging = false
 local openDragStart
 local openStartPos
 
-openButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+openButton.InputBegan:Connect(
+    function(input)
 
-        openDragging = true
-        openDragStart = input.Position
-        openStartPos = openButton.Position
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
 
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                openDragging = false
-            end
-        end)
+            openDragging = true
+
+            openDragStart =
+                input.Position
+
+            openStartPos =
+                openButton.Position
+
+        end
+
     end
-end)
+)
 
-UserInputService.InputChanged:Connect(function(input)
-    if openDragging and (
-        input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseMovement
-    ) then
+UserInputService.InputChanged:Connect(
+    function(input)
 
-        local delta = input.Position - openDragStart
+        if not openDragging then
+            return
+        end
 
-        openButton.Position = UDim2.new(
-            openStartPos.X.Scale,
-            openStartPos.X.Offset + delta.X,
-            openStartPos.Y.Scale,
-            openStartPos.Y.Offset + delta.Y
-        )
+        if input.UserInputType ==
+            Enum.UserInputType.MouseMovement
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            local delta =
+                input.Position
+                - openDragStart
+
+            openButton.Position =
+                UDim2.new(
+                    openStartPos.X.Scale,
+                    openStartPos.X.Offset
+                        + delta.X,
+
+                    openStartPos.Y.Scale,
+                    openStartPos.Y.Offset
+                        + delta.Y
+                )
+
+        end
+
     end
-end)
+)
 
-openButton.MouseButton1Click:Connect(function()
-    if not openDragging then
+UserInputService.InputEnded:Connect(
+    function(input)
+
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            openDragging = false
+
+        end
+
+    end
+)
+
+--------------------------------------------------
+-- OPEN BUTTON
+--------------------------------------------------
+
+openButton.MouseButton1Click:Connect(
+    function()
+
+        if openDragging then
+            return
+        end
+
         main.Visible = true
         openButton.Visible = false
+
     end
-end)
+)
+
+--------------------------------------------------
+-- CHARACTER RESPAWN SUPPORT
+--------------------------------------------------
+
+LocalPlayer.CharacterAdded:Connect(
+    function()
+
+        task.wait(1)
+
+        if noclipEnabled then
+
+            local character =
+                LocalPlayer.Character
+
+            if character then
+
+                for _, part in ipairs(
+                    character:GetDescendants()
+                ) do
+
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+)
+
+--------------------------------------------------
+-- READY
+--------------------------------------------------
+
+print(
+    "[RAHERHUB] Loaded successfully"
+)
