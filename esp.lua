@@ -12,8 +12,11 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local espEnabled = false
 local flyJumpEnabled = false
 local flyingUp = false
+local noclipEnabled = false
 
 local highlights = {}
+local flyConnection
+local noclipConnection
 
 --==================================================
 -- ESP
@@ -76,8 +79,6 @@ end)
 -- FLY JUMP
 --==================================================
 
-local flyConnection
-
 local function startFly()
     if not flyJumpEnabled then
         return
@@ -88,10 +89,8 @@ local function startFly()
         return
     end
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
     local root = character:FindFirstChild("HumanoidRootPart")
-
-    if not humanoid or not root then
+    if not root then
         return
     end
 
@@ -134,6 +133,40 @@ local function setFlyJump(state)
 end
 
 --==================================================
+-- NOCLIP
+--==================================================
+
+local function setCharacterCollision(enabled)
+    local character = LocalPlayer.Character
+    if not character then
+        return
+    end
+
+    for _, object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            object.CanCollide = enabled
+        end
+    end
+end
+
+local function setNoclip(state)
+    noclipEnabled = state
+
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+
+    if state then
+        noclipConnection = RunService.Stepped:Connect(function()
+            setCharacterCollision(false)
+        end)
+    else
+        setCharacterCollision(true)
+    end
+end
+
+--==================================================
 -- GUI
 --==================================================
 
@@ -149,115 +182,231 @@ gui.Parent = PlayerGui
 
 local main = Instance.new("Frame")
 main.Name = "MainPanel"
-main.Size = UDim2.fromOffset(235, 205)
-main.Position = UDim2.new(0.5, -117, 0.5, -102)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+main.Size = UDim2.fromOffset(285, 310)
+main.Position = UDim2.new(0.5, -142, 0.5, -155)
+main.BackgroundColor3 = Color3.fromRGB(20, 22, 32)
 main.BorderSizePixel = 0
 main.Parent = gui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 14)
+mainCorner.CornerRadius = UDim.new(0, 16)
 mainCorner.Parent = main
 
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(70, 70, 80)
-stroke.Thickness = 1
-stroke.Transparency = 0.25
-stroke.Parent = main
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(100, 110, 255)
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.15
+mainStroke.Parent = main
 
 --==================================================
 -- HEADER
 --==================================================
 
 local header = Instance.new("Frame")
-header.Size = UDim2.new(1, 0, 0, 45)
-header.BackgroundTransparency = 1
+header.Size = UDim2.new(1, 0, 0, 48)
+header.BackgroundColor3 = Color3.fromRGB(35, 38, 58)
+header.BorderSizePixel = 0
 header.Parent = main
 
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 16)
+headerCorner.Parent = header
+
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -55, 1, 0)
-title.Position = UDim2.fromOffset(15, 0)
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Position = UDim2.fromOffset(16, 0)
 title.BackgroundTransparency = 1
 title.Text = "TEST MENU"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 18
+title.TextSize = 19
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = header
 
---==================================================
--- HIDE
---==================================================
-
 local hideButton = Instance.new("TextButton")
-hideButton.Size = UDim2.fromOffset(40, 40)
-hideButton.Position = UDim2.new(1, -45, 0, 3)
+hideButton.Size = UDim2.fromOffset(42, 42)
+hideButton.Position = UDim2.new(1, -47, 0, 3)
 hideButton.BackgroundTransparency = 1
-hideButton.Text = "—"
-hideButton.TextColor3 = Color3.fromRGB(200, 200, 205)
-hideButton.TextSize = 24
+hideButton.Text = "×"
+hideButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+hideButton.TextSize = 27
 hideButton.Font = Enum.Font.GothamBold
 hideButton.Parent = header
 
 --==================================================
--- ESP BUTTON
+-- TABS
 --==================================================
 
-local espButton = Instance.new("TextButton")
-espButton.Size = UDim2.new(1, -30, 0, 48)
-espButton.Position = UDim2.fromOffset(15, 55)
-espButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
-espButton.BorderSizePixel = 0
-espButton.Text = "ESP     OFF"
-espButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-espButton.TextSize = 16
-espButton.Font = Enum.Font.GothamSemibold
-espButton.Parent = main
+local tabs = Instance.new("Frame")
+tabs.Size = UDim2.new(1, -20, 0, 42)
+tabs.Position = UDim2.fromOffset(10, 55)
+tabs.BackgroundTransparency = 1
+tabs.Parent = main
 
-local espCorner = Instance.new("UICorner")
-espCorner.CornerRadius = UDim.new(0, 10)
-espCorner.Parent = espButton
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+tabLayout.Padding = UDim.new(0, 5)
+tabLayout.Parent = tabs
+
+local pages = {}
+local tabButtons = {}
+
+local function createTab(name)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.fromOffset(78, 38)
+    button.BackgroundColor3 = Color3.fromRGB(42, 45, 62)
+    button.BorderSizePixel = 0
+    button.Text = name
+    button.TextColor3 = Color3.fromRGB(190, 195, 215)
+    button.TextSize = 12
+    button.Font = Enum.Font.GothamSemibold
+    button.Parent = tabs
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 9)
+    corner.Parent = button
+
+    local page = Instance.new("Frame")
+    page.Name = name .. "Page"
+    page.Size = UDim2.new(1, -20, 1, -110)
+    page.Position = UDim2.fromOffset(10, 103)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = main
+
+    tabButtons[name] = button
+    pages[name] = page
+
+    return button, page
+end
+
+local mainTab, mainPage = createTab("Main")
+local feature1Tab, feature1Page = createTab("Feature 1")
+local feature2Tab, feature2Page = createTab("Feature 2")
+
+--==================================================
+-- TAB SWITCHING
+--==================================================
+
+local function selectTab(name)
+    for tabName, page in pairs(pages) do
+        page.Visible = (tabName == name)
+
+        if tabButtons[tabName] then
+            if tabName == name then
+                tabButtons[tabName].BackgroundColor3 =
+                    Color3.fromRGB(90, 95, 220)
+
+                tabButtons[tabName].TextColor3 =
+                    Color3.fromRGB(255, 255, 255)
+            else
+                tabButtons[tabName].BackgroundColor3 =
+                    Color3.fromRGB(42, 45, 62)
+
+                tabButtons[tabName].TextColor3 =
+                    Color3.fromRGB(190, 195, 215)
+            end
+        end
+    end
+end
+
+mainTab.Activated:Connect(function()
+    selectTab("Main")
+end)
+
+feature1Tab.Activated:Connect(function()
+    selectTab("Feature 1")
+end)
+
+feature2Tab.Activated:Connect(function()
+    selectTab("Feature 2")
+end)
+
+--==================================================
+-- FEATURE BUTTON CREATOR
+--==================================================
+
+local function createFeatureButton(parent, text, y)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 48)
+    button.Position = UDim2.fromOffset(0, y)
+    button.BackgroundColor3 = Color3.fromRGB(42, 45, 62)
+    button.BorderSizePixel = 0
+    button.Text = text
+    button.TextColor3 = Color3.fromRGB(235, 235, 245)
+    button.TextSize = 15
+    button.Font = Enum.Font.GothamSemibold
+    button.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 11)
+    corner.Parent = button
+
+    return button
+end
+
+local espButton = createFeatureButton(mainPage, "ESP        OFF", 0)
+local flyButton = createFeatureButton(mainPage, "FLY JUMP        OFF", 58)
+local noclipButton = createFeatureButton(mainPage, "NOCLIP        OFF", 116)
+
+--==================================================
+-- EMPTY FEATURES
+--==================================================
+
+local function emptyPage(page, text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(120, 125, 145)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.Parent = page
+end
+
+emptyPage(feature1Page, "FEATURE 1\n\nComing soon...")
+emptyPage(feature2Page, "FEATURE 2\n\nComing soon...")
+
+--==================================================
+-- BUTTON EVENTS
+--==================================================
 
 espButton.Activated:Connect(function()
     setESP(not espEnabled)
 
     if espEnabled then
-        espButton.Text = "ESP     ON"
-        espButton.TextColor3 = Color3.fromRGB(120, 255, 150)
+        espButton.Text = "ESP        ON"
+        espButton.TextColor3 = Color3.fromRGB(120, 255, 170)
     else
-        espButton.Text = "ESP     OFF"
-        espButton.TextColor3 = Color3.fromRGB(230, 230, 235)
+        espButton.Text = "ESP        OFF"
+        espButton.TextColor3 = Color3.fromRGB(235, 235, 245)
     end
 end)
-
---==================================================
--- FLY JUMP BUTTON
---==================================================
-
-local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(1, -30, 0, 48)
-flyButton.Position = UDim2.fromOffset(15, 112)
-flyButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
-flyButton.BorderSizePixel = 0
-flyButton.Text = "FLY JUMP     OFF"
-flyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
-flyButton.TextSize = 16
-flyButton.Font = Enum.Font.GothamSemibold
-flyButton.Parent = main
-
-local flyCorner = Instance.new("UICorner")
-flyCorner.CornerRadius = UDim.new(0, 10)
-flyCorner.Parent = flyButton
 
 flyButton.Activated:Connect(function()
     setFlyJump(not flyJumpEnabled)
 
     if flyJumpEnabled then
-        flyButton.Text = "FLY JUMP     ON"
-        flyButton.TextColor3 = Color3.fromRGB(120, 200, 255)
+        flyButton.Text = "FLY JUMP        ON"
+        flyButton.TextColor3 = Color3.fromRGB(100, 210, 255)
     else
-        flyButton.Text = "FLY JUMP     OFF"
-        flyButton.TextColor3 = Color3.fromRGB(230, 230, 235)
+        flyButton.Text = "FLY JUMP        OFF"
+        flyButton.TextColor3 = Color3.fromRGB(235, 235, 245)
+    end
+
+    flyTouch.Visible = flyJumpEnabled
+end)
+
+noclipButton.Activated:Connect(function()
+    setNoclip(not noclipEnabled)
+
+    if noclipEnabled then
+        noclipButton.Text = "NOCLIP        ON"
+        noclipButton.TextColor3 = Color3.fromRGB(255, 190, 90)
+    else
+        noclipButton.Text = "NOCLIP        OFF"
+        noclipButton.TextColor3 = Color3.fromRGB(235, 235, 245)
     end
 end)
 
@@ -267,13 +416,13 @@ end)
 
 local openButton = Instance.new("TextButton")
 openButton.Name = "OpenButton"
-openButton.Size = UDim2.fromOffset(55, 55)
-openButton.Position = UDim2.new(0, 20, 0.5, -27)
-openButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+openButton.Size = UDim2.fromOffset(58, 58)
+openButton.Position = UDim2.new(0, 18, 0.5, -29)
+openButton.BackgroundColor3 = Color3.fromRGB(55, 60, 105)
 openButton.BorderSizePixel = 0
 openButton.Text = "≡"
 openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-openButton.TextSize = 25
+openButton.TextSize = 27
 openButton.Font = Enum.Font.GothamBold
 openButton.Visible = false
 openButton.Parent = gui
@@ -283,23 +432,23 @@ openCorner.CornerRadius = UDim.new(1, 0)
 openCorner.Parent = openButton
 
 local openStroke = Instance.new("UIStroke")
-openStroke.Color = Color3.fromRGB(90, 90, 100)
-openStroke.Thickness = 1
+openStroke.Color = Color3.fromRGB(120, 130, 255)
+openStroke.Thickness = 2
 openStroke.Parent = openButton
 
 --==================================================
--- FLY UP TOUCH BUTTON
+-- FLY TOUCH BUTTON
 --==================================================
 
 local flyTouch = Instance.new("TextButton")
 flyTouch.Name = "FlyTouch"
-flyTouch.Size = UDim2.fromOffset(65, 65)
-flyTouch.Position = UDim2.new(1, -85, 1, -180)
-flyTouch.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+flyTouch.Size = UDim2.fromOffset(68, 68)
+flyTouch.Position = UDim2.new(1, -88, 1, -185)
+flyTouch.BackgroundColor3 = Color3.fromRGB(45, 55, 100)
 flyTouch.BorderSizePixel = 0
 flyTouch.Text = "↑"
 flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTouch.TextSize = 30
+flyTouch.TextSize = 31
 flyTouch.Font = Enum.Font.GothamBold
 flyTouch.Visible = false
 flyTouch.Parent = gui
@@ -309,13 +458,9 @@ flyTouchCorner.CornerRadius = UDim.new(1, 0)
 flyTouchCorner.Parent = flyTouch
 
 local flyTouchStroke = Instance.new("UIStroke")
-flyTouchStroke.Color = Color3.fromRGB(90, 90, 100)
-flyTouchStroke.Thickness = 1
+flyTouchStroke.Color = Color3.fromRGB(100, 180, 255)
+flyTouchStroke.Thickness = 2
 flyTouchStroke.Parent = flyTouch
-
---==================================================
--- HOLD TO FLY
---==================================================
 
 flyTouch.InputBegan:Connect(function(input)
     if not flyJumpEnabled then
@@ -338,7 +483,7 @@ flyTouch.InputEnded:Connect(function(input)
 end)
 
 --==================================================
--- DRAG SYSTEM
+-- DRAG
 --==================================================
 
 local function makeDraggable(object, handle)
@@ -395,22 +540,15 @@ makeDraggable(openButton, openButton)
 hideButton.Activated:Connect(function()
     main.Visible = false
     openButton.Visible = true
-
-    if flyJumpEnabled then
-        flyTouch.Visible = true
-    end
 end)
 
 openButton.Activated:Connect(function()
     main.Visible = true
     openButton.Visible = false
-
-    if flyJumpEnabled then
-        flyTouch.Visible = true
-    end
 end)
 
--- Показываем кнопку сразу после включения FLY JUMP
-flyButton:GetPropertyChangedSignal("Text"):Connect(function()
-    flyTouch.Visible = flyJumpEnabled
-end)
+--==================================================
+-- DEFAULT TAB
+--==================================================
+
+selectTab("Main")
