@@ -10,9 +10,9 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 --==================================================
 
 local espEnabled = false
-local flyJumpEnabled = false
-local flyingUp = false
+local flyEnabled = false
 local noclipEnabled = false
+local flying = false
 
 local highlights = {}
 local flyConnection
@@ -79,8 +79,17 @@ end)
 -- FLY JUMP
 --==================================================
 
+local function stopFly()
+    flying = false
+
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+end
+
 local function startFly()
-    if not flyJumpEnabled then
+    if not flyEnabled then
         return
     end
 
@@ -94,18 +103,18 @@ local function startFly()
         return
     end
 
-    flyingUp = true
+    flying = true
 
     if flyConnection then
         flyConnection:Disconnect()
     end
 
     flyConnection = RunService.Heartbeat:Connect(function()
-        if not flyJumpEnabled or not flyingUp then
+        if not flyEnabled or not flying then
             return
         end
 
-        if root and root.Parent then
+        if root.Parent then
             root.AssemblyLinearVelocity = Vector3.new(
                 root.AssemblyLinearVelocity.X,
                 45,
@@ -115,17 +124,8 @@ local function startFly()
     end)
 end
 
-local function stopFly()
-    flyingUp = false
-
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
-end
-
-local function setFlyJump(state)
-    flyJumpEnabled = state
+local function setFly(state)
+    flyEnabled = state
 
     if not state then
         stopFly()
@@ -136,15 +136,16 @@ end
 -- NOCLIP
 --==================================================
 
-local function setCharacterCollision(enabled)
+local function restoreCollision()
     local character = LocalPlayer.Character
+
     if not character then
         return
     end
 
     for _, object in ipairs(character:GetDescendants()) do
         if object:IsA("BasePart") then
-            object.CanCollide = enabled
+            object.CanCollide = true
         end
     end
 end
@@ -159,10 +160,18 @@ local function setNoclip(state)
 
     if state then
         noclipConnection = RunService.Stepped:Connect(function()
-            setCharacterCollision(false)
+            local character = LocalPlayer.Character
+
+            if character then
+                for _, object in ipairs(character:GetDescendants()) do
+                    if object:IsA("BasePart") then
+                        object.CanCollide = false
+                    end
+                end
+            end
         end)
     else
-        setCharacterCollision(true)
+        restoreCollision()
     end
 end
 
@@ -195,7 +204,6 @@ mainCorner.Parent = main
 local mainStroke = Instance.new("UIStroke")
 mainStroke.Color = Color3.fromRGB(100, 110, 255)
 mainStroke.Thickness = 2
-mainStroke.Transparency = 0.15
 mainStroke.Parent = main
 
 --==================================================
@@ -204,17 +212,13 @@ mainStroke.Parent = main
 
 local header = Instance.new("Frame")
 header.Size = UDim2.new(1, 0, 0, 48)
-header.BackgroundColor3 = Color3.fromRGB(35, 38, 58)
+header.BackgroundColor3 = Color3.fromRGB(40, 44, 70)
 header.BorderSizePixel = 0
 header.Parent = main
 
-local headerCorner = Instance.new("UICorner")
-headerCorner.CornerRadius = UDim.new(0, 16)
-headerCorner.Parent = header
-
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -60, 1, 0)
-title.Position = UDim2.fromOffset(16, 0)
+title.Position = UDim2.fromOffset(15, 0)
 title.BackgroundTransparency = 1
 title.Text = "TEST MENU"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -245,7 +249,6 @@ tabs.Parent = main
 
 local tabLayout = Instance.new("UIListLayout")
 tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 tabLayout.Padding = UDim.new(0, 5)
 tabLayout.Parent = tabs
 
@@ -254,7 +257,7 @@ local tabButtons = {}
 
 local function createTab(name)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.fromOffset(78, 38)
+    button.Size = UDim2.fromOffset(82, 38)
     button.BackgroundColor3 = Color3.fromRGB(42, 45, 62)
     button.BorderSizePixel = 0
     button.Text = name
@@ -285,13 +288,9 @@ local mainTab, mainPage = createTab("Main")
 local feature1Tab, feature1Page = createTab("Feature 1")
 local feature2Tab, feature2Page = createTab("Feature 2")
 
---==================================================
--- TAB SWITCHING
---==================================================
-
 local function selectTab(name)
     for tabName, page in pairs(pages) do
-        page.Visible = (tabName == name)
+        page.Visible = tabName == name
 
         if tabButtons[tabName] then
             if tabName == name then
@@ -324,14 +323,14 @@ feature2Tab.Activated:Connect(function()
 end)
 
 --==================================================
--- FEATURE BUTTON CREATOR
+-- FEATURE BUTTON
 --==================================================
 
 local function createFeatureButton(parent, text, y)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 48)
+    button.Size = UDim2.new(1, 0, 0, 45)
     button.Position = UDim2.fromOffset(0, y)
-    button.BackgroundColor3 = Color3.fromRGB(42, 45, 62)
+    button.BackgroundColor3 = Color3.fromRGB(45, 48, 68)
     button.BorderSizePixel = 0
     button.Text = text
     button.TextColor3 = Color3.fromRGB(235, 235, 245)
@@ -346,9 +345,14 @@ local function createFeatureButton(parent, text, y)
     return button
 end
 
-local espButton = createFeatureButton(mainPage, "ESP        OFF", 0)
-local flyButton = createFeatureButton(mainPage, "FLY JUMP        OFF", 58)
-local noclipButton = createFeatureButton(mainPage, "NOCLIP        OFF", 116)
+local espButton =
+    createFeatureButton(mainPage, "ESP        OFF", 0)
+
+local flyButton =
+    createFeatureButton(mainPage, "FLY JUMP        OFF", 52)
+
+local noclipButton =
+    createFeatureButton(mainPage, "NOCLIP        OFF", 104)
 
 --==================================================
 -- EMPTY FEATURES
@@ -359,7 +363,7 @@ local function emptyPage(page, text)
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text
-    label.TextColor3 = Color3.fromRGB(120, 125, 145)
+    label.TextColor3 = Color3.fromRGB(130, 135, 155)
     label.TextSize = 14
     label.Font = Enum.Font.Gotham
     label.Parent = page
@@ -369,46 +373,30 @@ emptyPage(feature1Page, "FEATURE 1\n\nComing soon...")
 emptyPage(feature2Page, "FEATURE 2\n\nComing soon...")
 
 --==================================================
--- BUTTON EVENTS
+-- FLY TOUCH BUTTON
 --==================================================
 
-espButton.Activated:Connect(function()
-    setESP(not espEnabled)
+local flyTouch = Instance.new("TextButton")
+flyTouch.Name = "FlyTouch"
+flyTouch.Size = UDim2.fromOffset(68, 68)
+flyTouch.Position = UDim2.new(1, -88, 1, -185)
+flyTouch.BackgroundColor3 = Color3.fromRGB(45, 55, 100)
+flyTouch.BorderSizePixel = 0
+flyTouch.Text = "↑"
+flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTouch.TextSize = 31
+flyTouch.Font = Enum.Font.GothamBold
+flyTouch.Visible = false
+flyTouch.Parent = gui
 
-    if espEnabled then
-        espButton.Text = "ESP        ON"
-        espButton.TextColor3 = Color3.fromRGB(120, 255, 170)
-    else
-        espButton.Text = "ESP        OFF"
-        espButton.TextColor3 = Color3.fromRGB(235, 235, 245)
-    end
-end)
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(1, 0)
+flyCorner.Parent = flyTouch
 
-flyButton.Activated:Connect(function()
-    setFlyJump(not flyJumpEnabled)
-
-    if flyJumpEnabled then
-        flyButton.Text = "FLY JUMP        ON"
-        flyButton.TextColor3 = Color3.fromRGB(100, 210, 255)
-    else
-        flyButton.Text = "FLY JUMP        OFF"
-        flyButton.TextColor3 = Color3.fromRGB(235, 235, 245)
-    end
-
-    flyTouch.Visible = flyJumpEnabled
-end)
-
-noclipButton.Activated:Connect(function()
-    setNoclip(not noclipEnabled)
-
-    if noclipEnabled then
-        noclipButton.Text = "NOCLIP        ON"
-        noclipButton.TextColor3 = Color3.fromRGB(255, 190, 90)
-    else
-        noclipButton.Text = "NOCLIP        OFF"
-        noclipButton.TextColor3 = Color3.fromRGB(235, 235, 245)
-    end
-end)
+local flyStroke = Instance.new("UIStroke")
+flyStroke.Color = Color3.fromRGB(100, 180, 255)
+flyStroke.Thickness = 2
+flyStroke.Parent = flyTouch
 
 --==================================================
 -- OPEN BUTTON
@@ -437,33 +425,53 @@ openStroke.Thickness = 2
 openStroke.Parent = openButton
 
 --==================================================
--- FLY TOUCH BUTTON
+-- BUTTON EVENTS
 --==================================================
 
-local flyTouch = Instance.new("TextButton")
-flyTouch.Name = "FlyTouch"
-flyTouch.Size = UDim2.fromOffset(68, 68)
-flyTouch.Position = UDim2.new(1, -88, 1, -185)
-flyTouch.BackgroundColor3 = Color3.fromRGB(45, 55, 100)
-flyTouch.BorderSizePixel = 0
-flyTouch.Text = "↑"
-flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTouch.TextSize = 31
-flyTouch.Font = Enum.Font.GothamBold
-flyTouch.Visible = false
-flyTouch.Parent = gui
+espButton.Activated:Connect(function()
+    setESP(not espEnabled)
 
-local flyTouchCorner = Instance.new("UICorner")
-flyTouchCorner.CornerRadius = UDim.new(1, 0)
-flyTouchCorner.Parent = flyTouch
+    espButton.Text = espEnabled
+        and "ESP        ON"
+        or "ESP        OFF"
 
-local flyTouchStroke = Instance.new("UIStroke")
-flyTouchStroke.Color = Color3.fromRGB(100, 180, 255)
-flyTouchStroke.Thickness = 2
-flyTouchStroke.Parent = flyTouch
+    espButton.TextColor3 = espEnabled
+        and Color3.fromRGB(120, 255, 170)
+        or Color3.fromRGB(235, 235, 245)
+end)
+
+flyButton.Activated:Connect(function()
+    setFly(not flyEnabled)
+
+    flyButton.Text = flyEnabled
+        and "FLY JUMP        ON"
+        or "FLY JUMP        OFF"
+
+    flyButton.TextColor3 = flyEnabled
+        and Color3.fromRGB(100, 210, 255)
+        or Color3.fromRGB(235, 235, 245)
+
+    flyTouch.Visible = flyEnabled
+end)
+
+noclipButton.Activated:Connect(function()
+    setNoclip(not noclipEnabled)
+
+    noclipButton.Text = noclipEnabled
+        and "NOCLIP        ON"
+        or "NOCLIP        OFF"
+
+    noclipButton.TextColor3 = noclipEnabled
+        and Color3.fromRGB(255, 190, 90)
+        or Color3.fromRGB(235, 235, 245)
+end)
+
+--==================================================
+-- HOLD FLY
+--==================================================
 
 flyTouch.InputBegan:Connect(function(input)
-    if not flyJumpEnabled then
+    if not flyEnabled then
         return
     end
 
