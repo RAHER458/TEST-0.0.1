@@ -19,8 +19,8 @@ local LocalPlayer = Players.LocalPlayer
 --------------------------------------------------
 
 local httpRequest =
-    (request)
-    or (http_request)
+    request
+    or http_request
     or (syn and syn.request)
 
 if not httpRequest then
@@ -61,13 +61,58 @@ local function httpPost(path, body)
 end
 
 --------------------------------------------------
--- KEY AUTH
+-- INSTALL ID
+--------------------------------------------------
+
+local DEVICE_FILE = "raherhub_device.txt"
+
+local function getInstallId()
+    -- Используем сохранённый ID, если он уже существует
+    if isfile and readfile then
+        local exists = false
+
+        pcall(function()
+            exists = isfile(DEVICE_FILE)
+        end)
+
+        if exists then
+            local saved
+
+            pcall(function()
+                saved = readfile(DEVICE_FILE)
+            end)
+
+            if saved and #saved > 0 then
+                return saved
+            end
+        end
+    end
+
+    -- Создаём новый ID
+    local newId = HttpService:GenerateGUID(false)
+
+    -- Сохраняем его для следующих запусков
+    if writefile then
+        pcall(function()
+            writefile(DEVICE_FILE, newId)
+        end)
+    end
+
+    return newId
+end
+
+local hwid = getInstallId()
+
+--------------------------------------------------
+-- KEYAUTH
 --------------------------------------------------
 
 local session = ""
 
 local function randomString(length)
-    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
     local result = ""
 
     for i = 1, length do
@@ -89,7 +134,8 @@ local function ekisdeCall(name, fields)
         payload[k] = v
     end
 
-    local data, err = httpPost("/api/1.0/" .. name, payload)
+    local data, err =
+        httpPost("/api/1.0/" .. name, payload)
 
     if not data then
         return false, err
@@ -107,7 +153,7 @@ local function ekisdeCall(name, fields)
 end
 
 --------------------------------------------------
--- KEY WINDOW
+-- AUTH GUI
 --------------------------------------------------
 
 local authGui = Instance.new("ScreenGui")
@@ -150,7 +196,7 @@ keyBox.Size = UDim2.new(1, -30, 0, 42)
 keyBox.Position = UDim2.new(0, 15, 0, 72)
 keyBox.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
 keyBox.BorderSizePixel = 0
-keyBox.PlaceholderText = "XXXXXX-XXXXX-XXXXX-XXXXX"
+keyBox.PlaceholderText = "Enter license key"
 keyBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
 keyBox.Text = ""
 keyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -189,51 +235,82 @@ statusLabel.Font = Enum.Font.Gotham
 statusLabel.Parent = authFrame
 
 --------------------------------------------------
--- AUTH
+-- AUTHENTICATION
 --------------------------------------------------
 
 local authenticated = false
+local authenticating = false
 
 local function authenticate()
-    local license = keyBox.Text:gsub("%s+", "")
+    if authenticating or authenticated then
+        return
+    end
+
+    authenticating = true
+
+    local license =
+        keyBox.Text:gsub("%s+", "")
 
     if license == "" then
         statusLabel.Text = "Enter a license key"
+        authenticating = false
         return
     end
 
     checkButton.Text = "CHECKING..."
     statusLabel.Text = "Connecting..."
 
-    local ok, initResult = ekisdeCall("init", {
-        version = VERSION
-    })
+    --------------------------------------------------
+    -- INIT
+    --------------------------------------------------
+
+    local ok, initResult =
+        ekisdeCall("init", {
+            version = VERSION
+        })
 
     if not ok then
         statusLabel.Text = tostring(initResult)
         checkButton.Text = "CHECK KEY"
+        authenticating = false
         return
     end
 
-    local username = "rah_" .. randomString(12)
-    local password = randomString(32)
+    --------------------------------------------------
+    -- REGISTER LICENSE
+    --------------------------------------------------
 
-    local registerOK, registerResult = ekisdeCall("register", {
-        username = username,
-        password = password,
-        license = license
-    })
+    local username =
+        "rah_" .. randomString(12)
+
+    local password =
+        randomString(32)
+
+    local registerOK, registerResult =
+        ekisdeCall("register", {
+            username = username,
+            password = password,
+            license = license,
+            hwid = hwid
+        })
 
     if not registerOK then
         statusLabel.Text = tostring(registerResult)
         checkButton.Text = "CHECK KEY"
+        authenticating = false
         return
     end
+
+    --------------------------------------------------
+    -- SUCCESS
+    --------------------------------------------------
 
     authenticated = true
 
     statusLabel.Text = "License accepted"
-    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 130)
+    statusLabel.TextColor3 =
+        Color3.fromRGB(100, 255, 130)
+
     checkButton.Text = "ACCESS GRANTED"
 
     task.wait(0.8)
@@ -329,7 +406,9 @@ header.InputBegan:Connect(function(input)
         startPos = main.Position
 
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
+            if input.UserInputState ==
+                Enum.UserInputState.End then
+
                 dragging = false
             end
         end)
@@ -338,11 +417,14 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
+        input.UserInputType ==
+            Enum.UserInputType.MouseMovement
+        or input.UserInputType ==
+            Enum.UserInputType.Touch
     ) then
 
-        local delta = input.Position - dragStart
+        local delta =
+            input.Position - dragStart
 
         main.Position = UDim2.new(
             startPos.X.Scale,
@@ -365,12 +447,17 @@ tabs.Parent = main
 
 local function makeTab(text, x)
     local button = Instance.new("TextButton")
+
     button.Size = UDim2.new(0, 85, 1, 0)
     button.Position = UDim2.new(0, x, 0, 0)
-    button.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
+    button.BackgroundColor3 =
+        Color3.fromRGB(38, 38, 48)
+
     button.BorderSizePixel = 0
     button.Text = text
-    button.TextColor3 = Color3.fromRGB(220, 220, 220)
+    button.TextColor3 =
+        Color3.fromRGB(220, 220, 220)
+
     button.TextSize = 13
     button.Font = Enum.Font.GothamBold
     button.Parent = tabs
@@ -382,13 +469,22 @@ local function makeTab(text, x)
     return button
 end
 
-local mainTab = makeTab("Main", 0)
-local feature1Tab = makeTab("Feature 1", 90)
-local feature2Tab = makeTab("Feature 2", 180)
+local mainTab =
+    makeTab("Main", 0)
+
+local feature1Tab =
+    makeTab("Feature 1", 90)
+
+local feature2Tab =
+    makeTab("Feature 2", 180)
 
 local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -20, 1, -105)
-content.Position = UDim2.new(0, 10, 0, 100)
+content.Size =
+    UDim2.new(1, -20, 1, -105)
+
+content.Position =
+    UDim2.new(0, 10, 0, 100)
+
 content.BackgroundTransparency = 1
 content.Parent = main
 
@@ -398,18 +494,31 @@ content.Parent = main
 
 local function makeToggle(text, y)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 42)
-    button.Position = UDim2.new(0, 0, 0, y)
-    button.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+
+    button.Size =
+        UDim2.new(1, 0, 0, 42)
+
+    button.Position =
+        UDim2.new(0, 0, 0, y)
+
+    button.BackgroundColor3 =
+        Color3.fromRGB(35, 35, 45)
+
     button.BorderSizePixel = 0
-    button.Text = text .. "  [OFF]"
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Text =
+        text .. "  [OFF]"
+
+    button.TextColor3 =
+        Color3.fromRGB(255, 255, 255)
+
     button.TextSize = 15
     button.Font = Enum.Font.GothamBold
     button.Parent = content
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 9)
+    corner.CornerRadius =
+        UDim.new(0, 9)
+
     corner.Parent = button
 
     return button
@@ -446,20 +555,34 @@ local function createESP(player)
         return
     end
 
-    local highlight = Instance.new("Highlight")
+    local highlight =
+        Instance.new("Highlight")
+
     highlight.Name = "RaherESP"
-    highlight.FillColor = Color3.fromRGB(255, 70, 70)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+
+    highlight.FillColor =
+        Color3.fromRGB(255, 70, 70)
+
+    highlight.OutlineColor =
+        Color3.fromRGB(255, 255, 255)
+
     highlight.FillTransparency = 0.45
     highlight.OutlineTransparency = 0
-    highlight.Adornee = player.Character
-    highlight.Parent = player.Character
 
-    espObjects[player] = highlight
+    highlight.Adornee =
+        player.Character
+
+    highlight.Parent =
+        player.Character
+
+    espObjects[player] =
+        highlight
 end
 
 local function updateESP()
-    for _, player in ipairs(Players:GetPlayers()) do
+    for _, player in
+        ipairs(Players:GetPlayers()) do
+
         if espEnabled then
             createESP(player)
         else
@@ -477,17 +600,20 @@ end)
 
 Players.PlayerRemoving:Connect(removeESP)
 
-local espButton = makeToggle("ESP", 0)
+local espButton =
+    makeToggle("ESP", 0)
 
 espButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
 
     if espEnabled then
         espButton.Text = "ESP  [ON]"
-        espButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
+        espButton.BackgroundColor3 =
+            Color3.fromRGB(45, 125, 70)
     else
         espButton.Text = "ESP  [OFF]"
-        espButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        espButton.BackgroundColor3 =
+            Color3.fromRGB(35, 35, 45)
     end
 
     updateESP()
@@ -501,46 +627,69 @@ local flyEnabled = false
 local flySpeed = 4
 local flyTouchHeld = false
 
-local flyButton = makeToggle("FLY JUMP", 52)
+local flyButton =
+    makeToggle("FLY JUMP", 52)
 
 flyButton.MouseButton1Click:Connect(function()
     flyEnabled = not flyEnabled
 
     if flyEnabled then
         flyButton.Text = "FLY JUMP  [ON]"
-        flyButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
+        flyButton.BackgroundColor3 =
+            Color3.fromRGB(45, 125, 70)
     else
         flyButton.Text = "FLY JUMP  [OFF]"
-        flyButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        flyButton.BackgroundColor3 =
+            Color3.fromRGB(35, 35, 45)
     end
 end)
 
-local flyTouch = Instance.new("TextButton")
-flyTouch.Size = UDim2.new(0, 62, 0, 62)
-flyTouch.Position = UDim2.new(1, -85, 1, -150)
-flyTouch.BackgroundColor3 = Color3.fromRGB(45, 125, 255)
+local flyTouch =
+    Instance.new("TextButton")
+
+flyTouch.Size =
+    UDim2.new(0, 62, 0, 62)
+
+flyTouch.Position =
+    UDim2.new(1, -85, 1, -150)
+
+flyTouch.BackgroundColor3 =
+    Color3.fromRGB(45, 125, 255)
+
 flyTouch.BorderSizePixel = 0
 flyTouch.Text = "↑"
-flyTouch.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTouch.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
 flyTouch.TextSize = 30
 flyTouch.Font = Enum.Font.GothamBold
 flyTouch.Visible = true
 flyTouch.Parent = gui
 
-local flyCorner = Instance.new("UICorner")
-flyCorner.CornerRadius = UDim.new(1, 0)
+local flyCorner =
+    Instance.new("UICorner")
+
+flyCorner.CornerRadius =
+    UDim.new(1, 0)
+
 flyCorner.Parent = flyTouch
 
 flyTouch.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType ==
+        Enum.UserInputType.Touch
+        or input.UserInputType ==
+        Enum.UserInputType.MouseButton1 then
+
         flyTouchHeld = true
     end
 end)
 
 flyTouch.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType ==
+        Enum.UserInputType.Touch
+        or input.UserInputType ==
+        Enum.UserInputType.MouseButton1 then
+
         flyTouchHeld = false
     end
 end)
@@ -551,29 +700,39 @@ end)
 
 local noclipEnabled = false
 
-local noclipButton = makeToggle("NOCLIP", 104)
+local noclipButton =
+    makeToggle("NOCLIP", 104)
 
 noclipButton.MouseButton1Click:Connect(function()
     noclipEnabled = not noclipEnabled
 
     if noclipEnabled then
         noclipButton.Text = "NOCLIP  [ON]"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(45, 125, 70)
+        noclipButton.BackgroundColor3 =
+            Color3.fromRGB(45, 125, 70)
     else
         noclipButton.Text = "NOCLIP  [OFF]"
-        noclipButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+        noclipButton.BackgroundColor3 =
+            Color3.fromRGB(35, 35, 45)
     end
 end)
 
+--------------------------------------------------
+-- MOVEMENT LOOP
+--------------------------------------------------
+
 RunService.Stepped:Connect(function()
-    local character = LocalPlayer.Character
+    local character =
+        LocalPlayer.Character
 
     if not character then
         return
     end
 
     if noclipEnabled then
-        for _, part in ipairs(character:GetDescendants()) do
+        for _, part in
+            ipairs(character:GetDescendants()) do
+
             if part:IsA("BasePart") then
                 part.CanCollide = false
             end
@@ -581,14 +740,18 @@ RunService.Stepped:Connect(function()
     end
 
     if flyEnabled and flyTouchHeld then
-        local root = character:FindFirstChild("HumanoidRootPart")
+        local root =
+            character:FindFirstChild(
+                "HumanoidRootPart"
+            )
 
         if root then
-            root.Velocity = Vector3.new(
-                root.Velocity.X,
-                flySpeed * 10,
-                root.Velocity.Z
-            )
+            root.Velocity =
+                Vector3.new(
+                    root.Velocity.X,
+                    flySpeed * 10,
+                    root.Velocity.Z
+                )
         end
     end
 end)
@@ -598,13 +761,17 @@ end)
 --------------------------------------------------
 
 local function clearContent()
-    for _, child in ipairs(content:GetChildren()) do
+    for _, child in
+        ipairs(content:GetChildren()) do
+
         child.Visible = false
     end
 end
 
 mainTab.MouseButton1Click:Connect(function()
-    for _, child in ipairs(content:GetChildren()) do
+    for _, child in
+        ipairs(content:GetChildren()) do
+
         child.Visible = true
     end
 end)
@@ -621,20 +788,35 @@ end)
 -- HIDE / OPEN
 --------------------------------------------------
 
-local openButton = Instance.new("TextButton")
-openButton.Size = UDim2.new(0, 58, 0, 58)
-openButton.Position = UDim2.new(0, 20, 0.5, -29)
-openButton.BackgroundColor3 = Color3.fromRGB(35, 105, 230)
+local openButton =
+    Instance.new("TextButton")
+
+openButton.Size =
+    UDim2.new(0, 58, 0, 58)
+
+openButton.Position =
+    UDim2.new(0, 20, 0.5, -29)
+
+openButton.BackgroundColor3 =
+    Color3.fromRGB(35, 105, 230)
+
 openButton.BorderSizePixel = 0
 openButton.Text = "≡"
-openButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+openButton.TextColor3 =
+    Color3.fromRGB(255, 255, 255)
+
 openButton.TextSize = 30
 openButton.Font = Enum.Font.GothamBold
 openButton.Visible = false
 openButton.Parent = gui
 
-local openCorner = Instance.new("UICorner")
-openCorner.CornerRadius = UDim.new(1, 0)
+local openCorner =
+    Instance.new("UICorner")
+
+openCorner.CornerRadius =
+    UDim.new(1, 0)
+
 openCorner.Parent = openButton
 
 hideButton.MouseButton1Click:Connect(function()
