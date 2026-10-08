@@ -113,12 +113,12 @@ task.wait(5)
 if loadingFrame then loadingFrame:Destroy() end
 
 local COLORS = {
-    background = Color3.fromRGB(58, 65, 84),
-    panel = Color3.fromRGB(75, 84, 108),
-    panel2 = Color3.fromRGB(91, 103, 132),
-    button = Color3.fromRGB(105, 119, 151),
-    text = Color3.fromRGB(245, 248, 255),
-    muted = Color3.fromRGB(235, 240, 255),
+    background = Color3.fromRGB(112, 125, 153),
+    panel = Color3.fromRGB(145, 158, 187),
+    panel2 = Color3.fromRGB(171, 185, 211),
+    button = Color3.fromRGB(190, 202, 226),
+    text = Color3.fromRGB(20, 27, 45),
+    muted = Color3.fromRGB(38, 47, 70),
     accent = Color3.fromRGB(0, 220, 255),
     green = Color3.fromRGB(58, 235, 164),
     red = Color3.fromRGB(255, 77, 119)
@@ -141,9 +141,9 @@ local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
 make("UIGradient", {
     Rotation = 115,
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(76, 88, 116)),
-        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(62, 73, 99)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(86, 61, 103))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(163, 181, 216)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(130, 151, 190)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(177, 139, 198))
     })
 }, main)
 
@@ -499,8 +499,8 @@ local liveStatus = make("TextLabel", {
     BackgroundColor3 = COLORS.panel2,
     BorderSizePixel = 0,
     Text = "СТАТУС  •  Загрузка...",
-    TextColor3 = COLORS.text,
-    TextSize = 11,
+    TextColor3 = Color3.fromRGB(18, 26, 45),
+    TextSize = 10,
     Font = Enum.Font.GothamBold,
     TextWrapped = true,
     TextXAlignment = Enum.TextXAlignment.Left,
@@ -1202,8 +1202,8 @@ miniPanel = make("Frame", {
 }, main)
 local microPanel = make("Frame", {
     Name = "MicroPanel",
-    Position = UDim2.new(0, 10, 0, 68),
-    Size = UDim2.new(1, -20, 0, 48),
+    Position = UDim2.new(0, 0, 0, 0),
+    Size = UDim2.new(1, 0, 1, 0),
     BackgroundColor3 = COLORS.panel2,
     BorderSizePixel = 0,
     Visible = false
@@ -1214,13 +1214,30 @@ local microStatus = make("TextLabel", {
     Position = UDim2.new(0, 10, 0, 0),
     Size = UDim2.new(1, -20, 1, 0),
     BackgroundTransparency = 1,
-    Text = "RAHERHUB  •  READY",
+    Text = "RH  |  FPS --  |  PING --",
     TextColor3 = COLORS.text,
     TextSize = 11,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Center,
     TextWrapped = true
 }, microPanel)
+-- MICRO can be dragged anywhere on screen; later FPS/PING values fit here.
+local microDragging, microDragStart, microStartPos = false, nil, nil
+microPanel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        microDragging = true
+        microDragStart = input.Position
+        microStartPos = main.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then microDragging = false end end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if microDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - microDragStart
+        main.Position = UDim2.new(microStartPos.X.Scale, microStartPos.X.Offset + delta.X, microStartPos.Y.Scale, microStartPos.Y.Offset + delta.Y)
+    end
+end)
+
 local miniStatus = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 22),
     BackgroundTransparency = 1,
@@ -1396,6 +1413,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 local function enterFullMode()
+    header.Visible = true
     miniMode = false
     microMode = false
     tabsBar.Visible = true
@@ -1409,6 +1427,7 @@ local function enterFullMode()
 end
 
 local function enterMiniMode()
+    header.Visible = true
     miniMode = true
     microMode = false
     tabsBar.Visible = false
@@ -1427,7 +1446,11 @@ local function enterMicroMode()
     content.Visible = false
     miniPanel.Visible = false
     microPanel.Visible = true
-    main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 390) - 100, 190, 230), 112)
+    main.Size = UDim2.fromOffset(178, 34)
+    main.Position = UDim2.new(0.5, -89, 0, 12)
+    header.Visible = false
+    tabsBar.Visible = false
+    content.Visible = false
     miniModeButton.Text = "▣"
     microModeButton.Text = "•••"
 end
