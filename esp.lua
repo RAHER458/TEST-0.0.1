@@ -9,7 +9,10 @@ local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 
---// GUI
+--==================================================
+-- GUI
+--==================================================
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "RAHERHUB"
 ScreenGui.ResetOnSpawn = false
@@ -24,7 +27,7 @@ if not ScreenGui.Parent then
 end
 
 --==================================================
--- LOADING SCREEN
+-- LOADING
 --==================================================
 
 local loading = Instance.new("Frame")
@@ -122,10 +125,10 @@ loading:Destroy()
 --==================================================
 
 local ACTIVATION_PASSWORD = string.char(
-    49, -- 1
-    52, -- 4
-    56, -- 8
-    56  -- 8
+    49,
+    52,
+    56,
+    56
 )
 
 local activated = false
@@ -215,7 +218,7 @@ end)
 repeat task.wait() until activated
 
 --==================================================
--- MAIN GUI
+-- MAIN WINDOW
 --==================================================
 
 local main = Instance.new("Frame")
@@ -227,7 +230,10 @@ main.Parent = ScreenGui
 
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
 
---// TITLE BAR
+--==================================================
+-- TITLE BAR
+--==================================================
+
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 52)
 titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 34)
@@ -258,7 +264,7 @@ closeButton.Font = Enum.Font.GothamBold
 closeButton.Parent = titleBar
 
 --==================================================
--- DRAG MAIN WINDOW
+-- WINDOW DRAG
 --==================================================
 
 local dragging = false
@@ -341,6 +347,7 @@ local tabFeature2 = createTab("FEATURE 2", 4)
 
 local function createPage()
     local page = Instance.new("Frame")
+
     page.Size = UDim2.new(1, -20, 1, -112)
     page.Position = UDim2.new(0, 10, 0, 108)
     page.BackgroundTransparency = 1
@@ -395,53 +402,6 @@ end)
 tabFeature2.MouseButton1Click:Connect(function()
     showPage(4)
 end)
-
---==================================================
--- HELPERS
---==================================================
-
-local function createToggle(parent, text, y)
-    local button = Instance.new("TextButton")
-
-    button.Size = UDim2.new(1, 0, 0, 48)
-    button.Position = UDim2.new(0, 0, 0, y)
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    button.BorderSizePixel = 0
-    button.Text = text .. ": OFF"
-    button.TextColor3 = Color3.fromRGB(230, 230, 235)
-    button.TextSize = 14
-    button.TextXAlignment = Enum.TextXAlignment.Left
-    button.Font = Enum.Font.GothamMedium
-    button.Parent = parent
-
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 15)
-    padding.Parent = button
-
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 9)
-
-    local state = false
-
-    local function setState(value)
-        state = value
-
-        if state then
-            button.Text = text .. ": ON"
-            button.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
-        else
-            button.Text = text .. ": OFF"
-            button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        end
-    end
-
-    button.MouseButton1Click:Connect(function()
-        setState(not state)
-    end)
-
-    return button, function()
-        return state
-    end, setState
-end
 
 --==================================================
 -- ESP
@@ -637,7 +597,6 @@ speedButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- SPEED VALUE
 local speedValueLabel = Instance.new("TextLabel")
 speedValueLabel.Size = UDim2.new(1, 0, 0, 25)
 speedValueLabel.Position = UDim2.new(0, 0, 0, 168)
@@ -648,7 +607,6 @@ speedValueLabel.TextSize = 13
 speedValueLabel.Font = Enum.Font.GothamMedium
 speedValueLabel.Parent = mainPage
 
--- SPEED SLIDER
 local sliderBack = Instance.new("Frame")
 sliderBack.Size = UDim2.new(1, -20, 0, 8)
 sliderBack.Position = UDim2.new(0, 10, 0, 202)
@@ -751,7 +709,6 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- SPEED LIMIT LABELS
 local minLabel = Instance.new("TextLabel")
 minLabel.Size = UDim2.new(0, 40, 0, 20)
 minLabel.Position = UDim2.new(0, 0, 0, 215)
@@ -773,7 +730,6 @@ maxLabel.Font = Enum.Font.Gotham
 maxLabel.TextXAlignment = Enum.TextXAlignment.Right
 maxLabel.Parent = mainPage
 
--- KEEP SPEED ACTIVE
 RunService.Heartbeat:Connect(function()
     if speedEnabled then
         local character = LocalPlayer.Character
@@ -787,6 +743,168 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+
+--==================================================
+-- TELEPORT POINTS
+--==================================================
+
+local teleportPoints = {}
+local pointNumber = 0
+
+local pointList = Instance.new("ScrollingFrame")
+pointList.Size = UDim2.new(1, 0, 0, 245)
+pointList.Position = UDim2.new(0, 0, 0, 105)
+pointList.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+pointList.BorderSizePixel = 0
+pointList.ScrollBarThickness = 4
+pointList.CanvasSize = UDim2.new(0, 0, 0, 0)
+pointList.Parent = feature1Page
+
+Instance.new("UICorner", pointList).CornerRadius = UDim.new(0, 9)
+
+local pointLayout = Instance.new("UIListLayout")
+pointLayout.Padding = UDim.new(0, 6)
+pointLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+pointLayout.SortOrder = Enum.SortOrder.LayoutOrder
+pointLayout.Parent = pointList
+
+local pointPadding = Instance.new("UIPadding")
+pointPadding.PaddingTop = UDim.new(0, 7)
+pointPadding.PaddingBottom = UDim.new(0, 7)
+pointPadding.PaddingLeft = UDim.new(0, 7)
+pointPadding.PaddingRight = UDim.new(0, 7)
+pointPadding.Parent = pointList
+
+local pointInfo = Instance.new("TextLabel")
+pointInfo.Size = UDim2.new(1, 0, 0, 30)
+pointInfo.Position = UDim2.new(0, 0, 0, 70)
+pointInfo.BackgroundTransparency = 1
+pointInfo.Text = "Saved points"
+pointInfo.TextColor3 = Color3.fromRGB(160, 160, 170)
+pointInfo.TextSize = 12
+pointInfo.Font = Enum.Font.GothamMedium
+pointInfo.Parent = feature1Page
+
+local createPointButton = Instance.new("TextButton")
+createPointButton.Size = UDim2.new(1, 0, 0, 48)
+createPointButton.Position = UDim2.new(0, 0, 0, 5)
+createPointButton.BackgroundColor3 = Color3.fromRGB(55, 105, 190)
+createPointButton.BorderSizePixel = 0
+createPointButton.Text = "+ CREATE POINT"
+createPointButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+createPointButton.TextSize = 14
+createPointButton.Font = Enum.Font.GothamBold
+createPointButton.Parent = feature1Page
+
+Instance.new("UICorner", createPointButton).CornerRadius = UDim.new(0, 9)
+
+local function updatePointCanvas()
+    task.wait()
+
+    pointList.CanvasSize = UDim2.new(
+        0,
+        0,
+        0,
+        pointLayout.AbsoluteContentSize.Y + 14
+    )
+end
+
+local function createPointEntry(pointData)
+    local entry = Instance.new("Frame")
+
+    entry.Size = UDim2.new(1, 0, 0, 52)
+    entry.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
+    entry.BorderSizePixel = 0
+    entry.LayoutOrder = pointData.id
+    entry.Parent = pointList
+
+    Instance.new("UICorner", entry).CornerRadius = UDim.new(0, 8)
+
+    local teleportButton = Instance.new("TextButton")
+    teleportButton.Size = UDim2.new(1, -70, 1, 0)
+    teleportButton.Position = UDim2.new(0, 0, 0, 0)
+    teleportButton.BackgroundTransparency = 1
+    teleportButton.Text =
+        "  Point " .. tostring(pointData.id)
+    teleportButton.TextColor3 = Color3.fromRGB(235, 235, 240)
+    teleportButton.TextSize = 13
+    teleportButton.TextXAlignment = Enum.TextXAlignment.Left
+    teleportButton.Font = Enum.Font.GothamMedium
+    teleportButton.Parent = entry
+
+    local deleteButton = Instance.new("TextButton")
+    deleteButton.Size = UDim2.new(0, 58, 0, 38)
+    deleteButton.Position = UDim2.new(1, -62, 0.5, -19)
+    deleteButton.BackgroundColor3 = Color3.fromRGB(130, 45, 50)
+    deleteButton.BorderSizePixel = 0
+    deleteButton.Text = "×"
+    deleteButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    deleteButton.TextSize = 20
+    deleteButton.Font = Enum.Font.GothamBold
+    deleteButton.Parent = entry
+
+    Instance.new("UICorner", deleteButton).CornerRadius = UDim.new(0, 7)
+
+    teleportButton.MouseButton1Click:Connect(function()
+        local character = LocalPlayer.Character
+
+        if not character then
+            return
+        end
+
+        local root = character:FindFirstChild("HumanoidRootPart")
+
+        if not root then
+            return
+        end
+
+        root.CFrame = pointData.cframe
+    end)
+
+    deleteButton.MouseButton1Click:Connect(function()
+        for i, point in ipairs(teleportPoints) do
+            if point == pointData then
+                table.remove(teleportPoints, i)
+                break
+            end
+        end
+
+        entry:Destroy()
+        updatePointCanvas()
+    end)
+
+    return entry
+end
+
+createPointButton.MouseButton1Click:Connect(function()
+    local character = LocalPlayer.Character
+
+    if not character then
+        return
+    end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if not root then
+        return
+    end
+
+    pointNumber += 1
+
+    local pointData = {
+        id = pointNumber,
+        cframe = root.CFrame
+    }
+
+    table.insert(teleportPoints, pointData)
+
+    createPointEntry(pointData)
+    updatePointCanvas()
+end)
+
+pointLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(
+    updatePointCanvas
+)
 
 --==================================================
 -- FLY
@@ -918,7 +1036,6 @@ flyJumpButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- MOVE FLY BUTTON
 local moveFlyButton = Instance.new("TextButton")
 moveFlyButton.Size = UDim2.new(1, 0, 0, 48)
 moveFlyButton.Position = UDim2.new(0, 0, 0, 60)
@@ -1008,7 +1125,7 @@ plusButton.MouseButton1Click:Connect(function()
 end)
 
 --==================================================
--- RESET FLY POSITION
+-- RESET FLY
 --==================================================
 
 local resetFlyButton = Instance.new("TextButton")
@@ -1041,21 +1158,6 @@ flyInfo.TextSize = 12
 flyInfo.Font = Enum.Font.Gotham
 flyInfo.TextWrapped = true
 flyInfo.Parent = flyPage
-
---==================================================
--- FEATURE 1
---==================================================
-
-local feature1Text = Instance.new("TextLabel")
-feature1Text.Size = UDim2.new(1, 0, 0, 100)
-feature1Text.Position = UDim2.new(0, 0, 0, 30)
-feature1Text.BackgroundTransparency = 1
-feature1Text.Text = "FEATURE 1\nReserved for future testing"
-feature1Text.TextColor3 = Color3.fromRGB(170, 170, 180)
-feature1Text.TextSize = 15
-feature1Text.Font = Enum.Font.GothamMedium
-feature1Text.TextWrapped = true
-feature1Text.Parent = feature1Page
 
 --==================================================
 -- FEATURE 2
@@ -1091,7 +1193,7 @@ openButton.Parent = ScreenGui
 Instance.new("UICorner", openButton).CornerRadius = UDim.new(1, 0)
 
 --==================================================
--- CLOSE / OPEN MENU
+-- CLOSE / OPEN
 --==================================================
 
 closeButton.MouseButton1Click:Connect(function()
