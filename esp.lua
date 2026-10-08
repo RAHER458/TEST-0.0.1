@@ -113,12 +113,12 @@ task.wait(5)
 if loadingFrame then loadingFrame:Destroy() end
 
 local COLORS = {
-    background = Color3.fromRGB(25, 29, 43),
-    panel = Color3.fromRGB(38, 44, 63),
-    panel2 = Color3.fromRGB(52, 61, 85),
-    button = Color3.fromRGB(62, 71, 97),
+    background = Color3.fromRGB(58, 65, 84),
+    panel = Color3.fromRGB(75, 84, 108),
+    panel2 = Color3.fromRGB(91, 103, 132),
+    button = Color3.fromRGB(105, 119, 151),
     text = Color3.fromRGB(245, 248, 255),
-    muted = Color3.fromRGB(199, 208, 229),
+    muted = Color3.fromRGB(235, 240, 255),
     accent = Color3.fromRGB(0, 220, 255),
     green = Color3.fromRGB(58, 235, 164),
     red = Color3.fromRGB(255, 77, 119)
@@ -141,16 +141,18 @@ local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
 make("UIGradient", {
     Rotation = 115,
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(42, 49, 72)),
-        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(30, 36, 55)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 34, 70))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(76, 88, 116)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(62, 73, 99)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(86, 61, 103))
     })
 }, main)
 
 -- Fit the panel to small screens while keeping a comfortable touch layout.
+local miniMode, microMode = false, false
 local function fitPanel()
     local camera = workspace.CurrentCamera
     if not camera then return end
+    if miniMode or microMode then return end
     local viewport = camera.ViewportSize
     -- Compact by default: never occupy almost the entire phone screen.
     local width = math.clamp(viewport.X - 36, 280, 370)
@@ -190,7 +192,7 @@ local rgbGradient = make("UIGradient", {
 local title = make("TextLabel", {
     Name = "Title",
     Position = UDim2.new(0, 15, 0, 5),
-    Size = UDim2.new(1, -132, 0, 30),
+    Size = UDim2.new(1, -150, 0, 30),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
@@ -201,7 +203,7 @@ local title = make("TextLabel", {
 
 local subtitle = make("TextLabel", {
     Position = UDim2.new(0, 16, 0, 34),
-    Size = UDim2.new(1, -132, 0, 16),
+    Size = UDim2.new(1, -150, 0, 16),
     BackgroundTransparency = 1,
     Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
     TextColor3 = COLORS.muted,
@@ -239,7 +241,20 @@ local miniModeButton = make("TextButton", {
     AutoButtonColor = true
 }, header)
 corner(miniModeButton, 10)
-local miniMode = false
+local microModeButton = make("TextButton", {
+    Name = "MicroMode",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -92, 0, 9),
+    Size = UDim2.fromOffset(32, 38),
+    BackgroundColor3 = COLORS.button,
+    BorderSizePixel = 0,
+    Text = "· · ·",
+    TextColor3 = COLORS.text,
+    TextSize = 14,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = true
+}, header)
+corner(microModeButton, 10)
 local miniPanel
 local mainScale = make("UIScale", {Scale = 1}, main)
 local openCloseTween
@@ -1185,6 +1200,27 @@ miniPanel = make("Frame", {
     BackgroundTransparency = 1,
     Visible = false
 }, main)
+local microPanel = make("Frame", {
+    Name = "MicroPanel",
+    Position = UDim2.new(0, 10, 0, 68),
+    Size = UDim2.new(1, -20, 0, 48),
+    BackgroundColor3 = COLORS.panel2,
+    BorderSizePixel = 0,
+    Visible = false
+}, main)
+corner(microPanel, 12)
+stroke(microPanel, COLORS.accent, 1, 0.2)
+local microStatus = make("TextLabel", {
+    Position = UDim2.new(0, 10, 0, 0),
+    Size = UDim2.new(1, -20, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "RAHERHUB  •  READY",
+    TextColor3 = COLORS.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Center,
+    TextWrapped = true
+}, microPanel)
 local miniStatus = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 22),
     BackgroundTransparency = 1,
@@ -1279,9 +1315,9 @@ end
 local function layoutMiniControls()
     miniSpeedCard.Visible = miniExpanded == "SPEED" and speedEnabled
     miniFlyCard.Visible = miniExpanded == "FLY" and flyEnabled
-    miniPanel.Size = UDim2.new(1, -20, 0, (miniSpeedCard.Visible or miniFlyCard.Visible) and 130 or 72)
-    main.Size = UDim2.fromOffset(350, (miniSpeedCard.Visible or miniFlyCard.Visible) and 218 or 160)
-    fitPanel()
+    local expanded = miniSpeedCard.Visible or miniFlyCard.Visible
+    miniPanel.Size = UDim2.new(1, -20, 0, expanded and 130 or 72)
+    main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 390) - 70, 240, 300), expanded and 218 or 150)
     updateMiniSliderVisuals()
 end
 
@@ -1359,23 +1395,52 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
+local function enterFullMode()
+    miniMode = false
+    microMode = false
+    tabsBar.Visible = true
+    content.Visible = true
+    miniPanel.Visible = false
+    microPanel.Visible = false
+    main.Size = UDim2.fromOffset(350, 430)
+    fitPanel()
+    miniModeButton.Text = "▣"
+    microModeButton.Text = "· · ·"
+end
+
+local function enterMiniMode()
+    miniMode = true
+    microMode = false
+    tabsBar.Visible = false
+    content.Visible = false
+    miniPanel.Visible = true
+    microPanel.Visible = false
+    miniModeButton.Text = "□"
+    microModeButton.Text = "· · ·"
+    layoutMiniControls()
+end
+
+local function enterMicroMode()
+    miniMode = false
+    microMode = true
+    tabsBar.Visible = false
+    content.Visible = false
+    miniPanel.Visible = false
+    microPanel.Visible = true
+    main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 390) - 100, 190, 230), 112)
+    miniModeButton.Text = "▣"
+    microModeButton.Text = "•••"
+end
+
 miniModeButton.Activated:Connect(function()
-    miniMode = not miniMode
     playUIClick()
-    if miniMode then
-        tabsBar.Visible = false
-        content.Visible = false
-        miniPanel.Visible = true
-        miniModeButton.Text = "□"
-        layoutMiniControls()
-    else
-        miniPanel.Visible = false
-        tabsBar.Visible = true
-        content.Visible = true
-        main.Size = UDim2.fromOffset(350, 430)
-        fitPanel()
-        miniModeButton.Text = "▣"
-    end
+    if miniMode then enterFullMode() else enterMiniMode() end
+    updateFlyButton()
+end)
+
+microModeButton.Activated:Connect(function()
+    playUIClick()
+    if microMode then enterFullMode() else enterMicroMode() end
     updateFlyButton()
 end)
 
@@ -1394,6 +1459,9 @@ task.spawn(function()
         if miniStatus and miniStatus.Parent then
             miniStatus.Text = string.format("SPD %d  |  SPEED %s  |  FLY %s  |  NC %s",
                 actualSpeed, flag(speedEnabled), flag(flyEnabled), flag(noclipEnabled))
+        end
+        if microStatus and microStatus.Parent then
+            microStatus.Text = string.format("RH  •  SPD %d  •  %s  •  %s", actualSpeed, speedEnabled and "SPD ON" or "SPD OFF", flyEnabled and "FLY ON" or "FLY OFF")
         end
         task.wait(0.25)
     end
