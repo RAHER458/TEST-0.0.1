@@ -4,6 +4,8 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
@@ -34,9 +36,7 @@ local function make(className, props, parent)
 end
 
 local function corner(parent, radius)
-    return make("UICorner", {
-        CornerRadius = UDim.new(0, radius or 12)
-    }, parent)
+    return make("UICorner", {CornerRadius = UDim.new(0, radius or 12)}, parent)
 end
 
 local function stroke(parent, color, thickness, transparency)
@@ -48,10 +48,7 @@ local function stroke(parent, color, thickness, transparency)
 end
 
 local function safeParentGui(gui)
-    local ok = pcall(function()
-        gui.Parent = game:GetService("CoreGui")
-    end)
-
+    local ok = pcall(function() gui.Parent = game:GetService("CoreGui") end)
     if not ok or not gui.Parent then
         gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     end
@@ -63,105 +60,57 @@ local gui = make("ScreenGui", {
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     IgnoreGuiInset = true
 })
-
 safeParentGui(gui)
 
 -- Five-second animated loading screen
 local loadingFrame = make("Frame", {
-    Name = "LoadingScreen",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundColor3 = Color3.fromRGB(10, 11, 18),
-    BorderSizePixel = 0,
+    Name = "LoadingScreen", Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Color3.fromRGB(10, 11, 18), BorderSizePixel = 0,
     ZIndex = 1000
 }, gui)
-
 local loadingTitle = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 50),
-    Position = UDim2.new(0, 0, 0.36, 0),
-    BackgroundTransparency = 1,
-    Text = "RAHERHUB",
-    TextColor3 = Color3.fromRGB(255, 80, 190),
-    TextSize = 31,
-    Font = Enum.Font.GothamBlack,
-    ZIndex = 1001
+    Size = UDim2.new(1, 0, 0, 50), Position = UDim2.new(0, 0, 0.36, 0),
+    BackgroundTransparency = 1, Text = "RAHERHUB", TextColor3 = Color3.fromRGB(255, 80, 190),
+    TextSize = 31, Font = Enum.Font.GothamBlack, ZIndex = 1001
 }, loadingFrame)
-
 local loadingSubtitle = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 24),
-    Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1,
-    Text = "NEON SYSTEM  •  VERSION 0.1",
-    TextColor3 = Color3.fromRGB(160, 165, 190),
-    TextSize = 12,
-    Font = Enum.Font.GothamMedium,
-    ZIndex = 1001
+    Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
+    BackgroundTransparency = 1, Text = "NEON SYSTEM  •  VERSION 0.1", TextColor3 = Color3.fromRGB(160, 165, 190),
+    TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
-
 local loadingTrack = make("Frame", {
-    Size = UDim2.new(0.7, 0, 0, 10),
-    Position = UDim2.new(0.15, 0, 0.56, 0),
-    BackgroundColor3 = Color3.fromRGB(39, 42, 58),
-    BorderSizePixel = 0,
-    ZIndex = 1001
+    Size = UDim2.new(0.7, 0, 0, 10), Position = UDim2.new(0.15, 0, 0.56, 0),
+    BackgroundColor3 = Color3.fromRGB(39, 42, 58), BorderSizePixel = 0, ZIndex = 1001
 }, loadingFrame)
-
 corner(loadingTrack, 6)
-
 local loadingFill = make("Frame", {
-    Size = UDim2.new(0, 0, 1, 0),
-    BackgroundColor3 = Color3.fromRGB(255, 70, 190),
-    BorderSizePixel = 0,
-    ZIndex = 1002
+    Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(255, 70, 190),
+    BorderSizePixel = 0, ZIndex = 1002
 }, loadingTrack)
-
 corner(loadingFill, 6)
-
 local loadingPercent = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 24),
-    Position = UDim2.new(0, 0, 0.56, 16),
-    BackgroundTransparency = 1,
-    Text = "0%",
-    TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 13,
-    Font = Enum.Font.GothamBold,
-    ZIndex = 1001
+    Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.56, 16),
+    BackgroundTransparency = 1, Text = "0%", TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 13, Font = Enum.Font.GothamBold, ZIndex = 1001
 }, loadingFrame)
-
 local loadingHint = make("TextLabel", {
-    Size = UDim2.new(1, -30, 0, 26),
-    Position = UDim2.new(0, 15, 0.68, 0),
-    BackgroundTransparency = 1,
-    Text = "Подготавливаем интерфейс...",
-    TextColor3 = Color3.fromRGB(160, 165, 190),
-    TextSize = 12,
-    Font = Enum.Font.Gotham,
-    ZIndex = 1001
+    Size = UDim2.new(1, -30, 0, 26), Position = UDim2.new(0, 15, 0.68, 0),
+    BackgroundTransparency = 1, Text = "Подготавливаем интерфейс...", TextColor3 = Color3.fromRGB(160, 165, 190),
+    TextSize = 12, Font = Enum.Font.Gotham, ZIndex = 1001
 }, loadingFrame)
-
 task.spawn(function()
     local started = os.clock()
-
     while loadingFrame.Parent and os.clock() - started < 5 do
         local elapsed = math.min(os.clock() - started, 5)
         local progress = elapsed / 5
-
         loadingFill.Size = UDim2.new(progress, 0, 1, 0)
         loadingPercent.Text = tostring(math.floor(progress * 100)) .. "%"
-        loadingTitle.TextColor3 = Color3.fromHSV(
-            (elapsed * 0.22) % 1,
-            0.7,
-            1
-        )
-
+        loadingTitle.TextColor3 = Color3.fromHSV((elapsed * 0.22) % 1, 0.7, 1)
         task.wait(0.03)
     end
 end)
-
 task.wait(5)
-
-if loadingFrame then
-    loadingFrame:Destroy()
-end
+if loadingFrame then loadingFrame:Destroy() end
 
 local COLORS = {
     background = Color3.fromRGB(8, 10, 18),
@@ -175,7 +124,7 @@ local COLORS = {
     red = Color3.fromRGB(255, 77, 119)
 }
 
-local main = make("Frame", {
+local main = make("CanvasGroup", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
@@ -184,19 +133,11 @@ local main = make("Frame", {
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
-
 main.Size = UDim2.new(0, 350, 0, 430)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
-
+main.GroupTransparency = 0
 corner(main, 18)
-
-local mainStroke = stroke(
-    main,
-    Color3.fromRGB(0, 220, 255),
-    1.5,
-    0.08
-)
-
+local mainStroke = stroke(main, Color3.fromRGB(0, 220, 255), 1.5, 0.08)
 make("UIGradient", {
     Rotation = 115,
     Color = ColorSequence.new({
@@ -209,22 +150,13 @@ make("UIGradient", {
 -- Fit the panel to small screens while keeping a comfortable touch layout.
 local function fitPanel()
     local camera = workspace.CurrentCamera
-
-    if not camera then
-        return
-    end
-
+    if not camera then return end
     local viewport = camera.ViewportSize
-
-    -- Compact by default: never occupy almost the entire phone screen.
     local width = math.clamp(viewport.X - 36, 280, 370)
     local height = math.clamp(viewport.Y - 150, 300, 470)
-
     main.Size = UDim2.fromOffset(width, height)
 end
-
 fitPanel()
-
 if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitPanel)
 end
@@ -235,9 +167,7 @@ local header = make("Frame", {
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, main)
-
 corner(header, 18)
-
 local rgbStrip = make("Frame", {
     Name = "RGBAccent",
     Position = UDim2.new(0, 12, 0, 59),
@@ -246,9 +176,7 @@ local rgbStrip = make("Frame", {
     BorderSizePixel = 0,
     ZIndex = 5
 }, main)
-
 corner(rgbStrip, 2)
-
 local rgbGradient = make("UIGradient", {
     Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 230, 255)),
@@ -261,7 +189,7 @@ local rgbGradient = make("UIGradient", {
 local title = make("TextLabel", {
     Name = "Title",
     Position = UDim2.new(0, 15, 0, 5),
-    Size = UDim2.new(1, -92, 0, 30),
+    Size = UDim2.new(1, -132, 0, 30),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
@@ -272,7 +200,7 @@ local title = make("TextLabel", {
 
 local subtitle = make("TextLabel", {
     Position = UDim2.new(0, 16, 0, 34),
-    Size = UDim2.new(1, -95, 0, 16),
+    Size = UDim2.new(1, -132, 0, 16),
     BackgroundTransparency = 1,
     Text = "NEON INTERFACE  /  PRIVATE BUILD " .. VERSION,
     TextColor3 = COLORS.muted,
@@ -294,25 +222,84 @@ local minimize = make("TextButton", {
     Font = Enum.Font.GothamBold,
     AutoButtonColor = true
 }, header)
-
 corner(minimize, 12)
+
+local miniModeButton = make("TextButton", {
+    Name = "MiniMode",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -54, 0, 9),
+    Size = UDim2.fromOffset(32, 38),
+    BackgroundColor3 = COLORS.button,
+    BorderSizePixel = 0,
+    Text = "▣",
+    TextColor3 = COLORS.text,
+    TextSize = 17,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true
+}, header)
+corner(miniModeButton, 10)
+local miniMode = false
+local miniPanel
+local mainScale = make("UIScale", {Scale = 1}, main)
+local openCloseTween
+
+local function animateMain(show)
+    if openCloseTween then
+        pcall(function()
+            openCloseTween:Cancel()
+        end)
+    end
+
+    if show then
+        main.Visible = true
+        main.GroupTransparency = 1
+        mainScale.Scale = 0.92
+
+        openCloseTween = TweenService:Create(
+            main,
+            TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+            {GroupTransparency = 0}
+        )
+
+        TweenService:Create(
+            mainScale,
+            TweenInfo.new(0.26, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Scale = 1}
+        ):Play()
+
+        openCloseTween:Play()
+    else
+        openCloseTween = TweenService:Create(
+            main,
+            TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {GroupTransparency = 1}
+        )
+
+        TweenService:Create(
+            mainScale,
+            TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Scale = 0.92}
+        ):Play()
+
+        openCloseTween:Play()
+        openCloseTween.Completed:Once(function()
+            if main and main.Parent and main.GroupTransparency >= 0.99 then
+                main.Visible = false
+            end
+        end)
+    end
+end
 
 -- Rainbow title animation.
 local hue = 0
 local rgbConnection
-local openButtonStroke
-
 rgbConnection = RunService.RenderStepped:Connect(function(dt)
     if not title.Parent then
-        if rgbConnection then
-            rgbConnection:Disconnect()
-        end
-
+        if rgbConnection then rgbConnection:Disconnect() end
         return
     end
 
     hue = (hue + dt * 0.22) % 1
-
     title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
     mainStroke.Color = Color3.fromHSV((hue + 0.12) % 1, 0.82, 1)
 
@@ -327,7 +314,6 @@ end)
 
 -- Drag by the header on mouse or touch.
 local dragging, dragStart, startPos = false, nil, nil
-
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
@@ -350,7 +336,6 @@ UserInputService.InputChanged:Connect(function(input)
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
         local delta = input.Position - dragStart
-
         main.Position = UDim2.new(
             startPos.X.Scale,
             startPos.X.Offset + delta.X,
@@ -363,10 +348,7 @@ end)
 local openButton = make("TextButton", {
     Name = "OpenButton",
     Visible = false,
-    Position = UDim2.fromOffset(
-        savedUI.rhPosition.x or 18,
-        savedUI.rhPosition.y or 300
-    ),
+    Position = UDim2.fromOffset(savedUI.rhPosition.x or 18, savedUI.rhPosition.y or 300),
     Size = UDim2.fromOffset(58, 58),
     BackgroundColor3 = COLORS.accent,
     BorderSizePixel = 0,
@@ -375,24 +357,20 @@ local openButton = make("TextButton", {
     TextSize = 18,
     Font = Enum.Font.GothamBlack
 }, gui)
-
 corner(openButton, 29)
-
-openButtonStroke = stroke(
-    openButton,
-    Color3.fromRGB(0, 220, 255),
-    2,
-    0.05
-)
+local openButtonStroke = stroke(openButton, Color3.fromRGB(0, 220, 255), 2, 0.05)
 
 minimize.Activated:Connect(function()
-    main.Visible = false
-    openButton.Visible = true
+    animateMain(false)
+    task.delay(0.2, function()
+        if openButton and openButton.Parent then
+            openButton.Visible = true
+        end
+    end)
 end)
 
 do
-    local rhDragging, rhStart, rhStartPos, rhInput, rhMoved =
-        false, nil, nil, nil, false
+    local rhDragging, rhStart, rhStartPos, rhInput, rhMoved = false, nil, nil, nil, false
 
     openButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch
@@ -449,7 +427,7 @@ do
             or input.UserInputType == Enum.UserInputType.MouseButton1 then
 
             if not rhMoved then
-                main.Visible = true
+                animateMain(true)
                 openButton.Visible = false
             end
 
@@ -490,16 +468,10 @@ local tabCaptions = {
     ["COMING SOON"] = "MORE"
 }
 
-for _, tabName in ipairs({
-    "MAIN",
-    "FUNCTIONS",
-    "TELEPORT",
-    "SETTINGS",
-    "COMING SOON"
-}) do
+for _, tabName in ipairs({"MAIN", "FUNCTIONS", "TELEPORT", "SETTINGS", "COMING SOON"}) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
-        Size = UDim2.new(1 / 5, -6, 1, 0),
+        Size = UDim2.new(1/5, -6, 1, 0),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = tabCaptions[tabName] or tabName,
@@ -545,16 +517,10 @@ local function selectTab(name)
 
     for tabName, page in pairs(pages) do
         page.Visible = tabName == name
-
         tabButtons[tabName].BackgroundColor3 =
-            tabName == name
-            and Color3.fromRGB(44, 57, 83)
-            or COLORS.button
-
+            tabName == name and Color3.fromRGB(44, 57, 83) or COLORS.button
         tabButtons[tabName].TextColor3 =
-            tabName == name
-            and Color3.fromRGB(0, 230, 255)
-            or COLORS.muted
+            tabName == name and Color3.fromRGB(0, 230, 255) or COLORS.muted
     end
 end
 
@@ -622,28 +588,31 @@ local statusLabel = make("TextLabel", {
     Font = Enum.Font.GothamMedium,
     TextWrapped = true
 }, pages["MAIN"])
-
 corner(statusLabel, 11)
 
 section(pages["MAIN"], "OVERVIEW")
+infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
+infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест.")
+infoCard(pages["MAIN"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
-infoCard(
-    pages["MAIN"],
-    "RAHERHUB 0.1",
-    "Личная сборка с интерфейсом для телефона и сохранением точек телепорта."
-)
-
-infoCard(
-    pages["MAIN"],
-    "БЫСТРЫЙ СТАРТ",
-    "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест."
-)
-
-infoCard(
-    pages["MAIN"],
-    "ХРАНЕНИЕ ТОЧЕК",
-    "Точки сохраняются на устройстве, если среда поддерживает работу с файлами."
-)
+local liveStatus = make("TextLabel", {
+    Name = "LiveStatusPanel",
+    Size = UDim2.new(1, -2, 0, 58),
+    BackgroundColor3 = COLORS.panel2,
+    BorderSizePixel = 0,
+    Text = "СТАТУС  •  Загрузка...",
+    TextColor3 = COLORS.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center
+}, pages["MAIN"])
+corner(liveStatus, 11)
+make("UIPadding", {
+    PaddingLeft = UDim.new(0, 12),
+    PaddingRight = UDim.new(0, 8)
+}, liveStatus)
 
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
@@ -659,9 +628,7 @@ local function makeActionButton(parent, text, callback, height)
     }, parent)
 
     corner(button, 12)
-
     button.Activated:Connect(callback)
-
     return button
 end
 
@@ -677,10 +644,7 @@ local function makeToggle(parent, label, initial, callback)
     button = makeActionButton(parent, "", function()
         enabled = not enabled
         paint()
-
-        if callback then
-            callback(enabled)
-        end
+        if callback then callback(enabled) end
     end)
 
     paint()
@@ -688,20 +652,12 @@ local function makeToggle(parent, label, initial, callback)
     return button, function(value)
         enabled = value and true or false
         paint()
-
-        if callback then
-            callback(enabled)
-        end
+        if callback then callback(enabled) end
     end
 end
 
 section(pages["FUNCTIONS"], "УПРАВЛЕНИЕ ПЕРСОНАЖЕМ")
-
-infoCard(
-    pages["FUNCTIONS"],
-    "Инструменты тестирования",
-    "Используйте инструменты только в своей игре или там, где у вас есть разрешение."
-)
+infoCard(pages["FUNCTIONS"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
 
 -- Скорость ходьбы: диапазон 16–1000
 local speedEnabled = false
@@ -710,21 +666,15 @@ local walkSpeed = 16
 local function applyWalkSpeed()
     local character = LocalPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
     if humanoid then
         humanoid.WalkSpeed = speedEnabled and walkSpeed or 16
     end
 end
 
-makeToggle(
-    pages["FUNCTIONS"],
-    "Ускорение ходьбы",
-    false,
-    function(value)
-        speedEnabled = value
-        applyWalkSpeed()
-    end
-)
+local _, setSpeedToggle = makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
+    speedEnabled = value
+    applyWalkSpeed()
+end)
 
 local walkSpeedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24),
@@ -741,7 +691,6 @@ local walkSpeedTrack = make("Frame", {
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, pages["FUNCTIONS"])
-
 corner(walkSpeedTrack, 11)
 
 local walkSpeedBar = make("Frame", {
@@ -750,43 +699,36 @@ local walkSpeedBar = make("Frame", {
     BackgroundColor3 = COLORS.accent,
     BorderSizePixel = 0
 }, walkSpeedTrack)
-
 corner(walkSpeedBar, 5)
 
 local walkSpeedKnob = make("TextButton", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0, 10, 0.5, 0),
     Size = UDim2.fromOffset(25, 25),
-    BackgroundColor3 = Color3.new(1, 1, 1),
+    BackgroundColor3 = Color3.new(1,1,1),
     BorderSizePixel = 0,
     Text = "",
     AutoButtonColor = false
 }, walkSpeedTrack)
-
 corner(walkSpeedKnob, 13)
 
 local walkSpeedDragging = false
-
 local function setWalkSpeedFromX(x)
     local left = walkSpeedTrack.AbsolutePosition.X + 10
     local width = math.max(1, walkSpeedTrack.AbsoluteSize.X - 20)
     local alpha = math.clamp((x - left) / width, 0, 1)
 
     walkSpeed = math.floor(16 + alpha * (1000 - 16) + 0.5)
-
     walkSpeedLabel.Text = "СКОРОСТЬ: " .. walkSpeed
     walkSpeedBar.Size = UDim2.new(alpha, 0, 0, 8)
     walkSpeedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
 
-    if speedEnabled then
-        applyWalkSpeed()
-    end
+    if speedEnabled then applyWalkSpeed() end
 end
 
 walkSpeedTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         walkSpeedDragging = true
         setWalkSpeedFromX(input.Position.X)
     end
@@ -795,7 +737,6 @@ end)
 walkSpeedKnob.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         walkSpeedDragging = true
         setWalkSpeedFromX(input.Position.X)
     end
@@ -813,17 +754,13 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         walkSpeedDragging = false
     end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.5)
-
-    if speedEnabled then
-        applyWalkSpeed()
-    end
+    if speedEnabled then applyWalkSpeed() end
 end)
 
 -- ESP highlight state.
@@ -832,22 +769,14 @@ local espObjects = {}
 
 local function removeESP(player)
     local object = espObjects[player]
-
     if object then
-        pcall(function()
-            object:Destroy()
-        end)
+        pcall(function() object:Destroy() end)
     end
-
     espObjects[player] = nil
 end
 
 local function createESP(player)
-    if not espEnabled
-        or player == LocalPlayer
-        or not player.Character
-        or espObjects[player] then
-
+    if not espEnabled or player == LocalPlayer or not player.Character or espObjects[player] then
         return
     end
 
@@ -859,7 +788,6 @@ local function createESP(player)
     highlight.OutlineTransparency = 0
     highlight.Adornee = player.Character
     highlight.Parent = player.Character
-
     espObjects[player] = highlight
 end
 
@@ -882,15 +810,10 @@ end)
 
 Players.PlayerRemoving:Connect(removeESP)
 
-makeToggle(
-    pages["FUNCTIONS"],
-    "Подсветка игроков (ESP)",
-    false,
-    function(value)
-        espEnabled = value
-        updateESP()
-    end
-)
+local _, setESPToggle = makeToggle(pages["FUNCTIONS"], "Подсветка игроков (ESP)", false, function(value)
+    espEnabled = value
+    updateESP()
+end)
 
 -- FLY: one floating button. Hold to rise; release to fall. Drag it in edit mode.
 local flyTouch
@@ -898,32 +821,16 @@ local flyEditMode = false
 local flyHeld = false
 local flyEnabled = false
 local flySpeed = 4
+local flyDragState = {dragging = false, start = nil, startPos = nil, input = nil}
 
-local flyDragState = {
-    dragging = false,
-    start = nil,
-    startPos = nil,
-    input = nil
-}
+local _, setFlyToggle = makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
+    flyEnabled = value
+    if not value then flyHeld = false end
 
-makeToggle(
-    pages["FUNCTIONS"],
-    "Полёт (удерживать для подъёма)",
-    false,
-    function(value)
-        flyEnabled = value
-
-        if not value then
-            flyHeld = false
-        end
-
-        if flyTouch then
-            flyTouch.Visible =
-                flyEditMode
-                or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
-        end
+    if flyTouch then
+        flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
     end
-)
+end)
 
 local speedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24),
@@ -940,7 +847,6 @@ local speedTrack = make("Frame", {
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, pages["FUNCTIONS"])
-
 corner(speedTrack, 11)
 
 local speedBar = make("Frame", {
@@ -949,30 +855,26 @@ local speedBar = make("Frame", {
     BackgroundColor3 = COLORS.accent,
     BorderSizePixel = 0
 }, speedTrack)
-
 corner(speedBar, 5)
 
 local speedKnob = make("TextButton", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new((flySpeed - 1) / 19, 10, 0.5, 0),
     Size = UDim2.fromOffset(25, 25),
-    BackgroundColor3 = Color3.new(1, 1, 1),
+    BackgroundColor3 = Color3.new(1,1,1),
     BorderSizePixel = 0,
     Text = "",
     AutoButtonColor = false
 }, speedTrack)
-
 corner(speedKnob, 13)
 
 local speedDragging = false
-
 local function setFlySpeedFromX(x)
     local left = speedTrack.AbsolutePosition.X + 10
     local width = math.max(1, speedTrack.AbsoluteSize.X - 20)
     local alpha = math.clamp((x - left) / width, 0, 1)
 
     flySpeed = math.floor(1 + alpha * 19 + 0.5)
-
     speedLabel.Text = "СИЛА ПОЛЁТА: " .. flySpeed
     speedBar.Size = UDim2.new(alpha, 0, 0, 8)
     speedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
@@ -981,7 +883,6 @@ end
 speedTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         speedDragging = true
         setFlySpeedFromX(input.Position.X)
     end
@@ -990,7 +891,6 @@ end)
 speedKnob.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         speedDragging = true
         setFlySpeedFromX(input.Position.X)
     end
@@ -1008,13 +908,11 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
         or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         speedDragging = false
     end
 end)
 
 local flyPos = savedUI.flyPosition
-
 flyTouch = make("TextButton", {
     Name = "FlyHoldButton",
     Visible = false,
@@ -1031,43 +929,27 @@ flyTouch = make("TextButton", {
     AutoButtonColor = false,
     ZIndex = 100
 }, gui)
-
 corner(flyTouch, 100)
+stroke(flyTouch, Color3.fromRGB(255,255,255), 1, 0.35)
 
-stroke(
-    flyTouch,
-    Color3.fromRGB(255, 255, 255),
-    1,
-    0.35
-)
+local _, setFlyEditToggle = makeToggle(pages["FUNCTIONS"], "Редактировать кнопку FLY", false, function(value)
+    flyEditMode = value
+    flyHeld = false
 
-local _, setFlyEditToggle = makeToggle(
-    pages["FUNCTIONS"],
-    "Редактировать кнопку FLY",
-    false,
-    function(value)
-        flyEditMode = value
-        flyHeld = false
-
-        if flyTouch then
-            flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
-            flyTouch.Visible =
-                value
-                or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
-        end
-
-        statusLabel.Text = value
-            and "Перетащи кнопку FLY пальцем. Нажатие в этом режиме не запускает полёт."
-            or "Режим редактирования FLY выключен."
-
-        statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
+    if flyTouch then
+        flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
+        flyTouch.Visible = value or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
     end
-)
+
+    statusLabel.Text = value
+        and "Перетащи кнопку FLY пальцем. Нажатие в этом режиме не запускает полёт."
+        or "Режим редактирования FLY выключен."
+    statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
+end)
 
 flyTouch.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Touch
         and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
-
         return
     end
 
@@ -1082,23 +964,14 @@ flyTouch.InputBegan:Connect(function(input)
 end)
 
 local function releaseFly()
-    if not flyHeld then
-        return
-    end
-
+    if not flyHeld then return end
     flyHeld = false
 
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
-
     if root then
         local velocity = root.AssemblyLinearVelocity
-
-        root.AssemblyLinearVelocity = Vector3.new(
-            velocity.X,
-            -2,
-            velocity.Z
-        )
+        root.AssemblyLinearVelocity = Vector3.new(velocity.X, -2, velocity.Z)
     end
 end
 
@@ -1108,7 +981,6 @@ flyTouch.InputEnded:Connect(function(input)
 
         if flyEditMode then
             flyDragState.dragging = false
-
             savedUI.flyPosition = {
                 x = flyTouch.Position.X.Offset,
                 y = flyTouch.Position.Y.Offset
@@ -1120,9 +992,7 @@ flyTouch.InputEnded:Connect(function(input)
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if flyEditMode
-        and flyDragState.dragging
-        and flyDragState.start
+    if flyEditMode and flyDragState.dragging and flyDragState.start
         and (
             input == flyDragState.input
             or input.UserInputType == Enum.UserInputType.Touch
@@ -1130,7 +1000,6 @@ UserInputService.InputChanged:Connect(function(input)
         ) then
 
         local delta = input.Position - flyDragState.start
-
         local camera = workspace.CurrentCamera
         local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
         local size = flyTouch.AbsoluteSize
@@ -1157,7 +1026,6 @@ UserInputService.InputEnded:Connect(function(input)
 
         if flyEditMode and flyDragState.dragging then
             flyDragState.dragging = false
-
             savedUI.flyPosition = {
                 x = flyTouch.Position.X.Offset,
                 y = flyTouch.Position.Y.Offset
@@ -1171,37 +1039,25 @@ end)
 local noclipEnabled = false
 local originalCollision = {}
 
-makeToggle(
-    pages["FUNCTIONS"],
-    "Проход сквозь объекты (Noclip)",
-    false,
-    function(value)
-        noclipEnabled = value
+local _, setNoclipToggle = makeToggle(pages["FUNCTIONS"], "Проход сквозь объекты (Noclip)", false, function(value)
+    noclipEnabled = value
 
-        if not value then
-            for part, oldValue in pairs(originalCollision) do
-                if part and part.Parent then
-                    pcall(function()
-                        part.CanCollide = oldValue
-                    end)
-                end
+    if not value then
+        for part, oldValue in pairs(originalCollision) do
+            if part and part.Parent then
+                pcall(function() part.CanCollide = oldValue end)
             end
-
-            table.clear(originalCollision)
         end
+
+        table.clear(originalCollision)
     end
-)
+end)
 
 RunService.Stepped:Connect(function()
-    if speedEnabled then
-        applyWalkSpeed()
-    end
+    if speedEnabled then applyWalkSpeed() end
 
     local character = LocalPlayer.Character
-
-    if not character then
-        return
-    end
+    if not character then return end
 
     if noclipEnabled then
         for _, part in ipairs(character:GetDescendants()) do
@@ -1209,7 +1065,6 @@ RunService.Stepped:Connect(function()
                 if originalCollision[part] == nil then
                     originalCollision[part] = part.CanCollide
                 end
-
                 part.CanCollide = false
             end
         end
@@ -1217,28 +1072,17 @@ RunService.Stepped:Connect(function()
 
     if flyEnabled and flyHeld then
         local root = character:FindFirstChild("HumanoidRootPart")
-
         if root then
             local velocity = root.AssemblyLinearVelocity
-
-            root.AssemblyLinearVelocity = Vector3.new(
-                velocity.X,
-                flySpeed * 10,
-                velocity.Z
-            )
+            root.AssemblyLinearVelocity = Vector3.new(velocity.X, flySpeed * 10, velocity.Z)
         end
     end
 end)
 
 -- Show the single FLY button while the feature is enabled or being edited.
 local function updateFlyButton()
-    if not flyTouch then
-        return
-    end
-
-    flyTouch.Visible =
-        flyEditMode
-        or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+    if not flyTouch then return end
+    flyTouch.Visible = flyEditMode or (main.Visible and not miniMode and activeTab == "FUNCTIONS" and flyEnabled)
 end
 
 for _, button in pairs(tabButtons) do
@@ -1260,21 +1104,13 @@ local function canUseFiles()
 end
 
 local function loadPoints()
-    if not canUseFiles() then
-        return
-    end
+    if not canUseFiles() then return end
 
     local ok, exists = pcall(isfile, POINTS_FILE)
-
-    if not ok or not exists then
-        return
-    end
+    if not ok or not exists then return end
 
     local readOK, raw = pcall(readfile, POINTS_FILE)
-
-    if not readOK or type(raw) ~= "string" then
-        return
-    end
+    if not readOK or type(raw) ~= "string" then return end
 
     local decodeOK, data = pcall(function()
         return HttpService:JSONDecode(raw)
@@ -1301,36 +1137,24 @@ end
 
 local function savePoints()
     if not canUseFiles() then
-        statusLabel.Text =
-            "Файловое сохранение недоступно: точки останутся до конца сессии."
-
+        statusLabel.Text = "Файловое сохранение недоступно: точки останутся до конца сессии."
         statusLabel.TextColor3 = Color3.fromRGB(255, 190, 90)
-
         return false
     end
 
     local ok, raw = pcall(function()
         return HttpService:JSONEncode(teleportPoints)
     end)
-
-    if not ok then
-        return false
-    end
+    if not ok then return false end
 
     local writeOK = pcall(writefile, POINTS_FILE, raw)
-
     return writeOK
 end
 
 loadPoints()
 
 section(pages["TELEPORT"], "УПРАВЛЕНИЕ ТОЧКАМИ")
-
-infoCard(
-    pages["TELEPORT"],
-    "Сохранённые места",
-    "Сохраните текущее место, чтобы позже вернуться к нему."
-)
+infoCard(pages["TELEPORT"], "Сохранённые места", "Сохраните текущее место, чтобы позже вернуться к нему.")
 
 local pointNameBox = make("TextBox", {
     Size = UDim2.new(1, -2, 0, 46),
@@ -1344,7 +1168,6 @@ local pointNameBox = make("TextBox", {
     Font = Enum.Font.Gotham,
     ClearTextOnFocus = false
 }, pages["TELEPORT"])
-
 corner(pointNameBox, 12)
 
 local pointsList = make("Frame", {
@@ -1352,7 +1175,6 @@ local pointsList = make("Frame", {
     AutomaticSize = Enum.AutomaticSize.Y,
     BackgroundTransparency = 1
 }, pages["TELEPORT"])
-
 make("UIListLayout", {
     Padding = UDim.new(0, 7),
     SortOrder = Enum.SortOrder.LayoutOrder
@@ -1377,11 +1199,10 @@ local function refreshPoints()
             Text = "Сохранённых точек пока нет.",
             TextColor3 = COLORS.muted,
             TextSize = 12,
-            Font = Enum.Font.Gotham
+            Font = Enum.Font.Gotham,
         }, pointsList)
 
         corner(empty, 10)
-
         return
     end
 
@@ -1411,12 +1232,7 @@ local function refreshPoints()
             Position = UDim2.new(0, 11, 0, 30),
             Size = UDim2.new(1, -22, 0, 16),
             BackgroundTransparency = 1,
-            Text = string.format(
-                "X %.1f   Y %.1f   Z %.1f",
-                point.x,
-                point.y,
-                point.z
-            ),
+            Text = string.format("X %.1f   Y %.1f   Z %.1f", point.x, point.y, point.z),
             TextColor3 = COLORS.muted,
             TextSize = 10,
             Font = Enum.Font.Code,
@@ -1429,7 +1245,7 @@ local function refreshPoints()
             BackgroundColor3 = COLORS.accent,
             BorderSizePixel = 0,
             Text = "ПЕРЕМЕСТИТЬСЯ",
-            TextColor3 = Color3.new(1, 1, 1),
+            TextColor3 = Color3.new(1,1,1),
             TextSize = 11,
             Font = Enum.Font.GothamBold
         }, row)
@@ -1448,7 +1264,6 @@ local function refreshPoints()
 
             -- Local character movement: use only in your own place / authorized tests.
             root.CFrame = CFrame.new(point.x, point.y + 3, point.z)
-
             statusLabel.Text = "Перемещение к точке: " .. point.name
             statusLabel.TextColor3 = COLORS.green
         end)
@@ -1460,7 +1275,7 @@ local function refreshPoints()
             BackgroundColor3 = COLORS.red,
             BorderSizePixel = 0,
             Text = "УДАЛИТЬ",
-            TextColor3 = Color3.new(1, 1, 1),
+            TextColor3 = Color3.new(1,1,1),
             TextSize = 11,
             Font = Enum.Font.GothamBold
         }, row)
@@ -1475,88 +1290,61 @@ local function refreshPoints()
     end
 end
 
-makeActionButton(
-    pages["TELEPORT"],
-    "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕСТО",
-    function()
-        local character = LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
+makeActionButton(pages["TELEPORT"], "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕСТО", function()
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
 
-        if not root then
-            statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
+    if not root then
+        statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
+        statusLabel.TextColor3 = COLORS.red
+        return
+    end
+
+    local name = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then
+        name = "Точка " .. tostring(#teleportPoints + 1)
+    end
+
+    for _, point in ipairs(teleportPoints) do
+        if point.name:lower() == name:lower() then
+            statusLabel.Text = "Точка с таким названием уже существует."
             statusLabel.TextColor3 = COLORS.red
             return
         end
-
-        local name = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
-
-        if name == "" then
-            name = "Точка " .. tostring(#teleportPoints + 1)
-        end
-
-        for _, point in ipairs(teleportPoints) do
-            if point.name:lower() == name:lower() then
-                statusLabel.Text = "Точка с таким названием уже существует."
-                statusLabel.TextColor3 = COLORS.red
-                return
-            end
-        end
-
-        local pos = root.Position
-
-        table.insert(teleportPoints, {
-            name = name,
-            x = pos.X,
-            y = pos.Y,
-            z = pos.Z
-        })
-
-        local saved = savePoints()
-
-        pointNameBox.Text = ""
-        refreshPoints()
-
-        statusLabel.Text = saved
-            and ("Точка сохранена: " .. name)
-            or ("Точка создана: " .. name .. " (session only)")
-
-        statusLabel.TextColor3 = saved
-            and COLORS.green
-            or Color3.fromRGB(255, 190, 90)
     end
-)
 
-makeActionButton(
-    pages["TELEPORT"],
-    "УДАЛИТЬ ВСЕ ТОЧКИ",
-    function()
-        table.clear(teleportPoints)
-        savePoints()
-        refreshPoints()
+    local pos = root.Position
+    table.insert(teleportPoints, {
+        name = name,
+        x = pos.X,
+        y = pos.Y,
+        z = pos.Z
+    })
 
-        statusLabel.Text = "Все сохранённые точки удалены."
-        statusLabel.TextColor3 = COLORS.muted
-    end
-)
+    local saved = savePoints()
+    pointNameBox.Text = ""
+    refreshPoints()
 
--- SETTINGS: customize independently draggable flight controls.
+    statusLabel.Text = saved
+        and ("Точка сохранена: " .. name)
+        or ("Точка создана: " .. name .. " (session only)")
+
+    statusLabel.TextColor3 = saved and COLORS.green or Color3.fromRGB(255, 190, 90)
+end)
+
+makeActionButton(pages["TELEPORT"], "УДАЛИТЬ ВСЕ ТОЧКИ", function()
+    table.clear(teleportPoints)
+    savePoints()
+    refreshPoints()
+    statusLabel.Text = "Все сохранённые точки удалены."
+    statusLabel.TextColor3 = COLORS.muted
+end)
+
+-- SETTINGS: customize both independently draggable flight controls.
 section(pages["SETTINGS"], "INTERFACE SETTINGS")
+infoCard(pages["SETTINGS"], "Настройка кнопок FLY", "Изменяйте размер и прозрачность обеих кнопок. Позиции кнопок сохраняются отдельно.")
 
-infoCard(
-    pages["SETTINGS"],
-    "Настройка кнопок FLY",
-    "Изменяйте размер и прозрачность обеих кнопок. Позиции кнопок сохраняются отдельно."
-)
-
-local function createSettingSlider(
-    parent,
-    titleText,
-    minValue,
-    maxValue,
-    initialValue,
-    formatter,
-    onChange
-)
+local function createSettingSlider(parent, titleText, minValue, maxValue, initialValue, formatter, onChange)
     local wrap = make("Frame", {
         Size = UDim2.new(1, -2, 0, 68),
         BackgroundColor3 = COLORS.panel,
@@ -1582,7 +1370,6 @@ local function createSettingSlider(
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0
     }, wrap)
-
     corner(track, 5)
 
     local alpha = (initialValue - minValue) / (maxValue - minValue)
@@ -1592,7 +1379,6 @@ local function createSettingSlider(
         BackgroundColor3 = COLORS.accent,
         BorderSizePixel = 0
     }, track)
-
     corner(fill, 5)
 
     local knob = make("TextButton", {
@@ -1604,7 +1390,6 @@ local function createSettingSlider(
         Text = "",
         AutoButtonColor = false
     }, track)
-
     corner(knob, 11)
 
     local dragging = false
@@ -1613,22 +1398,17 @@ local function createSettingSlider(
         local left = track.AbsolutePosition.X
         local width = math.max(1, track.AbsoluteSize.X)
         local ratio = math.clamp((x - left) / width, 0, 1)
-
-        local value = math.floor(
-            minValue + ratio * (maxValue - minValue) + 0.5
-        )
+        local value = math.floor(minValue + ratio * (maxValue - minValue) + 0.5)
 
         fill.Size = UDim2.new(ratio, 0, 1, 0)
         knob.Position = UDim2.new(ratio, 0, 0.5, 0)
         label.Text = titleText .. ": " .. formatter(value)
-
         onChange(value)
     end
 
     local function begin(input)
         if input.UserInputType == Enum.UserInputType.Touch
             or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
             dragging = true
             setValueFromX(input.Position.X)
         end
@@ -1649,7 +1429,6 @@ local function createSettingSlider(
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch
             or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
             dragging = false
         end
     end)
@@ -1669,9 +1448,7 @@ createSettingSlider(
     44,
     110,
     savedUI.flySize,
-    function(v)
-        return tostring(v) .. " px"
-    end,
+    function(v) return tostring(v) .. " px" end,
     function(value)
         savedUI.flySize = value
         applyFlyAppearance()
@@ -1684,68 +1461,210 @@ createSettingSlider(
     0,
     85,
     math.floor(savedUI.flyOpacity * 100 + 0.5),
-    function(v)
-        return tostring(v) .. "%"
-    end,
+    function(v) return tostring(v) .. "%" end,
     function(value)
         savedUI.flyOpacity = value / 100
         applyFlyAppearance()
     end
 )
 
-makeActionButton(
-    pages["SETTINGS"],
-    "СБРОСИТЬ ПОЗИЦИЮ FLY",
-    function()
-        savedUI.flyPosition = {x = -24, y = -150}
-        flyTouch.Position = UDim2.new(1, -24, 1, -150)
+makeActionButton(pages["SETTINGS"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
+    savedUI.flyPosition = {x = -24, y = -150}
+    flyTouch.Position = UDim2.new(1, -24, 1, -150)
+    statusLabel.Text = "Позиция кнопки FLY сброшена."
+    statusLabel.TextColor3 = COLORS.green
+end)
 
-        statusLabel.Text = "Позиция кнопки FLY сброшена."
-        statusLabel.TextColor3 = COLORS.green
-    end
-)
+makeActionButton(pages["SETTINGS"], "СБРОСИТЬ РАЗМЕР И ПРОЗРАЧНОСТЬ", function()
+    savedUI.flySize = 66
+    savedUI.flyOpacity = 0.12
+    applyFlyAppearance()
+    statusLabel.Text = "Размер и прозрачность кнопок сброшены."
+    statusLabel.TextColor3 = COLORS.green
+end)
 
-makeActionButton(
-    pages["SETTINGS"],
-    "СБРОСИТЬ РАЗМЕР И ПРОЗРАЧНОСТЬ",
-    function()
-        savedUI.flySize = 66
-        savedUI.flyOpacity = 0.12
-
-        applyFlyAppearance()
-
-        statusLabel.Text = "Размер и прозрачность кнопок сброшены."
-        statusLabel.TextColor3 = COLORS.green
-    end
-)
-
-makeActionButton(
-    pages["SETTINGS"],
-    "ГОТОВО / ВЫЙТИ ИЗ РЕДАКТИРОВАНИЯ",
-    function()
-        flyEditMode = false
-        flyTouch.Text = "FLY"
-
-        statusLabel.Text = "Настройки применены."
-        statusLabel.TextColor3 = COLORS.green
-
-        updateFlyButton()
-    end
-)
+makeActionButton(pages["SETTINGS"], "ГОТОВО / ВЫЙТИ ИЗ РЕДАКТИРОВАНИЯ", function()
+    flyEditMode = false
+    flyTouch.Text = "FLY"
+    statusLabel.Text = "Настройки применены."
+    statusLabel.TextColor3 = COLORS.green
+    updateFlyButton()
+end)
 
 section(pages["COMING SOON"], "COMING SOON")
+infoCard(pages["COMING SOON"], "В разработке", "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования.")
+infoCard(pages["COMING SOON"], "Следующие улучшения", "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования.")
 
-infoCard(
-    pages["COMING SOON"],
-    "В разработке",
-    "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования."
-)
+-- Optional UI click sounds. Sound playback is guarded because some launch environments block asset audio.
+local uiSoundsEnabled = false
+local uiClickSound = make("Sound", {
+    Name = "RAHERHUB_UIClick",
+    SoundId = "rbxassetid://6895079853",
+    Volume = 0.25
+}, SoundService)
 
-infoCard(
-    pages["COMING SOON"],
-    "Следующие улучшения",
-    "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования."
-)
+local function playUIClick()
+    if not uiSoundsEnabled then return end
+
+    pcall(function()
+        uiClickSound:Stop()
+        uiClickSound.TimePosition = 0
+        SoundService:PlayLocalSound(uiClickSound)
+    end)
+end
+
+makeToggle(pages["SETTINGS"], "Звуки интерфейса", false, function(value)
+    uiSoundsEnabled = value
+    statusLabel.Text = value
+        and "Звуки интерфейса включены (если доступны)."
+        or "Звуки интерфейса выключены."
+    statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
+    playUIClick()
+end)
+
+-- Compact mini mode: core toggles remain reachable without opening the full menu.
+miniPanel = make("Frame", {
+    Name = "MiniPanel",
+    Position = UDim2.new(0, 10, 0, 68),
+    Size = UDim2.new(1, -20, 0, 92),
+    BackgroundTransparency = 1,
+    Visible = false
+}, main)
+
+local miniStatus = make("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 24),
+    BackgroundTransparency = 1,
+    Text = "SPD 16  |  SPEED OFF  |  FLY OFF",
+    TextColor3 = COLORS.muted,
+    TextSize = 10,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, miniPanel)
+
+local miniButtonsRow = make("Frame", {
+    Position = UDim2.new(0, 0, 0, 29),
+    Size = UDim2.new(1, 0, 0, 40),
+    BackgroundTransparency = 1
+}, miniPanel)
+
+make("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    Padding = UDim.new(0, 6),
+    SortOrder = Enum.SortOrder.LayoutOrder
+}, miniButtonsRow)
+
+local function miniButton(label, callback)
+    local button = make("TextButton", {
+        Size = UDim2.new(1/4, -5, 1, 0),
+        BackgroundColor3 = COLORS.button,
+        BorderSizePixel = 0,
+        Text = label,
+        TextColor3 = COLORS.text,
+        TextSize = 10,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = true
+    }, miniButtonsRow)
+
+    corner(button, 10)
+    button.Activated:Connect(function()
+        playUIClick()
+        callback()
+    end)
+
+    return button
+end
+
+miniButton("SPEED", function()
+    setSpeedToggle(not speedEnabled)
+end)
+
+miniButton("FLY", function()
+    setFlyToggle(not flyEnabled)
+end)
+
+miniButton("NOCLIP", function()
+    setNoclipToggle(not noclipEnabled)
+end)
+
+miniButton("FULL", function()
+    miniMode = false
+    miniPanel.Visible = false
+    tabsBar.Visible = true
+    content.Visible = true
+    main.Size = UDim2.fromOffset(350, 430)
+    fitPanel()
+    miniModeButton.Text = "▣"
+    playUIClick()
+end)
+
+miniModeButton.Activated:Connect(function()
+    miniMode = not miniMode
+    playUIClick()
+
+    if miniMode then
+        tabsBar.Visible = false
+        content.Visible = false
+        miniPanel.Visible = true
+        main.Size = UDim2.fromOffset(350, 170)
+        miniModeButton.Text = "□"
+    else
+        miniPanel.Visible = false
+        tabsBar.Visible = true
+        content.Visible = true
+        main.Size = UDim2.fromOffset(350, 430)
+        fitPanel()
+        miniModeButton.Text = "▣"
+    end
+end)
+
+-- Keep the live status panel current without depending on a particular tab.
+task.spawn(function()
+    while gui.Parent do
+        local actualSpeed = 16
+        local character = LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+        if humanoid then
+            actualSpeed = math.floor(humanoid.WalkSpeed + 0.5)
+        end
+
+        local function flag(value)
+            return value and "ON" or "OFF"
+        end
+
+        if liveStatus and liveStatus.Parent then
+            liveStatus.Text = string.format(
+                "СТАТУС\nSPEED %s  •  %d\nFLY %s  •  NOCLIP %s  •  ESP %s",
+                flag(speedEnabled),
+                actualSpeed,
+                flag(flyEnabled),
+                flag(noclipEnabled),
+                flag(espEnabled)
+            )
+        end
+
+        if miniStatus and miniStatus.Parent then
+            miniStatus.Text = string.format(
+                "SPD %d  |  SPEED %s  |  FLY %s  |  NC %s",
+                actualSpeed,
+                flag(speedEnabled),
+                flag(flyEnabled),
+                flag(noclipEnabled)
+            )
+        end
+
+        task.wait(0.25)
+    end
+end)
+
+-- Route common button presses through the optional click sound.
+for _, obj in ipairs(gui:GetDescendants()) do
+    if obj:IsA("TextButton") and obj ~= openButton then
+        obj.Activated:Connect(playUIClick)
+    end
+end
 
 refreshPoints()
 selectTab("MAIN")
@@ -1762,9 +1681,23 @@ for _, button in pairs(tabButtons) do
 end
 
 minimize.Activated:Connect(syncFlyButton)
-
 openButton.Activated:Connect(function()
     task.defer(syncFlyButton)
 end)
+
+main.GroupTransparency = 1
+mainScale.Scale = 0.94
+
+TweenService:Create(
+    main,
+    TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    {GroupTransparency = 0}
+):Play()
+
+TweenService:Create(
+    mainScale,
+    TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Scale = 1}
+):Play()
 
 print("RAHERHUB " .. VERSION .. " запущен.")
