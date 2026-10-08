@@ -30,7 +30,6 @@ end
 
 local loading = Instance.new("Frame")
 loading.Size = UDim2.new(1, 0, 1, 0)
-loading.Position = UDim2.new(0, 0, 0, 0)
 loading.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 loading.BorderSizePixel = 0
 loading.ZIndex = 100
@@ -168,27 +167,15 @@ loading:Destroy()
 -- ACTIVATION
 --==================================================
 
-local function decodePart(data, key)
-    local result = {}
-
-    for i = 1, #data do
-        result[i] = string.char(data[i] - key)
-    end
-
-    return table.concat(result)
-end
-
--- 1 4 8 8
-local partA = decodePart({50}, 1)
-local partB = decodePart({55}, 3)
-local partC = decodePart({64}, 8)
-local partD = decodePart({64}, 8)
-
-local ACTIVATION_PASSWORD =
-    partA .. partB .. partC .. partD
-
-
 local activated = false
+
+-- Пароль: 1488
+local ACTIVATION_PASSWORD = string.char(
+    49, -- 1
+    52, -- 4
+    56, -- 8
+    56  -- 8
+)
 
 local activation = Instance.new("Frame")
 activation.Size = UDim2.new(0, 320, 0, 190)
@@ -272,7 +259,13 @@ errorLabel.Parent = activation
 
 
 local function checkPassword()
-    if passwordBox.Text == ACTIVATION_PASSWORD then
+
+    local entered = passwordBox.Text
+
+    entered = entered:gsub("^%s+", "")
+    entered = entered:gsub("%s+$", "")
+
+    if entered == ACTIVATION_PASSWORD then
 
         activated = true
 
@@ -291,13 +284,17 @@ local function checkPassword()
     end
 end
 
+
 activateButton.Activated:Connect(checkPassword)
 
 passwordBox.FocusLost:Connect(function(enterPressed)
+
     if enterPressed then
         checkPassword()
     end
+
 end)
+
 
 repeat
     task.wait()
@@ -418,6 +415,7 @@ end
 local function showPage(index)
 
     for i, page in ipairs(pages) do
+
         page.Visible = (i == index)
 
         if i == index then
@@ -427,61 +425,18 @@ local function showPage(index)
             tabs[i].BackgroundColor3 = Color3.fromRGB(32, 32, 42)
             tabs[i].TextColor3 = Color3.fromRGB(180, 180, 190)
         end
+
     end
 
 end
 
 
 for i, tab in ipairs(tabs) do
+
     tab.Activated:Connect(function()
         showPage(i)
     end)
-end
 
-
---==================================================
--- TOGGLE HELPER
---==================================================
-
-local function makeToggle(parent, text, y)
-
-    local button = Instance.new("TextButton")
-
-    button.Size = UDim2.new(1, 0, 0, 45)
-    button.Position = UDim2.new(0, 0, 0, y)
-
-    button.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
-    button.BorderSizePixel = 0
-    button.Text = text .. "  [OFF]"
-    button.TextColor3 = Color3.fromRGB(230, 230, 235)
-    button.TextSize = 14
-    button.Font = Enum.Font.GothamBold
-    button.ZIndex = 12
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = button
-
-    local enabled = false
-
-    button.Activated:Connect(function()
-
-        enabled = not enabled
-
-        if enabled then
-            button.Text = text .. "  [ON]"
-            button.BackgroundColor3 = Color3.fromRGB(60, 80, 65)
-        else
-            button.Text = text .. "  [OFF]"
-            button.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
-        end
-
-    end)
-
-    return button, function()
-        return enabled
-    end
 end
 
 
@@ -537,6 +492,7 @@ local function addESP(player)
     highlight.Parent = player.Character
 
     highlights[player] = highlight
+
 end
 
 
@@ -784,14 +740,13 @@ end)
 
 
 --==================================================
--- FLY SETTINGS PAGE
+-- FLY SETTINGS
 --==================================================
 
 local flyPage = pages[3]
 
 local flyTitle = Instance.new("TextLabel")
 flyTitle.Size = UDim2.new(1, 0, 0, 35)
-flyTitle.Position = UDim2.new(0, 0, 0, 0)
 flyTitle.BackgroundTransparency = 1
 flyTitle.Text = "FLY SETTINGS"
 flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -801,8 +756,6 @@ flyTitle.TextXAlignment = Enum.TextXAlignment.Left
 flyTitle.ZIndex = 12
 flyTitle.Parent = flyPage
 
-
--- Fly ON/OFF
 
 local flyToggle = Instance.new("TextButton")
 flyToggle.Size = UDim2.new(1, 0, 0, 45)
@@ -843,14 +796,12 @@ end)
 
 
 --==================================================
--- FLY MOVE MODE
+-- MOVE FLY BUTTON
 --==================================================
 
 local moveButton = Instance.new("TextButton")
-
 moveButton.Size = UDim2.new(1, 0, 0, 45)
 moveButton.Position = UDim2.new(0, 0, 0, 100)
-
 moveButton.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
 moveButton.BorderSizePixel = 0
 moveButton.Text = "MOVE FLY BUTTON  [OFF]"
@@ -942,14 +893,12 @@ end)
 
 
 --==================================================
--- SIZE CONTROLS
+-- SIZE
 --==================================================
 
 local sizeLabel = Instance.new("TextLabel")
-
 sizeLabel.Size = UDim2.new(0.5, 0, 0, 35)
 sizeLabel.Position = UDim2.new(0, 0, 0, 155)
-
 sizeLabel.BackgroundTransparency = 1
 sizeLabel.Text = "Button size: 60"
 sizeLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
@@ -961,10 +910,8 @@ sizeLabel.Parent = flyPage
 
 
 local minusButton = Instance.new("TextButton")
-
 minusButton.Size = UDim2.new(0, 45, 0, 35)
 minusButton.Position = UDim2.new(0.62, 0, 0, 155)
-
 minusButton.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
 minusButton.BorderSizePixel = 0
 minusButton.Text = "−"
@@ -980,10 +927,8 @@ minusCorner.Parent = minusButton
 
 
 local plusButton = Instance.new("TextButton")
-
 plusButton.Size = UDim2.new(0, 45, 0, 35)
 plusButton.Position = UDim2.new(0.78, 0, 0, 155)
-
 plusButton.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
 plusButton.BorderSizePixel = 0
 plusButton.Text = "+"
@@ -1007,8 +952,7 @@ local function updateFlySize()
         flyButtonSize
     )
 
-    sizeLabel.Text =
-        "Button size: " .. tostring(flyButtonSize)
+    sizeLabel.Text = "Button size: " .. tostring(flyButtonSize)
 
 end
 
@@ -1042,10 +986,8 @@ end)
 --==================================================
 
 local resetFlyButton = Instance.new("TextButton")
-
 resetFlyButton.Size = UDim2.new(1, 0, 0, 42)
 resetFlyButton.Position = UDim2.new(0, 0, 0, 205)
-
 resetFlyButton.BackgroundColor3 = Color3.fromRGB(32, 32, 42)
 resetFlyButton.BorderSizePixel = 0
 resetFlyButton.Text = "RESET FLY POSITION"
@@ -1077,14 +1019,11 @@ end)
 
 
 local flyInfo = Instance.new("TextLabel")
-
 flyInfo.Size = UDim2.new(1, 0, 0, 70)
 flyInfo.Position = UDim2.new(0, 0, 0, 260)
-
 flyInfo.BackgroundTransparency = 1
 flyInfo.Text =
     "Hold ↑ to rise\nRelease to fall\nMove mode allows dragging the button"
-
 flyInfo.TextColor3 = Color3.fromRGB(130, 130, 140)
 flyInfo.TextSize = 12
 flyInfo.Font = Enum.Font.Gotham
@@ -1204,7 +1143,6 @@ openButton.InputBegan:Connect(function(input)
 
         openDragging = true
         openMoved = false
-
         openDragStart = input.Position
         openStartPosition = openButton.Position
 
