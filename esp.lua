@@ -1,4 +1,4 @@
--- RAHERHUB 0.1 | Private testing UI
+-- RAHERHUB 0.1 | Compact RGB + Micro FPS/PING UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
+local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 
 local VERSION = "0.1"
@@ -134,7 +135,7 @@ local main = make("Frame", {
 main.Size = UDim2.new(0, 390, 0, 540)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
-stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
+local mainStroke = stroke(main, Color3.fromRGB(74, 80, 115), 1.6, 0.05)
 
 -- Fit the panel to small screens while keeping a comfortable touch layout.
 local function fitPanel()
@@ -196,16 +197,42 @@ local minimize = make("TextButton", {
 }, header)
 corner(minimize, 12)
 
--- Rainbow title animation.
+-- Rainbow title, border and HUD animation.
 local hue = 0
 local rgbConnection
+local statsHud
+local hudStroke
+local fpsValue = 0
+local frameCounter, fpsTimer, hudTimer = 0, 0, 0
 rgbConnection = RunService.RenderStepped:Connect(function(dt)
     if not title.Parent then
         if rgbConnection then rgbConnection:Disconnect() end
         return
     end
-    hue = (hue + dt * 0.22) % 1
-    title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
+    hue = (hue + dt * 0.32) % 1
+    title.TextColor3 = Color3.fromHSV(hue, 0.78, 1)
+    if mainStroke then
+        mainStroke.Color = Color3.fromHSV(hue, 0.9, 1)
+        mainStroke.Thickness = 1.6 + (math.sin(os.clock() * 3) + 1) * 0.7
+    end
+    frameCounter = frameCounter + 1
+    fpsTimer = fpsTimer + dt
+    hudTimer = hudTimer + dt
+    if fpsTimer >= 0.5 then
+        fpsValue = math.floor(frameCounter / fpsTimer + 0.5)
+        frameCounter, fpsTimer = 0, 0
+    end
+    if statsHud and hudTimer >= 0.25 then
+        hudTimer = 0
+        local pingText = "--"
+        pcall(function()
+            local item = Stats.Network.ServerStatsItem["Data Ping"]
+            if item then pingText = item:GetValueString():gsub(" ms", "") end
+        end)
+        statsHud.Text = "FPS " .. tostring(fpsValue) .. "  •  PING " .. pingText
+        statsHud.TextColor3 = Color3.fromHSV(hue, 0.65, 1)
+        if hudStroke then hudStroke.Color = Color3.fromHSV((hue + 0.18) % 1, 0.9, 1) end
+    end
 end)
 
 -- Drag by the header on mouse or touch.
@@ -240,6 +267,28 @@ local openButton = make("TextButton", {
     Font = Enum.Font.GothamBlack
 }, gui)
 corner(openButton, 29)
+local hudEnabled = false
+statsHud = make("TextButton", {
+    Name = "MicroFpsPing",
+    Visible = false,
+    Position = UDim2.fromOffset(12, 90),
+    Size = UDim2.fromOffset(150, 28),
+    BackgroundColor3 = COLORS.panel,
+    BackgroundTransparency = 0.12,
+    BorderSizePixel = 0,
+    Text = "FPS --  •  PING --",
+    TextColor3 = COLORS.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true,
+    ZIndex = 50
+}, gui)
+corner(statsHud, 10)
+hudStroke = stroke(statsHud, COLORS.accent, 1.5, 0.05)
+statsHud.Activated:Connect(function()
+    main.Visible = true
+    openButton.Visible = false
+end)
 
 minimize.Activated:Connect(function()
     main.Visible = false
@@ -443,6 +492,56 @@ local function makeToggle(parent, label, initial, callback)
         if callback then callback(enabled) end
     end
 end
+
+
+-- Compact and micro display modes.
+local miniMode = false
+local function applyMenuMode(enabled)
+    miniMode = enabled
+    if enabled then
+        main.Size = UDim2.fromOffset(310, 440)
+        header.Size = UDim2.new(1, 0, 0, 58)
+        title.Position = UDim2.new(0, 12, 0, 5)
+        title.Size = UDim2.new(1, -82, 0, 29)
+        title.TextSize = 21
+        subtitle.Visible = false
+        minimize.Position = UDim2.new(1, -9, 0, 8)
+        minimize.Size = UDim2.fromOffset(36, 36)
+        tabsBar.Position = UDim2.new(0, 8, 0, 64)
+        tabsBar.Size = UDim2.new(1, -16, 0, 36)
+        tabLayout.Padding = UDim.new(0, 3)
+        content.Position = UDim2.new(0, 9, 0, 108)
+        content.Size = UDim2.new(1, -18, 1, -117)
+        for _, tab in pairs(tabButtons) do tab.TextSize = 8 end
+    else
+        fitPanel()
+        header.Size = UDim2.new(1, 0, 0, 76)
+        title.Position = UDim2.new(0, 16, 0, 9)
+        title.Size = UDim2.new(1, -100, 0, 34)
+        title.TextSize = 25
+        subtitle.Visible = true
+        minimize.Position = UDim2.new(1, -12, 0, 13)
+        minimize.Size = UDim2.fromOffset(42, 42)
+        tabsBar.Position = UDim2.new(0, 12, 0, 86)
+        tabsBar.Size = UDim2.new(1, -24, 0, 44)
+        tabLayout.Padding = UDim.new(0, 7)
+        content.Position = UDim2.new(0, 12, 0, 138)
+        content.Size = UDim2.new(1, -24, 1, -150)
+        for _, tab in pairs(tabButtons) do tab.TextSize = 9 end
+    end
+end
+
+makeActionButton(pages["MAIN"], "КОМПАКТНОЕ МЕНЮ: ВКЛ / ВЫКЛ", function()
+    applyMenuMode(not miniMode)
+    statusLabel.Text = miniMode and "Компактное меню включено." or "Обычный размер меню восстановлен."
+    statusLabel.TextColor3 = COLORS.green
+end, 42)
+makeActionButton(pages["MAIN"], "МИКРО HUD: FPS + PING: ВКЛ / ВЫКЛ", function()
+    hudEnabled = not hudEnabled
+    statsHud.Visible = hudEnabled
+    statusLabel.Text = hudEnabled and "Микро HUD FPS/PING включён. Нажми на него, чтобы открыть меню." or "Микро HUD выключен."
+    statusLabel.TextColor3 = COLORS.green
+end, 42)
 
 section(pages["FUNCTIONS"], "УПРАВЛЕНИЕ ПЕРСОНАЖЕМ")
 infoCard(pages["FUNCTIONS"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
