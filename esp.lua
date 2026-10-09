@@ -1419,15 +1419,19 @@ local function createSettingSlider(parent, titleText, minValue, maxValue, initia
     corner(knob, 11)
 
     local dragging = false
-    local function setValueFromX(x)
-        local left = track.AbsolutePosition.X
-        local width = math.max(1, track.AbsoluteSize.X)
-        local ratio = math.clamp((x - left) / width, 0, 1)
-        local value = math.floor(minValue + ratio * (maxValue - minValue) + 0.5)
+    local function setValue(value)
+        value = math.clamp(math.floor(value + 0.5), minValue, maxValue)
+        local ratio = (value - minValue) / (maxValue - minValue)
         fill.Size = UDim2.new(ratio, 0, 1, 0)
         knob.Position = UDim2.new(ratio, 0, 0.5, 0)
         label.Text = titleText .. ": " .. formatter(value)
         onChange(value)
+    end
+    local function setValueFromX(x)
+        local left = track.AbsolutePosition.X
+        local width = math.max(1, track.AbsoluteSize.X)
+        local ratio = math.clamp((x - left) / width, 0, 1)
+        setValue(math.floor(minValue + ratio * (maxValue - minValue) + 0.5))
     end
 
     local function begin(input)
@@ -1446,7 +1450,7 @@ local function createSettingSlider(parent, titleText, minValue, maxValue, initia
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
-    return wrap
+    return setValue
 end
 
 local function applyFlyAppearance()
@@ -1455,12 +1459,12 @@ local function applyFlyAppearance()
     flyTouch.BackgroundTransparency = savedUI.flyOpacity
 end
 
-createSettingSlider(pages["SETTINGS"], "Размер кнопки FLY", 44, 110, savedUI.flySize, function(v) return tostring(v) .. " px" end, function(value)
+local setFlySizeSetting = createSettingSlider(pages["SETTINGS"], "Размер кнопки FLY", 44, 110, savedUI.flySize, function(v) return tostring(v) .. " px" end, function(value)
     savedUI.flySize = value
     applyFlyAppearance()
 end)
 
-createSettingSlider(pages["SETTINGS"], "Прозрачность кнопки FLY", 0, 85, math.floor(savedUI.flyOpacity * 100 + 0.5), function(v) return tostring(v) .. "%" end, function(value)
+local setFlyOpacitySetting = createSettingSlider(pages["SETTINGS"], "Прозрачность кнопки FLY", 0, 85, math.floor(savedUI.flyOpacity * 100 + 0.5), function(v) return tostring(v) .. "%" end, function(value)
     savedUI.flyOpacity = value / 100
     applyFlyAppearance()
 end)
@@ -1624,7 +1628,7 @@ makeToggle(pages["VISUAL"], "Настройка угла обзора (FOV)", fa
     local camera = workspace.CurrentCamera
     if camera then camera.FieldOfView = value and (savedUI.cameraFov or 80) or cameraFovOriginal end
 end)
-createSettingSlider(pages["SETTINGS"], "Угол обзора FOV", 50, 120, savedUI.cameraFov or 80, function(v) return tostring(v) .. "°" end, function(value)
+local setFovSetting = createSettingSlider(pages["SETTINGS"], "Угол обзора FOV", 50, 120, savedUI.cameraFov or 80, function(v) return tostring(v) .. "°" end, function(value)
     savedUI.cameraFov = value
     if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = value end
 end)
@@ -1654,25 +1658,50 @@ makeActionButton(pages["HOME"], "PANIC BUTTON — ВЫКЛЮЧИТЬ ВСЁ", fu
     updateESP()
 end)
 
-section(pages["HOME"], "ИЗБРАННОЕ / QUICK TOGGLE")
-local function findToggle(label)
-    for _, entry in ipairs(toggleRegistry) do if entry.label == label then return entry end end
-    return nil
-end
-local quickRow = make("Frame", {Size = UDim2.new(1, -2, 0, 64), BackgroundTransparency = 1}, pages["HOME"])
-make("UIGridLayout", {CellSize = UDim2.new(0.5, -4, 0, 29), CellPadding = UDim2.fromOffset(6, 5), SortOrder = Enum.SortOrder.LayoutOrder}, quickRow)
-local quickLabels = {"Полёт (удерживать для подъёма)", "Ускорение ходьбы", "Подсветка игроков (ESP)", "Координаты персонажа"}
-for _, label in ipairs(quickLabels) do
-    local entry = findToggle(label)
-    if entry then
-        local button = make("TextButton", {BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = label, TextColor3 = COLORS.text, TextSize = 9, TextWrapped = true, Font = Enum.Font.GothamBold}, quickRow)
-        corner(button, 8)
-        button.Activated:Connect(function()
-            entry.set(not entry.get())
-            button.BackgroundColor3 = entry.get() and COLORS.green or COLORS.button
-        end)
+makeActionButton(pages["SETTINGS"], "ПОЛНЫЙ СБРОС ДО ЗАВОДСКИХ", function()
+    -- Disable every feature first and restore any modified character/camera state.
+    setAllToggles(false)
+    speedEnabled, noclipEnabled, flyEnabled, flyHeld = false, false, false, false
+    espEnabled, coordsEnabled, cameraFovEnabled = false, false, false
+    if coordinateHud then coordinateHud.Visible = false end
+    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = cameraFovOriginal end
+    for part, oldValue in pairs(originalCollision) do
+        if part and part.Parent then pcall(function() part.CanCollide = oldValue end) end
     end
-end
+    table.clear(originalCollision)
+    updateESP()
+
+    -- Restore factory movement and visual values.
+    walkSpeed = 16
+    flySpeed = 4
+    walkSpeedLabel.Text = "СКОРОСТЬ: 16"
+    walkSpeedBar.Size = UDim2.new(0, 0, 0, 4)
+    walkSpeedKnob.Position = UDim2.new(0, 10, 0.5, 0)
+    speedLabel.Text = "СИЛА ПОЛЁТА: 4"
+    speedBar.Size = UDim2.new(3 / 19, 0, 0, 4)
+    speedKnob.Position = UDim2.new(3 / 19, 10, 0.5, 0)
+    savedUI.flySize = 66
+    savedUI.flyOpacity = 0.12
+    savedUI.flyPosition = {x = -24, y = -150}
+    savedUI.rhPosition = {x = 18, y = 300}
+    savedUI.cameraFov = 80
+    if flyTouch then
+        flyTouch.Position = UDim2.new(1, -24, 1, -150)
+        applyFlyAppearance()
+        updateFlyButton()
+    end
+    if openButton then openButton.Position = UDim2.fromOffset(18, 300) end
+    if statsOverlay then statsOverlay.Position = UDim2.fromOffset(18, 300) end
+    if setFlySizeSetting then setFlySizeSetting(66) end
+    if setFlyOpacitySetting then setFlyOpacitySetting(12) end
+    if setFovSetting then setFovSetting(80) end
+    -- Remove the saved settings profile too, so old values cannot be reloaded later.
+    pcall(function()
+        if type(isfile) == "function" and type(delfile) == "function" and isfile(CONFIG_FILE) then
+            delfile(CONFIG_FILE)
+        end
+    end)
+end)
 
 section(pages["HOME"], "ПОИСК ФУНКЦИЙ")
 local functionBox = make("TextBox", {Size = UDim2.new(1, -2, 0, 32), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, Text = "", PlaceholderText = "Например: скорость, FOV, координаты…", PlaceholderColor3 = COLORS.muted, TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.Gotham, ClearTextOnFocus = false}, pages["HOME"])
@@ -1713,30 +1742,137 @@ local function refreshSearch()
 end
 functionBox:GetPropertyChangedSignal("Text"):Connect(refreshSearch)
 
-makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ", function()
-    if not canUseFiles() then return end
-    local data = {version = VERSION, toggles = {}, walkSpeed = walkSpeed, flySpeed = flySpeed, flySize = savedUI.flySize, flyOpacity = savedUI.flyOpacity, cameraFov = savedUI.cameraFov}
+-- Named profiles are stored together in one JSON file. The profile name is a key,
+-- not a filename, so arbitrary path characters cannot escape the config file.
+local profileNameBox = make("TextBox", {
+    Name = "ProfileName", Size = UDim2.new(1, -2, 0, 34),
+    BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
+    Text = "Мой профиль", PlaceholderText = "Название профиля",
+    PlaceholderColor3 = COLORS.muted, TextColor3 = COLORS.text,
+    TextSize = 11, Font = Enum.Font.Gotham, ClearTextOnFocus = false
+}, pages["SETTINGS"])
+corner(profileNameBox, 10)
+local profileStatus = make("TextLabel", {
+    Name = "ProfileStatus", Size = UDim2.new(1, -2, 0, 38),
+    BackgroundTransparency = 1, Text = "Профили хранятся в файле настроек.",
+    TextColor3 = COLORS.muted, TextSize = 10, Font = Enum.Font.Gotham,
+    TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left
+}, pages["SETTINGS"])
+local function profileMessage(message, success)
+    profileStatus.Text = message
+    profileStatus.TextColor3 = success and COLORS.green or COLORS.muted
+end
+local function readProfileStore()
+    if not canUseFiles() then return nil, "Среда не поддерживает работу с файлами." end
+    local existsOK, exists = pcall(isfile, CONFIG_FILE)
+    if not existsOK or not exists then return {version = VERSION, profiles = {}}, nil end
+    local readOK, raw = pcall(readfile, CONFIG_FILE)
+    if not readOK or type(raw) ~= "string" then return nil, "Не удалось прочитать файл профилей." end
+    local decodeOK, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not decodeOK or type(data) ~= "table" then return nil, "Файл профилей повреждён." end
+    -- Migrate the old single-profile format without discarding its settings.
+    if type(data.profiles) ~= "table" then
+        local legacy = data
+        data = {version = VERSION, profiles = {}}
+        if type(legacy.toggles) == "table" then data.profiles["Мой профиль"] = legacy end
+    end
+    return data, nil
+end
+local function writeProfileStore(store)
+    local encodeOK, raw = pcall(function() return HttpService:JSONEncode(store) end)
+    if not encodeOK then return false end
+    local writeOK = pcall(writefile, CONFIG_FILE, raw)
+    return writeOK
+end
+local function currentSettingsData()
+    local data = {
+        version = VERSION, toggles = {}, walkSpeed = walkSpeed,
+        flySpeed = flySpeed, flySize = savedUI.flySize,
+        flyOpacity = savedUI.flyOpacity, cameraFov = savedUI.cameraFov,
+        flyPosition = savedUI.flyPosition, launcherPosition = savedUI.rhPosition
+    }
     for _, entry in ipairs(toggleRegistry) do data.toggles[entry.label] = entry.get() end
-    local ok, raw = pcall(function() return HttpService:JSONEncode(data) end)
-    if ok then pcall(writefile, CONFIG_FILE, raw) end
-end)
-makeActionButton(pages["SETTINGS"], "ЗАГРУЗИТЬ ПРОФИЛЬ", function()
-    if not canUseFiles() then return end
-    local okRead, raw = pcall(readfile, CONFIG_FILE)
-    if not okRead or type(raw) ~= "string" then return end
-    local okDecode, data = pcall(function() return HttpService:JSONDecode(raw) end)
-    if not okDecode or type(data) ~= "table" then return end
+    return data
+end
+local function cleanProfileName()
+    local name = profileNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    if #name > 32 then name = name:sub(1, 32) end
+    return name
+end
+local function listProfileNames()
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); return end
+    local names = {}
+    for name in pairs(store.profiles) do table.insert(names, name) end
+    table.sort(names, function(a, b) return a:lower() < b:lower() end)
+    profileMessage(#names > 0 and ("Профили: " .. table.concat(names, " • ")) or "Сохранённых профилей пока нет.", #names > 0)
+end
+local function applySettingsData(data)
     if type(data.toggles) == "table" then
         for _, entry in ipairs(toggleRegistry) do
             if type(data.toggles[entry.label]) == "boolean" then pcall(entry.set, data.toggles[entry.label]) end
         end
     end
-    if type(data.walkSpeed) == "number" then walkSpeed = math.clamp(data.walkSpeed, 16, 1000); if speedEnabled then applyWalkSpeed() end end
-    if type(data.flySpeed) == "number" then flySpeed = math.clamp(data.flySpeed, 1, 20) end
-    if type(data.flySize) == "number" then savedUI.flySize = math.clamp(data.flySize, 44, 110); applyFlyAppearance() end
-    if type(data.flyOpacity) == "number" then savedUI.flyOpacity = math.clamp(data.flyOpacity, 0, 0.85); applyFlyAppearance() end
-    if type(data.cameraFov) == "number" then savedUI.cameraFov = math.clamp(data.cameraFov, 50, 120); if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = savedUI.cameraFov end end
+    if type(data.walkSpeed) == "number" then
+        walkSpeed = math.clamp(data.walkSpeed, 16, 1000)
+        if walkSpeedLabel then walkSpeedLabel.Text = "СКОРОСТЬ: " .. walkSpeed end
+        if walkSpeedTrack then
+            local alpha = (walkSpeed - 16) / (1000 - 16)
+            walkSpeedBar.Size = UDim2.new(alpha, 0, 0, 4)
+            walkSpeedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
+        end
+        if speedEnabled then applyWalkSpeed() end
+    end
+    if type(data.flySpeed) == "number" then
+        flySpeed = math.clamp(data.flySpeed, 1, 20)
+        if speedLabel then speedLabel.Text = "СИЛА ПОЛЁТА: " .. flySpeed end
+        local alpha = (flySpeed - 1) / 19
+        speedBar.Size = UDim2.new(alpha, 0, 0, 4)
+        speedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
+    end
+    if type(data.flySize) == "number" then savedUI.flySize = math.clamp(data.flySize, 44, 110); if setFlySizeSetting then setFlySizeSetting(savedUI.flySize) end; applyFlyAppearance() end
+    if type(data.flyOpacity) == "number" then savedUI.flyOpacity = math.clamp(data.flyOpacity, 0, 0.85); if setFlyOpacitySetting then setFlyOpacitySetting(math.floor(savedUI.flyOpacity * 100 + 0.5)) end; applyFlyAppearance() end
+    if type(data.cameraFov) == "number" then savedUI.cameraFov = math.clamp(data.cameraFov, 50, 120); if setFovSetting then setFovSetting(savedUI.cameraFov) end; if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = savedUI.cameraFov end end
+    if type(data.flyPosition) == "table" and type(data.flyPosition.x) == "number" and type(data.flyPosition.y) == "number" then
+        savedUI.flyPosition = {x = data.flyPosition.x, y = data.flyPosition.y}
+        if flyTouch then flyTouch.Position = UDim2.new(1, data.flyPosition.x, 1, data.flyPosition.y) end
+    end
+    if type(data.launcherPosition) == "table" and type(data.launcherPosition.x) == "number" and type(data.launcherPosition.y) == "number" then
+        savedUI.rhPosition = {x = data.launcherPosition.x, y = data.launcherPosition.y}
+        if openButton then openButton.Position = UDim2.fromOffset(data.launcherPosition.x, data.launcherPosition.y) end
+        if statsOverlay then statsOverlay.Position = UDim2.fromOffset(data.launcherPosition.x, data.launcherPosition.y) end
+    end
+end
+makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗВАНИЕМ", function()
+    local name = cleanProfileName()
+    if name == "" then profileMessage("Сначала введи название профиля.", false); return end
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); return end
+    store.profiles[name] = currentSettingsData()
+    if writeProfileStore(store) then profileMessage("Профиль «" .. name .. "» сохранён.", true)
+    else profileMessage("Не удалось сохранить профиль в файл.", false) end
 end)
+makeActionButton(pages["SETTINGS"], "ЗАГРУЗИТЬ ПРОФИЛЬ ПО НАЗВАНИЮ", function()
+    local name = cleanProfileName()
+    if name == "" then profileMessage("Введи название профиля для загрузки.", false); return end
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); return end
+    local data = store.profiles[name]
+    if type(data) ~= "table" then profileMessage("Профиль «" .. name .. "» не найден.", false); return end
+    applySettingsData(data)
+    profileMessage("Профиль «" .. name .. "» загружен.", true)
+end)
+makeActionButton(pages["SETTINGS"], "УДАЛИТЬ ВЫБРАННЫЙ ПРОФИЛЬ", function()
+    local name = cleanProfileName()
+    if name == "" then profileMessage("Введи название профиля для удаления.", false); return end
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); return end
+    if store.profiles[name] == nil then profileMessage("Профиль «" .. name .. "» не найден.", false); return end
+    store.profiles[name] = nil
+    if writeProfileStore(store) then profileMessage("Профиль «" .. name .. "» удалён.", true)
+    else profileMessage("Не удалось обновить файл профилей.", false) end
+end)
+makeActionButton(pages["SETTINGS"], "ПОКАЗАТЬ СПИСОК ПРОФИЛЕЙ", listProfileNames)
 
 refreshPoints()
 selectTab("HOME")
