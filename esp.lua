@@ -1,4 +1,4 @@
--- RAHERHUB 0.1 | Private testing UI
+-- RAHERHUB 0.0.2 | STABLE BUILD 3 | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -9,7 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.1"
+local VERSION = "0.0.2"
 local SETTINGS_KEY = "RAHERHUB_01_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -74,7 +74,7 @@ local loadingTitle = make("TextLabel", {
 }, loadingFrame)
 local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.1 • ЗАПУСК", TextColor3 = Color3.fromRGB(160, 165, 190),
+    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.0.2 • STABLE BUILD 3", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
 local loadingTrack = make("Frame", {
@@ -669,7 +669,7 @@ local statusLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 30),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "RAHERHUB 0.1  |  ЗАКРЫТЫЙ ALPHA-ТЕСТ  |  PRIVATE BUILD",
+    Text = "RAHERHUB 0.0.2  |  STABLE BUILD 3  |  ЗАКРЫТЫЙ ALPHA-ТЕСТ",
     TextColor3 = COLORS.green,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -678,7 +678,7 @@ local statusLabel = make("TextLabel", {
 corner(statusLabel, 11)
 
 section(pages["HOME"], "ПАНЕЛЬ УПРАВЛЕНИЯ")
-infoCard(pages["HOME"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
+infoCard(pages["HOME"], "RAHERHUB 0.0.2 — STABLE BUILD 3", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
 infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
 infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
@@ -1394,7 +1394,146 @@ end)
 section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
 infoCard(pages["EDIT"], "Перемещение кнопки FLY", "Включи режим редактирования, затем перетащи кнопку FLY в удобное место. Отключи режим, чтобы снова использовать полёт.")
 section(pages["ABOUT"], "О ПРОЕКТЕ")
-infoCard(pages["ABOUT"], "RAHERHUB 0.1", "Личная сборка. Версия 0.1 остаётся до начала альфа-тестирования.")
+infoCard(pages["ABOUT"], "RAHERHUB 0.0.2 — STABLE BUILD 3", "Личная сборка. Стабильная сборка №3.")
+
+-- Developer contact card: Telegram icon, link, copy action, and mobile fallback.
+local TELEGRAM_LINK = "https://t.me/generalvaneska2024"
+local TELEGRAM_ICON = "rbxassetid://138727397408628"
+local contactCard = make("Frame", {
+    Name = "DeveloperContactCard",
+    Size = UDim2.new(1, -2, 0, 112),
+    BackgroundColor3 = COLORS.panel,
+    BorderSizePixel = 0,
+    ClipsDescendants = true
+}, pages["ABOUT"])
+corner(contactCard, 13)
+stroke(contactCard, COLORS.accent, 1.2, 0.12)
+
+local telegramIcon = make("ImageLabel", {
+    Name = "TelegramIcon",
+    Position = UDim2.fromOffset(10, 12),
+    Size = UDim2.fromOffset(34, 34),
+    BackgroundTransparency = 1,
+    Image = TELEGRAM_ICON,
+    ScaleType = Enum.ScaleType.Fit
+}, contactCard)
+
+make("TextLabel", {
+    Position = UDim2.fromOffset(52, 9),
+    Size = UDim2.new(1, -62, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "TELEGRAM",
+    TextColor3 = COLORS.text,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, contactCard)
+make("TextLabel", {
+    Position = UDim2.fromOffset(52, 26),
+    Size = UDim2.new(1, -62, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "CONTACT THE DEVELOPER",
+    TextColor3 = COLORS.muted,
+    TextSize = 8,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, contactCard)
+
+local telegramUrlBox = make("TextBox", {
+    Name = "TelegramLink",
+    Position = UDim2.fromOffset(10, 52),
+    Size = UDim2.new(1, -112, 0, 27),
+    BackgroundColor3 = COLORS.background,
+    BorderSizePixel = 0,
+    Text = TELEGRAM_LINK,
+    TextColor3 = Color3.fromRGB(170, 185, 255),
+    TextSize = 9,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Center,
+    ClearTextOnFocus = false,
+    TextEditable = true,
+    TextTruncate = Enum.TextTruncate.AtEnd
+}, contactCard)
+corner(telegramUrlBox, 8)
+stroke(telegramUrlBox, COLORS.accent, 1, 0.45)
+
+local copyTelegramButton = make("TextButton", {
+    Name = "CopyTelegramLink",
+    Position = UDim2.new(1, -94, 0, 52),
+    Size = UDim2.fromOffset(84, 27),
+    BackgroundColor3 = COLORS.accent,
+    BorderSizePixel = 0,
+    Text = "COPY LINK",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 9,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false
+}, contactCard)
+corner(copyTelegramButton, 8)
+
+local telegramToast = make("TextLabel", {
+    Name = "TelegramStatus",
+    Position = UDim2.fromOffset(10, 84),
+    Size = UDim2.new(1, -20, 0, 18),
+    BackgroundTransparency = 1,
+    Text = "Tap the link to select and copy manually if needed.",
+    TextColor3 = COLORS.muted,
+    TextSize = 8,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextWrapped = true
+}, contactCard)
+
+local telegramToastToken = 0
+local function showTelegramStatus(message, color)
+    telegramToastToken += 1
+    local token = telegramToastToken
+    telegramToast.Text = message
+    telegramToast.TextColor3 = color or COLORS.muted
+    telegramToast.TextTransparency = 0
+    task.delay(3, function()
+        if token == telegramToastToken and telegramToast.Parent then
+            TweenService:Create(telegramToast, TweenInfo.new(0.2), {TextTransparency = 0.35}):Play()
+        end
+    end)
+end
+
+copyTelegramButton.Activated:Connect(function()
+    local copied = false
+    -- Clipboard functions are executor-specific; try only if the environment exposes one.
+    local clipboardFunctions = {}
+    if type(setclipboard) == "function" then table.insert(clipboardFunctions, setclipboard) end
+    if type(toclipboard) == "function" then table.insert(clipboardFunctions, toclipboard) end
+    local okGetEnv, env = pcall(function()
+        if type(getgenv) == "function" then return getgenv() end
+        return _G
+    end)
+    if okGetEnv and type(env) == "table" then
+        if type(env.setclipboard) == "function" then table.insert(clipboardFunctions, env.setclipboard) end
+        if type(env.toclipboard) == "function" then table.insert(clipboardFunctions, env.toclipboard) end
+    end
+    for _, clipboardFunction in ipairs(clipboardFunctions) do
+        local ok = pcall(clipboardFunction, TELEGRAM_LINK)
+        if ok then copied = true break end
+    end
+
+    if copied then
+        showTelegramStatus("TELEGRAM LINK COPIED!", COLORS.green)
+    else
+        telegramUrlBox:CaptureFocus()
+        telegramUrlBox.CursorPosition = #TELEGRAM_LINK + 1
+        telegramUrlBox.SelectionStart = 1
+        showTelegramStatus("Select the link above and copy it manually.", COLORS.accent)
+    end
+    TweenService:Create(copyTelegramButton, TweenInfo.new(0.08), {BackgroundColor3 = COLORS.green}):Play()
+    task.delay(0.18, function()
+        if copyTelegramButton.Parent then
+            TweenService:Create(copyTelegramButton, TweenInfo.new(0.16), {BackgroundColor3 = COLORS.accent}):Play()
+        end
+    end)
+end)
+
+infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
 infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
 infoCard(pages["ABOUT"], "Совместимость", "Некоторые функции зависят от доступных возможностей среды и прав в текущем Roblox-проекте.")
 
