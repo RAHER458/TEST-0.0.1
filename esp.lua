@@ -1320,20 +1320,20 @@ end, 34)
 paintESPColorButton()
 infoCard(pages["VISUAL"], "НАСТРОЙКА ESP", "Выбери цвет кнопкой выше. Боксы обводят персонажа, линии ведут от нижней части экрана, чамсы подсвечивают модель.")
 
--- Triggerbot for testing: fires the equipped Tool when the center-screen ray
--- hits a living NPC or another Player character. Player characters are allowed
--- even if they are teammates, so a friend can be used for private testing.
+-- NPC-only triggerbot: fires the currently equipped Tool only when the
+-- center-screen ray hits a living NPC model. Actual Player characters and
+-- models marked as friendly are deliberately excluded.
 local triggerBotEnabled = false
 local triggerBotLastShot = 0
 local triggerBotCooldown = 0.14
 local triggerBotRange = 1000
 local triggerBotToggleSetter
-local _, triggerBotToggleSetterLocal = makeToggle(pages["VISUAL"], "TRIGGERBOT: ИГРОКИ + БОТЫ", false, function(value)
+local _, triggerBotToggleSetterLocal = makeToggle(pages["VISUAL"], "TRIGGERBOT: ТОЛЬКО БОТЫ", false, function(value)
     triggerBotEnabled = value
     triggerBotLastShot = 0
 end)
 triggerBotToggleSetter = triggerBotToggleSetterLocal
-infoCard(pages["VISUAL"], "TRIGGERBOT", "Автоматически активирует экипированное оружие при наведении по центру экрана на живого игрока или NPC. Игроки, включая союзников, тоже являются целями для тестирования.")
+infoCard(pages["VISUAL"], "TRIGGERBOT", "Автоматически активирует экипированное оружие, когда прицел по центру экрана наведён на живого NPC. Игроков и распознанных союзников игнорирует.")
 
 RunService.Heartbeat:Connect(function()
     if not triggerBotEnabled then return end
@@ -1363,9 +1363,7 @@ RunService.Heartbeat:Connect(function()
     if not result or not result.Instance then return end
 
     local model = result.Instance:FindFirstAncestorOfClass("Model")
-    if not model or not model.Parent then return end
-    local isPlayerTarget = isPlayerCharacterModel(model)
-    if not isPlayerTarget and isAllyNPC(model) then return end
+    if not model or not model.Parent or isPlayerCharacterModel(model) or isAllyNPC(model) then return end
     local targetHumanoid = model:FindFirstChildOfClass("Humanoid")
     if not targetHumanoid or targetHumanoid.Health <= 0 then return end
 
