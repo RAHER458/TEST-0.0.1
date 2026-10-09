@@ -132,7 +132,7 @@ local main = make("Frame", {
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
-main.Size = UDim2.fromOffset(310, 440)
+main.Size = UDim2.fromOffset(350, 440)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
 stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
@@ -147,7 +147,7 @@ local function fitPanel()
     if compactMode then
         main.Size = UDim2.fromOffset(math.min(252, viewport.X - 20), math.min(326, viewport.Y - 60))
     else
-        main.Size = UDim2.fromOffset(math.min(310, viewport.X - 20), math.min(440, viewport.Y - 60))
+        main.Size = UDim2.fromOffset(math.min(350, viewport.X - 20), math.min(440, viewport.Y - 60))
     end
 end
 fitPanel()
@@ -363,8 +363,8 @@ local function applyMenuLayout()
     tabsBar.Position = UDim2.new(0, 8, 0, compactMode and 58 or 66)
     tabsBar.Size = UDim2.new(0, 78, 1, compactMode and -66 or -76)
     content.Position = UDim2.new(0, 94, 0, compactMode and 58 or 66)
-    content.Size = UDim2.new(1, -102, 1, compactMode and -66 or -76)
-    tabLayout.Padding = UDim.new(0, 5)
+    content.Size = UDim2.new(1, -98, 1, compactMode and -66 or -76)
+    tabLayout.Padding = UDim.new(0, 4)
     tabsBar.AutomaticCanvasSize = Enum.AutomaticSize.Y
     tabsBar.CanvasSize = UDim2.new(0, 0, 0, 0)
     for _, button in pairs(tabButtons or {}) do
@@ -617,41 +617,43 @@ for _, button in pairs(tabButtons) do animateButton(button) end
 
 local function section(parent, text)
     return make("TextLabel", {
-        Size = UDim2.new(1, -2, 0, 24),
+        Size = UDim2.new(1, -2, 0, 19),
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = COLORS.muted,
-        TextSize = 12,
+        TextSize = 10,
         Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true
     }, parent)
 end
 
 local function infoCard(parent, heading, body)
     local card = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 70),
+        Size = UDim2.new(1, -2, 0, 54),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
     corner(card, 13)
     make("TextLabel", {
-        Position = UDim2.new(0, 13, 0, 10),
-        Size = UDim2.new(1, -26, 0, 22),
+        Position = UDim2.new(0, 10, 0, 6),
+        Size = UDim2.new(1, -20, 0, 17),
         BackgroundTransparency = 1,
         Text = heading,
         TextColor3 = COLORS.text,
-        TextSize = 13,
+        TextSize = 11,
         Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd
     }, card)
     make("TextLabel", {
-        Position = UDim2.new(0, 10, 0, 31),
-        Size = UDim2.new(1, -20, 0, 34),
+        Position = UDim2.new(0, 10, 0, 24),
+        Size = UDim2.new(1, -20, 0, 25),
         BackgroundTransparency = 1,
         Text = body,
         TextWrapped = true,
         TextColor3 = COLORS.muted,
-        TextSize = 10,
+        TextSize = 9,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top
@@ -679,12 +681,13 @@ infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохран�
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
-        Size = UDim2.new(1, -2, 0, height or 38),
+        Size = UDim2.new(1, -2, 0, height or 31),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = text,
         TextColor3 = COLORS.text,
-        TextSize = 12,
+        TextSize = 10,
+        TextWrapped = true,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true
     }, parent)
@@ -737,7 +740,7 @@ walkSpeedLabel = make("TextLabel", {
     TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
 }, pages["MOVE"])
 walkSpeedTrack = make("Frame", {
-    Size = UDim2.new(1, -2, 0, 36), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
+    Size = UDim2.new(1, -2, 0, 29), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
 }, pages["MOVE"])
 corner(walkSpeedTrack, 11)
 walkSpeedLabel.Visible = false
@@ -853,7 +856,7 @@ speedLabel = make("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left
 }, pages["MOVE"])
 speedTrack = make("Frame", {
-    Size = UDim2.new(1, -2, 0, 34),
+    Size = UDim2.new(1, -2, 0, 28),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, pages["MOVE"])
@@ -1076,14 +1079,14 @@ loadPoints()
 section(pages["TELEPORT"], "УПРАВЛЕНИЕ ТОЧКАМИ")
 infoCard(pages["TELEPORT"], "Сохранённые места", "Сохраните текущее место, чтобы позже вернуться к нему.")
 local pointNameBox = make("TextBox", {
-    Size = UDim2.new(1, -2, 0, 46),
+    Size = UDim2.new(1, -2, 0, 34),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
     Text = "",
     PlaceholderText = "Название точки (например, Дом)",
     PlaceholderColor3 = COLORS.muted,
     TextColor3 = COLORS.text,
-    TextSize = 14,
+    TextSize = 12,
     Font = Enum.Font.Gotham,
     ClearTextOnFocus = false
 }, pages["TELEPORT"])
@@ -1094,7 +1097,7 @@ local pointsList = make("Frame", {
     AutomaticSize = Enum.AutomaticSize.Y,
     BackgroundTransparency = 1
 }, pages["TELEPORT"])
-make("UIListLayout", {Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder}, pointsList)
+make("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, pointsList)
 
 local function clearPointRows()
     for _, child in ipairs(pointsList:GetChildren()) do
@@ -1118,7 +1121,7 @@ local function refreshPoints()
     end
     for index, point in ipairs(teleportPoints) do
         local row = make("Frame", {
-            Size = UDim2.new(1, -2, 0, 88),
+            Size = UDim2.new(1, -2, 0, 70),
             BackgroundColor3 = COLORS.panel,
             BorderSizePixel = 0,
             LayoutOrder = index
@@ -1126,18 +1129,18 @@ local function refreshPoints()
         corner(row, 12)
         make("TextLabel", {
             Position = UDim2.new(0, 11, 0, 8),
-            Size = UDim2.new(1, -22, 0, 21),
+            Size = UDim2.new(1, -22, 0, 17),
             BackgroundTransparency = 1,
             Text = point.name,
             TextColor3 = COLORS.text,
-            TextSize = 14,
+            TextSize = 12,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd
         }, row)
         make("TextLabel", {
-            Position = UDim2.new(0, 11, 0, 30),
-            Size = UDim2.new(1, -22, 0, 16),
+            Position = UDim2.new(0, 11, 0, 25),
+            Size = UDim2.new(1, -22, 0, 13),
             BackgroundTransparency = 1,
             Text = string.format("X %.1f   Y %.1f   Z %.1f", point.x, point.y, point.z),
             TextColor3 = COLORS.muted,
@@ -1146,8 +1149,8 @@ local function refreshPoints()
             TextXAlignment = Enum.TextXAlignment.Left
         }, row)
         local go = make("TextButton", {
-            Position = UDim2.new(0, 9, 0, 53),
-            Size = UDim2.new(0.67, -8, 0, 27),
+            Position = UDim2.new(0, 9, 0, 43),
+            Size = UDim2.new(0.67, -8, 0, 22),
             BackgroundColor3 = COLORS.accent,
             BorderSizePixel = 0,
             Text = "ПЕРЕМЕСТИТЬСЯ",
@@ -1171,8 +1174,8 @@ local function refreshPoints()
         end)
         local delete = make("TextButton", {
             AnchorPoint = Vector2.new(1, 0),
-            Position = UDim2.new(1, -9, 0, 53),
-            Size = UDim2.new(0.33, -5, 0, 27),
+            Position = UDim2.new(1, -9, 0, 43),
+            Size = UDim2.new(0.33, -5, 0, 22),
             BackgroundColor3 = COLORS.red,
             BorderSizePixel = 0,
             Text = "УДАЛИТЬ",
@@ -1245,15 +1248,15 @@ infoCard(pages["SETTINGS"], "Настройка кнопок FLY", "Изменя
 
 local function createSettingSlider(parent, titleText, minValue, maxValue, initialValue, formatter, onChange)
     local wrap = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 68),
+        Size = UDim2.new(1, -2, 0, 54),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
     corner(wrap, 12)
 
     local label = make("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 7),
-        Size = UDim2.new(1, -24, 0, 20),
+        Position = UDim2.new(0, 10, 0, 5),
+        Size = UDim2.new(1, -20, 0, 17),
         BackgroundTransparency = 1,
         Text = titleText .. ": " .. formatter(initialValue),
         TextColor3 = COLORS.text,
@@ -1263,8 +1266,8 @@ local function createSettingSlider(parent, titleText, minValue, maxValue, initia
     }, wrap)
 
     local track = make("Frame", {
-        Position = UDim2.new(0, 12, 0, 39),
-        Size = UDim2.new(1, -24, 0, 8),
+        Position = UDim2.new(0, 10, 0, 32),
+        Size = UDim2.new(1, -20, 0, 7),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0
     }, wrap)
