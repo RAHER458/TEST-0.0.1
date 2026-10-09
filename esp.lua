@@ -1,6 +1,6 @@
 -- RAHERHUB 0.2 | UNIVERSAL COMPATIBILITY BUILD | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
--- License integration build: Cloudflare Worker + D1. Original baseline remains unchanged.
+-- Separate license integration build; original baseline is unchanged.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,7 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2-LICENSE-ADMIN-TEST"
+local VERSION = "0.2-LICENSE-REBUILD-TEST"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -557,8 +557,8 @@ content = make("Frame", {
     BackgroundTransparency = 1
 }, main)
 
-local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "COMPAT", "EDIT", "SETTINGS", "LICENSE", "ADMIN", "ABOUT"}
-local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", COMPAT = "✓", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i", LICENSE = "KEY", ADMIN = "A"}
+local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "COMPAT", "EDIT", "SETTINGS", "LICENSE", "ABOUT"}
+local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", COMPAT = "✓", EDIT = "✚", SETTINGS = "⚙", LICENSE = "KEY", ABOUT = "i"}
 for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
@@ -575,7 +575,6 @@ for tabIndex, tabName in ipairs(tabNames) do
     }, tabsBar)
     corner(tab, 10)
     tabButtons[tabName] = tab
-    if tabName == "ADMIN" then tab.Visible = false end
     local page = make("ScrollingFrame", {
         Name = tabName .. "Page",
         Size = UDim2.fromScale(1, 1),
@@ -603,7 +602,6 @@ end
 local pageTween
 local function selectTab(name)
     if not pages[name] then return end
-    if name == "ADMIN" and tabButtons["ADMIN"] and not tabButtons["ADMIN"].Visible then return end
     activeTab = name
     if pageTween then pageTween:Cancel() end
     for tabName, page in pairs(pages) do
@@ -2557,43 +2555,36 @@ task.spawn(function()
     end
 end)
 
--- RAHERHUB LICENSE PANEL (separate build; original baseline untouched)
+-- RAHERHUB license integration. Kept to one additional navigation tab.
 local LICENSE_BASE = "https://raherauth.raher458.workers.dev"
 local LICENSE_DEVICE_FILE = "raherhub_license_device.txt"
-local licenseToken = nil
-local licenseStatus
-local licenseKeyBox
-local adminSecretBox
-local adminKeyBox
-local adminDurationBox
-local adminCountBox
-local adminOutput
+local licenseToken, licenseStatus, licenseKeyBox, adminSecretBox, adminKeyBox, adminDurationBox, adminCountBox, adminOutput
+local licensePage = pages["LICENSE"]
+local licensePublicPage = make("Frame", {Name="LicensePublicPanel", Size=UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, BorderSizePixel=0}, licensePage)
+make("UIListLayout", {Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder}, licensePublicPage)
+local adminPage = make("Frame", {Name="OwnerAdminPanel", Size=UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, BorderSizePixel=0, Visible=false}, licensePage)
+make("UIListLayout", {Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder}, adminPage)
 local function licenseRequest(path, body, adminSecret)
     local req = request or http_request or (syn and syn.request)
-    if type(req) ~= "function" then
-        return nil, "В этой среде нет request/http_request; HTTPS-запрос невозможен."
-    end
+    if type(req) ~= "function" then return nil, "В этой среде нет request/http_request; HTTPS-запрос невозможен." end
     local headers = { ["Content-Type"] = "application/json" }
     if adminSecret and adminSecret ~= "" then headers["X-Admin-Secret"] = adminSecret end
-    local ok, response = pcall(req, {
-        Url = LICENSE_BASE .. path, Method = "POST", Headers = headers,
-        Body = HttpService:JSONEncode(body or {})
-    })
+    local ok, response = pcall(req, {Url=LICENSE_BASE .. path, Method="POST", Headers=headers, Body=HttpService:JSONEncode(body or {})})
     if not ok or type(response) ~= "table" then return nil, "Ошибка HTTP-запроса к серверу." end
     local code = tonumber(response.StatusCode or response.Status or 0) or 0
     local raw = response.Body or response.body or ""
     local decodedOK, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
     if code < 200 or code >= 300 then
-        local message = decodedOK and (decoded.error or decoded.message) or nil
+        local message = decodedOK and type(decoded)=="table" and (decoded.error or decoded.message) or nil
         return nil, tostring(message or ("HTTP " .. code))
     end
     if not decodedOK or type(decoded) ~= "table" then return nil, "Сервер вернул некорректный ответ." end
     return decoded
 end
 local function getLicenseDeviceId()
-    if type(readfile) == "function" and type(writefile) == "function" then
-        local ok, value = pcall(function() if isfile and isfile(LICENSE_DEVICE_FILE) then return readfile(LICENSE_DEVICE_FILE) end end)
-        if ok and type(value) == "string" and #value >= 16 then return value end
+    if type(readfile)=="function" and type(writefile)=="function" then
+        local ok, value = pcall(function() if type(isfile)=="function" and isfile(LICENSE_DEVICE_FILE) then return readfile(LICENSE_DEVICE_FILE) end end)
+        if ok and type(value)=="string" and #value>=16 then return value end
         local generated = HttpService:GenerateGUID(false) .. HttpService:GenerateGUID(false)
         local saved = pcall(function() writefile(LICENSE_DEVICE_FILE, generated) end)
         if saved then return generated end
@@ -2601,107 +2592,86 @@ local function getLicenseDeviceId()
     return nil
 end
 local function setLicenseStatus(text, good)
-    if licenseStatus then
-        licenseStatus.Text = text
-        licenseStatus.TextColor3 = good and COLORS.green or COLORS.red
-    end
+    if licenseStatus then licenseStatus.Text=text; licenseStatus.TextColor3=good and COLORS.green or COLORS.red end
 end
-local licensePage = pages["LICENSE"]
-local adminPage = pages["ADMIN"]
-section(licensePage, "ЛИЦЕНЗИЯ RAHERHUB")
-infoCard(licensePage, "ПОДКЛЮЧЕНИЕ К CLOUDFLARE", "Ключ активируется через сервер. Срок ограничивается сервером и начинается при первой активации.")
-licenseStatus = make("TextLabel", {Size=UDim2.new(1,-2,0,42), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="Статус: лицензия не проверена", TextColor3=COLORS.muted, TextSize=10, TextWrapped=true, Font=Enum.Font.GothamMedium}, licensePage)
-corner(licenseStatus, 10)
-licenseKeyBox = make("TextBox", {Size=UDim2.new(1,-2,0,36), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="", PlaceholderText="Вставьте лицензионный ключ", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=11, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, licensePage)
-corner(licenseKeyBox, 10)
-makeActionButton(licensePage, "АКТИВИРОВАТЬ КЛЮЧ", function()
-    local key = tostring(licenseKeyBox.Text or ""):gsub("%s+", "")
-    if key == "" then setLicenseStatus("Введите ключ лицензии.", false); return end
-    local device = getLicenseDeviceId()
-    if not device then setLicenseStatus("Нет постоянного хранилища файла для привязки устройства. Включите file APIs в executor.", false); return end
-    setLicenseStatus("Проверяем ключ на сервере…", false)
-    local result, err = licenseRequest("/activate", {key=key, install_hash=device, roblox_user_id=tostring(LocalPlayer.UserId)})
-    if not result then setLicenseStatus("Активация не удалась: " .. tostring(err), false); return end
-    licenseToken = result.token
-    local exp = result.expires_at or result.expiresAt or (result.lifetime and "Бессрочно") or "срок не указан"
-    setLicenseStatus("Лицензия активирована. Окончание: " .. tostring(exp), true)
+section(licensePublicPage, "ЛИЦЕНЗИЯ RAHERHUB")
+infoCard(licensePublicPage, "CLOUDFLARE WORKER", "Активация ключа и проверка выполняются через сервер лицензий.")
+licenseStatus = make("TextLabel", {Size=UDim2.new(1,-2,0,42), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="Статус: лицензия не проверена", TextColor3=COLORS.muted, TextSize=10, TextWrapped=true, Font=Enum.Font.GothamMedium}, licensePublicPage)
+corner(licenseStatus,10)
+licenseKeyBox = make("TextBox", {Size=UDim2.new(1,-2,0,36), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="", PlaceholderText="Вставьте лицензионный ключ", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=11, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, licensePublicPage)
+corner(licenseKeyBox,10)
+makeActionButton(licensePublicPage, "АКТИВИРОВАТЬ КЛЮЧ", function()
+    local key=tostring(licenseKeyBox.Text or ""):gsub("%s+", "")
+    if key=="" then setLicenseStatus("Введите лицензионный ключ.",false); return end
+    local device=getLicenseDeviceId()
+    if not device then setLicenseStatus("Нет постоянного файлового хранилища для привязки устройства.",false); return end
+    setLicenseStatus("Проверяем ключ на сервере…",false)
+    local result,err=licenseRequest("/activate",{key=key,install_hash=device,roblox_user_id=tostring(LocalPlayer.UserId)})
+    if not result or not result.token then setLicenseStatus("Активация не удалась: "..tostring(err or "нет токена в ответе"),false); return end
+    licenseToken=result.token
+    setLicenseStatus("Лицензия активирована. Окончание: "..tostring(result.expires_at or result.expiresAt or (result.lifetime and "Бессрочно") or "срок не указан"),true)
 end)
-makeActionButton(licensePage, "ПРОВЕРИТЬ АКТИВНУЮ СЕССИЮ", function()
-    if not licenseToken then setLicenseStatus("Сначала активируйте ключ.", false); return end
-    local result, err = licenseRequest("/verify", {token=licenseToken})
-    if not result or result.valid ~= true then setLicenseStatus("Проверка не пройдена: " .. tostring(err or "сервер не подтвердил valid=true"), false); return end
-    setLicenseStatus("Сервер подтвердил сессию лицензии.", true)
+makeActionButton(licensePublicPage, "ПРОВЕРИТЬ ЛИЦЕНЗИЮ", function()
+    if not licenseToken then setLicenseStatus("Сначала активируйте ключ.",false); return end
+    local result,err=licenseRequest("/verify",{token=licenseToken})
+    if not result or result.valid~=true then setLicenseStatus("Проверка не пройдена: "..tostring(err or "сервер не подтвердил valid=true"),false); return end
+    setLicenseStatus("Сервер подтвердил сессию лицензии.",true)
 end)
-section(licensePage, "ДОСТУП ВЛАДЕЛЬЦА")
-infoCard(licensePage, "АДМИН-ПАНЕЛЬ СКРЫТА", "Только владелец с ADMIN_SECRET может открыть вкладку ADMIN. Не сообщайте секрет другим пользователям.")
-adminSecretBox = make("TextBox", {Size=UDim2.new(1,-2,0,36), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="", PlaceholderText="ADMIN_SECRET (ввод вручную)", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, licensePage)
-corner(adminSecretBox, 10)
-makeActionButton(licensePage, "ОТКРЫТЬ ADMIN", function()
-    local secret = tostring(adminSecretBox.Text or "")
-    if secret == "" then setLicenseStatus("Введите свой ADMIN_SECRET для проверки доступа.", false); return end
-    setLicenseStatus("Проверяем права администратора на сервере…", false)
-    local result, err = licenseRequest("/admin/list", {}, secret)
-    if not result then
-        tabButtons["ADMIN"].Visible = false
-        if activeTab == "ADMIN" then selectTab("LICENSE") end
-        setLicenseStatus("Доступ администратора не подтверждён: " .. tostring(err), false)
-        return
-    end
-    tabButtons["ADMIN"].Visible = true
-    adminOutput.Text = HttpService:JSONEncode(result)
-    setLicenseStatus("Права администратора подтверждены сервером. Вкладка ADMIN открыта.", true)
-    selectTab("ADMIN")
-end)
-section(adminPage, "УПРАВЛЕНИЕ ЛИЦЕНЗИЯМИ")
-infoCard(adminPage, "АДМИН-ПАНЕЛЬ", "Создание, просмотр, отзыв ключей и сброс привязки устройства. Каждая операция проверяется сервером.")
+section(licensePublicPage, "ДОСТУП ВЛАДЕЛЬЦА")
+infoCard(licensePublicPage, "АДМИН-ПАНЕЛЬ СКРЫТА", "Открывается только после проверки ADMIN_SECRET сервером.")
+adminSecretBox = make("TextBox", {Size=UDim2.new(1,-2,0,36), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="", PlaceholderText="ADMIN_SECRET (ввод вручную)", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, licensePublicPage)
+corner(adminSecretBox,10)
+section(adminPage, "ADMIN · УПРАВЛЕНИЕ ЛИЦЕНЗИЯМИ")
+infoCard(adminPage, "ЗАЩИЩЁННЫЙ РАЗДЕЛ", "Каждая операция проверяется Cloudflare Worker.")
 adminDurationBox = make("TextBox", {Size=UDim2.new(1,-2,0,34), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="1d", PlaceholderText="Срок: 30m / 12h / 7d / lifetime", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, adminPage)
-corner(adminDurationBox, 10)
-adminCountBox = make("TextBox", {Size=UDim2.new(1,-2,0,34), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="1", PlaceholderText="Количество ключей", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, adminPage)
-corner(adminCountBox, 10)
+corner(adminDurationBox,10)
+adminCountBox = make("TextBox", {Size=UDim2.new(1,-2,0,34), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="1", PlaceholderText="Количество ключей (1–100)", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, adminPage)
+corner(adminCountBox,10)
 adminKeyBox = make("TextBox", {Size=UDim2.new(1,-2,0,34), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="", PlaceholderText="Ключ для отзыва / сброса устройства", PlaceholderColor3=COLORS.muted, TextColor3=COLORS.text, TextSize=10, Font=Enum.Font.Gotham, ClearTextOnFocus=false}, adminPage)
-corner(adminKeyBox, 10)
-adminOutput = make("TextLabel", {Size=UDim2.new(1,-2,0,110), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="Ответы администратора появятся здесь.", TextColor3=COLORS.text, TextSize=10, TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top, Font=Enum.Font.Gotham}, adminPage)
-corner(adminOutput, 10)
+corner(adminKeyBox,10)
+adminOutput = make("TextLabel", {Size=UDim2.new(1,-2,0,110), BackgroundColor3=COLORS.panel, BorderSizePixel=0, Text="Ответы сервера появятся здесь.", TextColor3=COLORS.text, TextSize=10, TextWrapped=true, TextYAlignment=Enum.TextYAlignment.Top, Font=Enum.Font.Gotham}, adminPage)
+corner(adminOutput,10)
 local function adminCall(path, body)
-    local secret = tostring(adminSecretBox.Text or "")
-    if secret == "" then adminOutput.Text = "Введите ADMIN_SECRET."; return end
-    local result, err = licenseRequest(path, body, secret)
-    if not result then adminOutput.Text = "Ошибка: " .. tostring(err); return end
-    adminOutput.Text = HttpService:JSONEncode(result)
+    local result,err=licenseRequest(path,body,adminSecretBox.Text)
+    if not result then adminOutput.Text="Ошибка: "..tostring(err); return end
+    adminOutput.Text=HttpService:JSONEncode(result)
 end
+makeActionButton(licensePublicPage, "ОТКРЫТЬ ADMIN", function()
+    local secret=tostring(adminSecretBox.Text or "")
+    if secret=="" then setLicenseStatus("Введите ADMIN_SECRET.",false); return end
+    setLicenseStatus("Проверяем права администратора…",false)
+    local result,err=licenseRequest("/admin/list",{},secret)
+    if not result then setLicenseStatus("Доступ не подтверждён: "..tostring(err),false); return end
+    adminPage.Visible=true
+    licensePublicPage.Visible=false
+    adminOutput.Text=HttpService:JSONEncode(result)
+    setLicenseStatus("Права администратора подтверждены.",true)
+end)
 makeActionButton(adminPage, "СОЗДАТЬ КЛЮЧИ", function()
-    local duration = tostring(adminDurationBox.Text or "1d"):lower():gsub("%s+", "")
-    local count = math.floor(tonumber(adminCountBox.Text) or 1)
-    if count < 1 or count > 100 then adminOutput.Text = "Количество: от 1 до 100."; return end
-    local body = {count=count}
-    if duration == "lifetime" or duration == "life" then body.lifetime = true
-    else
-        local n, unit = duration:match("^(%d+)([mhd])$")
-        n = tonumber(n)
-        if not n or n < 1 then adminOutput.Text = "Формат срока: 30m, 12h, 7d или lifetime."; return end
-        if unit == "m" then body.minutes=n elseif unit == "h" then body.hours=n else body.days=n end
+    local duration=tostring(adminDurationBox.Text or "1d"):lower():gsub("%s+","")
+    local count=math.floor(tonumber(adminCountBox.Text) or 1)
+    if count<1 or count>100 then adminOutput.Text="Количество: от 1 до 100."; return end
+    local body={count=count}
+    if duration=="lifetime" or duration=="life" then body.lifetime=true else
+        local n,unit=duration:match("^(%d+)([mhd])$"); n=tonumber(n)
+        if not n or n<1 then adminOutput.Text="Формат срока: 30m, 12h, 7d или lifetime."; return end
+        if unit=="m" then body.minutes=n elseif unit=="h" then body.hours=n else body.days=n end
     end
-    adminCall("/admin/create", body)
+    adminCall("/admin/create",body)
 end)
-makeActionButton(adminPage, "СПИСОК КЛЮЧЕЙ", function() adminCall("/admin/list", {}) end)
+makeActionButton(adminPage, "СПИСОК КЛЮЧЕЙ", function() adminCall("/admin/list",{}) end)
 makeActionButton(adminPage, "ОТОЗВАТЬ КЛЮЧ", function()
-    local key = tostring(adminKeyBox.Text or ""):gsub("%s+", "")
-    if key == "" then adminOutput.Text = "Введите ключ для отзыва."; return end
-    adminCall("/admin/revoke", {key=key})
+    local key=tostring(adminKeyBox.Text or ""):gsub("%s+",""); if key=="" then adminOutput.Text="Введите ключ."; return end
+    adminCall("/admin/revoke",{key=key})
 end)
-makeActionButton(adminPage, "СБРОСИТЬ ПРИВЯЗКУ УСТРОЙСТВА", function()
-    local key = tostring(adminKeyBox.Text or ""):gsub("%s+", "")
-    if key == "" then adminOutput.Text = "Введите ключ для сброса привязки."; return end
-    adminCall("/admin/reset-device", {key=key})
+makeActionButton(adminPage, "СБРОСИТЬ ПРИВЯЗКУ", function()
+    local key=tostring(adminKeyBox.Text or ""):gsub("%s+",""); if key=="" then adminOutput.Text="Введите ключ."; return end
+    adminCall("/admin/reset-device",{key=key})
 end)
-
 makeActionButton(adminPage, "ЗАКРЫТЬ ADMIN", function()
-    adminSecretBox.Text = ""
-    tabButtons["ADMIN"].Visible = false
-    selectTab("LICENSE")
-    setLicenseStatus("Админ-панель закрыта. Для повторного входа нужна серверная проверка.", false)
+    adminSecretBox.Text=""; adminPage.Visible=false; licensePublicPage.Visible=true
+    setLicenseStatus("Админ-панель закрыта.",false)
 end)
-
 
 refreshPoints()
 refreshCompatibility()
