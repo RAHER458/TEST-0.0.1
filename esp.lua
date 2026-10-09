@@ -1868,7 +1868,7 @@ local pickerClose = make("TextButton", {
 corner(pickerClose, 9)
 local pickerHint = make("TextLabel", {
     Position = UDim2.new(0, 12, 0, 38), Size = UDim2.new(1, -24, 0, 28),
-    BackgroundTransparency = 1, Text = "Выбери профиль из списка, затем нажми «ЗАГРУЗИТЬ».",
+    BackgroundTransparency = 1, Text = "Выбери профиль во вкладке: можно загрузить или удалить.",
     TextColor3 = COLORS.muted, TextSize = 9, Font = Enum.Font.Gotham,
     TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 301
 }, profilePicker)
@@ -1998,19 +1998,7 @@ makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗ
     if writeProfileStore(store) then profileMessage("Профиль «" .. name .. "» сохранён.", true)
     else profileMessage("Не удалось сохранить профиль в файл.", false) end
 end)
-makeActionButton(pages["SETTINGS"], "ВЫБРАТЬ И ЗАГРУЗИТЬ ПРОФИЛЬ", openProfilePicker)
-makeActionButton(pages["SETTINGS"], "УДАЛИТЬ ПРОФИЛЬ ПО НАЗВАНИЮ", function()
-    local name = cleanProfileName()
-    if name == "" then profileMessage("Введи название профиля для удаления.", false); return end
-    local store, err = readProfileStore()
-    if not store then profileMessage(err, false); return end
-    if store.profiles[name] == nil then profileMessage("Профиль «" .. name .. "» не найден.", false); return end
-    store.profiles[name] = nil
-    if writeProfileStore(store) then
-        if selectedProfileName == name then selectedProfileName = nil end
-        profileMessage("Профиль «" .. name .. "» удалён.", true)
-    else profileMessage("Не удалось обновить файл профилей.", false) end
-end)
+makeActionButton(pages["SETTINGS"], "ОТКРЫТЬ СПИСОК ПРОФИЛЕЙ", openProfilePicker)
 
 refreshPoints()
 selectTab("HOME")
@@ -2024,4 +2012,3 @@ minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
 print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
--- test
