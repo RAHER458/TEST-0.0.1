@@ -996,8 +996,6 @@ local _, setFlyEditToggle = makeToggle(pages["EDIT"], "Редактироват�
         flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
         flyTouch.Visible = value or (main.Visible and activeTab == "MOVE" and flyEnabled)
     end
-    statusLabel.Text = value and "Перетащи кнопку FLY пальцем. Нажатие в этом режиме не запускает полёт." or "Режим редактирования FLY выключен."
-    statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
 end)
 
 flyTouch.InputBegan:Connect(function(input)
@@ -1123,8 +1121,6 @@ local function loadPoints()
 end
 local function savePoints()
     if not canUseFiles() then
-        statusLabel.Text = "Файловое сохранение недоступно: точки останутся до конца сессии."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 190, 90)
         return false
     end
     local ok, raw = pcall(function() return HttpService:JSONEncode(teleportPoints) end)
@@ -1221,14 +1217,10 @@ local function refreshPoints()
             local character = LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             if not root then
-                statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
-                statusLabel.TextColor3 = COLORS.red
                 return
             end
             -- Local character movement: use only in your own place / authorized tests.
             root.CFrame = CFrame.new(point.x, point.y + 3, point.z)
-            statusLabel.Text = "Перемещение к точке: " .. point.name
-            statusLabel.TextColor3 = COLORS.green
         end)
         local delete = make("TextButton", {
             AnchorPoint = Vector2.new(1, 0),
@@ -1254,16 +1246,12 @@ makeActionButton(pages["TELEPORT"], "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕС�
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then
-        statusLabel.Text = "Персонаж ещё не готов. Попробуйте снова."
-        statusLabel.TextColor3 = COLORS.red
         return
     end
     local name = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
     if name == "" then name = "Точка " .. tostring(#teleportPoints + 1) end
     for _, point in ipairs(teleportPoints) do
         if point.name:lower() == name:lower() then
-            statusLabel.Text = "Точка с таким названием уже существует."
-            statusLabel.TextColor3 = COLORS.red
             return
         end
     end
@@ -1272,32 +1260,24 @@ makeActionButton(pages["TELEPORT"], "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕС�
     local saved = savePoints()
     pointNameBox.Text = ""
     refreshPoints()
-    statusLabel.Text = saved and ("Точка сохранена: " .. name) or ("Точка создана: " .. name .. " (session only)")
-    statusLabel.TextColor3 = saved and COLORS.green or Color3.fromRGB(255, 190, 90)
 end)
 
 makeActionButton(pages["TELEPORT"], "УДАЛИТЬ ВСЕ ТОЧКИ", function()
     table.clear(teleportPoints)
     savePoints()
     refreshPoints()
-    statusLabel.Text = "Все сохранённые точки удалены."
-    statusLabel.TextColor3 = COLORS.muted
 end)
 
 -- SETTINGS: customize both independently draggable flight controls.
 makeActionButton(pages["EDIT"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
     savedUI.flyPosition = {x = -24, y = -150}
     flyTouch.Position = UDim2.new(1, -24, 1, -150)
-    statusLabel.Text = "Позиция кнопки FLY сброшена."
-    statusLabel.TextColor3 = COLORS.green
 end)
 
 makeActionButton(pages["EDIT"], "ГОТОВО — ВЫЙТИ ИЗ РЕДАКТОРА", function()
     flyEditMode = false
     flyTouch.Text = "FLY"
     if setFlyEditToggle then setFlyEditToggle(false) end
-    statusLabel.Text = "Режим редактирования выключен."
-    statusLabel.TextColor3 = COLORS.green
     updateFlyButton()
 end)
 
@@ -1401,8 +1381,6 @@ makeActionButton(pages["SETTINGS"], "СБРОСИТЬ РАЗМЕР И ПРОЗР
     savedUI.flySize = 66
     savedUI.flyOpacity = 0.12
     applyFlyAppearance()
-    statusLabel.Text = "Размер и прозрачность кнопок сброшены."
-    statusLabel.TextColor3 = COLORS.green
 end)
 
 section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
