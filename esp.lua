@@ -223,18 +223,18 @@ local statsOverlay = make("TextButton", {
     Visible = false,
     AnchorPoint = Vector2.new(0, 0),
     Position = UDim2.fromOffset(18, 300),
-    Size = UDim2.fromOffset(190, 58),
+    Size = UDim2.fromOffset(156, 26),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "FPS: --   PING: --\nЗАДЕРЖКА: -- ms",
+    Text = "FPS --  |  PING --  |  -- ms",
     TextColor3 = COLORS.text,
-    TextSize = 12,
+    TextSize = 10,
     Font = Enum.Font.GothamBold,
-    TextWrapped = true,
+    TextWrapped = false,
     AutoButtonColor = true,
     ZIndex = 50
 }, gui)
-corner(statsOverlay, 12)
+corner(statsOverlay, 8)
 stroke(statsOverlay, COLORS.accent, 1, 0.1)
 
 local statsService = game:GetService("Stats")
@@ -261,7 +261,7 @@ RunService.RenderStepped:Connect(function(dt)
         currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
         local frameDelay = currentFPS > 0 and (1000 / currentFPS) or 0
         local ping = readPing()
-        statsOverlay.Text = string.format("FPS: %d   PING: %s\nЗАДЕРЖКА: %.1f ms", currentFPS, ping and (tostring(ping) .. " ms") or "--", frameDelay)
+        statsOverlay.Text = string.format("%d FPS  |  %s PING  |  %.1f ms", currentFPS, ping and tostring(ping) or "--", frameDelay)
         fpsFrames, fpsElapsed = 0, 0
     end
 end)
@@ -790,38 +790,98 @@ LocalPlayer.CharacterAdded:Connect(function()
     if speedEnabled then applyWalkSpeed() end
 end)
 
--- ESP highlight state.
+-- ESP highlight state. Reconcile players repeatedly so newly spawned characters
+-- and characters whose appearance loads late are picked up reliably.
 local espEnabled = false
 local espObjects = {}
+local espCharacterConnections = {}
+
 local function removeESP(player)
     local object = espObjects[player]
     if object then pcall(function() object:Destroy() end) end
     espObjects[player] = nil
 end
+
 local function createESP(player)
-    if not espEnabled or player == LocalPlayer or not player.Character or espObjects[player] then return end
+    if not espEnabled or player == LocalPlayer then return end
+    local character = player.Character
+    if not character or not character.Parent then
+        removeESP(player)
+        return
+    end
+
+    local existing = espObjects[player]
+    if existing and existing.Parent and existing.Adornee == character then
+        return
+    end
+    -- The player may have respawned while an old Highlight still exists.
+    removeESP(player)
+
     local highlight = Instance.new("Highlight")
     highlight.Name = "RaherESP"
     highlight.FillColor = Color3.fromRGB(255, 75, 95)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.FillTransparency = 0.48
     highlight.OutlineTransparency = 0
-    highlight.Adornee = player.Character
-    highlight.Parent = player.Character
+    highlight.Adornee = character
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
     espObjects[player] = highlight
 end
-local function updateESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if espEnabled then createESP(player) else removeESP(player) end
+
+local function bindESPPlayer(player)
+    if player == LocalPlayer or espCharacterConnections[player] then return end
+    espCharacterConnections[player] = player.CharacterAdded:Connect(function(character)
+        -- Wait for the new character to enter the world, then retry briefly while
+        -- Roblox finishes spawning its model/parts.
+        task.spawn(function()
+            for _ = 1, 20 do
+                if not espEnabled or player.Parent ~= Players then return end
+                if player.Character == character and character.Parent then
+                    createESP(player)
+                    if espObjects[player] and espObjects[player].Adornee == character then return end
+                end
+                task.wait(0.25)
+            end
+        end)
+    end)
+    if player.Character then
+        task.defer(function() createESP(player) end)
     end
 end
+
+local function updateESP()
+    if espEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            bindESPPlayer(player)
+            createESP(player)
+        end
+    else
+        for player in pairs(espObjects) do removeESP(player) end
+    end
+end
+
 Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        createESP(player)
-    end)
+    bindESPPlayer(player)
+    if espEnabled then task.defer(function() createESP(player) end) end
 end)
-Players.PlayerRemoving:Connect(removeESP)
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+    local connection = espCharacterConnections[player]
+    if connection then connection:Disconnect() end
+    espCharacterConnections[player] = nil
+end)
+-- Bind players already in the server, not only those who join after the script.
+for _, player in ipairs(Players:GetPlayers()) do bindESPPlayer(player) end
+
+-- Low-frequency reconciliation catches missed spawn timing without per-frame work.
+task.spawn(function()
+    while true do
+        task.wait(0.75)
+        if espEnabled then updateESP() end
+    end
+end)
+
 makeToggle(pages["VISUAL"], "Подсветка игроков (ESP)", false, function(value)
     espEnabled = value
     updateESP()
