@@ -1,16 +1,18 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.1
+    Version: 1.2 "Heartbeat"
     Platform: Roblox / Delta Executor / iOS
 
-    Отдельный проект. Работает через Cloudflare Worker.
+    CHANGELOG 1.2:
+      - Таймер оставшегося времени в хедере
+      - Heartbeat: проверка каждые 5 секунд
+      - Авто-выкид на авторизацию при истечении ключа
+      - Исправлена логика кнопок «—» и «⌄»
 ]]
 
--- ============ WAIT GAME ============
 repeat task.wait() until game:IsLoaded()
 
--- ============ SERVICES ============
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local TweenService     = game:GetService("TweenService")
@@ -19,9 +21,8 @@ local HttpService      = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 
--- ============ CONFIG ============
 local CONFIG = {
-    VERSION     = "1.1",
+    VERSION     = "1.2",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -31,7 +32,6 @@ local CONFIG = {
     WINDOW_H    = 440,
 }
 
--- ============ COLORS ============
 local C = {
     bg      = Color3.fromRGB(11, 12, 18),
     surface = Color3.fromRGB(20, 23, 32),
@@ -49,7 +49,7 @@ local C = {
     yellow  = Color3.fromRGB(255, 195, 80),
 }
 
--- ============ CLEANUP ============
+-- CLEANUP
 pcall(function()
     local core = game:GetService("CoreGui")
     for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
@@ -65,7 +65,6 @@ pcall(function()
     end
 end)
 
--- ============ STATE ============
 local STATE = {
     authed   = false,
     token    = nil,
@@ -74,7 +73,6 @@ local STATE = {
     mode     = "window",  -- "window" / "circle" / "overlay"
 }
 
--- ============ HELPERS ============
 local function create(class, props, parent)
     local obj = Instance.new(class)
     for k, v in pairs(props or {}) do obj[k] = v end
@@ -101,14 +99,12 @@ local function safeParent(guiObj)
     end
 end
 
--- ============ FILE API ============
 local function hasFileAPI()
     return type(readfile) == "function"
        and type(writefile) == "function"
        and type(isfile) == "function"
 end
 
--- ============ DEVICE ID ============
 local function generateDeviceId()
     return "RH-" .. HttpService:GenerateGUID(false)
 end
@@ -126,16 +122,13 @@ local function loadDeviceId()
             writefile(CONFIG.DEVICE_FILE, val)
             return val
         end)
-        if ok and type(result) == "string" then
-            return result
-        end
+        if ok and type(result) == "string" then return result end
     end
     return generateDeviceId()
 end
 
 STATE.deviceId = loadDeviceId()
 
--- ============ TOKEN ============
 local function saveToken(token)
     if hasFileAPI() then
         pcall(writefile, CONFIG.TOKEN_FILE, tostring(token))
@@ -167,7 +160,6 @@ local function clearToken()
     end
 end
 
--- ============ HTTP ============
 local function getRequestFn()
     if type(request) == "function" then return request end
     if type(http_request) == "function" then return http_request end
@@ -177,17 +169,13 @@ end
 
 local function api(path, body)
     local req = getRequestFn()
-    if not req then
-        return nil, "Executor не поддерживает HTTP-запросы"
-    end
+    if not req then return nil, "Executor не поддерживает HTTP-запросы" end
 
     local payload
     local encOK, encErr = pcall(function()
         payload = HttpService:JSONEncode(body or {})
     end)
-    if not encOK then
-        return nil, "Ошибка подготовки данных: " .. tostring(encErr)
-    end
+    if not encOK then return nil, "Ошибка JSON: " .. tostring(encErr) end
 
     local callOK, response = pcall(function()
         return req({
@@ -202,7 +190,7 @@ local function api(path, body)
     end)
 
     if not callOK or type(response) ~= "table" then
-        return nil, "Не удалось выполнить запрос к серверу"
+        return nil, "Не удалось выполнить запрос"
     end
 
     local status = tonumber(response.StatusCode or response.Status or 0) or 0
@@ -224,13 +212,12 @@ local function api(path, body)
     end
 
     if not decOK or type(decoded) ~= "table" then
-        return nil, "Сервер вернул некорректный ответ"
+        return nil, "Некорректный ответ"
     end
 
     return decoded
 end
 
--- ============ TOAST FACTORY ============
 local function makeToast(guiObj, parentFrame)
     local container = create("Frame", {
         Position = UDim2.new(0, 0, 1, -180),
@@ -302,7 +289,7 @@ local function makeToast(guiObj, parentFrame)
     end
 end
 
--- ============ AUTH GUI ============
+-- AUTH GUI
 local authGui = create("ScreenGui", {
     Name = "RH_HUB_AUTH_GUI",
     ResetOnSpawn = false,
@@ -344,7 +331,6 @@ if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(authFit)
 end
 
--- Header
 local authHeader = create("Frame", {
     Size = UDim2.new(1, 0, 0, 68),
     BackgroundColor3 = C.bg,
@@ -391,7 +377,6 @@ task.spawn(function()
     end
 end)
 
--- Замок
 create("TextLabel", {
     Position = UDim2.new(0.5, -12, 0, 78),
     Size = UDim2.fromOffset(24, 24),
@@ -403,7 +388,6 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Center,
 }, authMain)
 
--- Описание
 create("TextLabel", {
     Position = UDim2.new(0, 22, 0, 106),
     Size = UDim2.new(1, -44, 0, 34),
@@ -417,7 +401,6 @@ create("TextLabel", {
     TextYAlignment = Enum.TextYAlignment.Top,
 }, authMain)
 
--- Заголовок поля
 create("TextLabel", {
     Position = UDim2.new(0, 22, 0, 144),
     Size = UDim2.new(1, -44, 0, 14),
@@ -429,7 +412,6 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, authMain)
 
--- Поле ввода
 local authInputWrap = create("Frame", {
     Position = UDim2.new(0, 22, 0, 162),
     Size = UDim2.new(1, -44, 0, 42),
@@ -477,7 +459,6 @@ authKeyBox.FocusLost:Connect(function()
     }):Play()
 end)
 
--- АКТИВИРОВАТЬ
 local authActBtn = create("TextButton", {
     Position = UDim2.new(0, 22, 0, 214),
     Size = UDim2.new(1, -44, 0, 44),
@@ -491,7 +472,6 @@ local authActBtn = create("TextButton", {
 }, authMain)
 corner(authActBtn, 12)
 
--- ПОЛУЧИТЬ КЛЮЧ
 local authTgBtn = create("TextButton", {
     Position = UDim2.new(0, 22, 0, 266),
     Size = UDim2.new(1, -44, 0, 40),
@@ -506,7 +486,6 @@ local authTgBtn = create("TextButton", {
 corner(authTgBtn, 11)
 stroke(authTgBtn, C.pink, 1, 0.3)
 
--- Статус
 local authStatus = create("TextLabel", {
     Position = UDim2.new(0, 22, 1, -36),
     Size = UDim2.new(1, -44, 0, 28),
@@ -546,7 +525,6 @@ local function setBusy(busy)
     end
 end
 
--- PASTE
 authPasteBtn.MouseButton1Click:Connect(function()
     if STATE.busy then return end
 
@@ -571,7 +549,6 @@ authPasteBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- TELEGRAM
 local tgCooldown = false
 
 authTgBtn.MouseButton1Click:Connect(function()
@@ -598,7 +575,6 @@ authTgBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- ============ ACTIVATE ============
 local onAuthSuccess
 
 local function activateKey(rawKey)
@@ -659,7 +635,6 @@ local function activateKey(rawKey)
     end)
 end
 
--- VERIFY
 local function verifySavedToken(token)
     if type(token) ~= "string" or token == "" then
         return false, "no_token"
@@ -694,7 +669,6 @@ authKeyBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- AUTO CHECK
 task.spawn(function()
     task.wait(0.3)
 
@@ -726,38 +700,6 @@ task.spawn(function()
     end
 end)
 
--- ============ AUTH SUCCESS CALLBACK ============
-onAuthSuccess = function(token)
-    STATE.authed = true
-    STATE.token = token
-
-    if token then saveToken(token) end
-
-    setStatus("Успешная авторизация!", "ok")
-    authToast("Добро пожаловать!", "ok")
-
-    task.spawn(function()
-        task.wait(0.7)
-
-        if authMain and authMain.Parent then
-            local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1,
-                Size = UDim2.fromOffset(authMain.Size.X.Offset * 0.88, authMain.Size.Y.Offset * 0.88),
-            })
-            tw:Play()
-            tw.Completed:Wait()
-        end
-
-        if authGui and authGui.Parent then
-            pcall(function() authGui:Destroy() end)
-        end
-
-        if _G.RH_HUB_ON_AUTH_SUCCESS then
-            pcall(_G.RH_HUB_ON_AUTH_SUCCESS, token)
-        end
-    end)
-end
-
 -- [КОНЕЦ ЧАСТИ 1]
 
 -- ============ MAIN GUI ============
@@ -766,12 +708,12 @@ local mainGui = create("ScreenGui", {
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     IgnoreGuiInset = true,
-    Enabled = false,  -- включается после авторизации
+    Enabled = false,
 })
 safeParent(mainGui)
 
-local WIN_W = CONFIG.WINDOW_W  -- 340
-local WIN_H = CONFIG.WINDOW_H  -- 440
+local WIN_W = CONFIG.WINDOW_W
+local WIN_H = CONFIG.WINDOW_H
 
 local main = create("Frame", {
     Name = "MainWindow",
@@ -785,7 +727,6 @@ local main = create("Frame", {
 corner(main, 16)
 stroke(main, C.border, 1, 0.15)
 
--- Адаптив под экран
 local function fitMain()
     local cam = workspace.CurrentCamera
     if not cam then return end
@@ -816,7 +757,7 @@ create("Frame", {
 
 local titleLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 6),
-    Size = UDim2.new(1, -100, 0, 24),
+    Size = UDim2.new(1, -180, 0, 24),
     BackgroundTransparency = 1,
     Text = "RH-HUB",
     TextColor3 = C.pink,
@@ -827,7 +768,7 @@ local titleLabel = create("TextLabel", {
 
 create("TextLabel", {
     Position = UDim2.new(0, 13, 0, 28),
-    Size = UDim2.new(1, -100, 0, 12),
+    Size = UDim2.new(1, -180, 0, 12),
     BackgroundTransparency = 1,
     Text = "MULTI-TOOL  •  v" .. CONFIG.VERSION,
     TextColor3 = C.muted,
@@ -836,7 +777,19 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, header)
 
--- Радужный логотип
+-- Таймер оставшегося времени (в хедере)
+local timerLabel = create("TextLabel", {
+    Position = UDim2.new(1, -170, 0, 8),
+    Size = UDim2.new(0, 90, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "⏱ --",
+    TextColor3 = C.muted,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Right,
+    TextYAlignment = Enum.TextYAlignment.Center,
+}, header)
+
 task.spawn(function()
     local hue = 0
     while mainGui.Parent do
@@ -848,7 +801,6 @@ task.spawn(function()
     end
 end)
 
--- Кнопки в хедере
 local minimizeBtn = create("TextButton", {
     Position = UDim2.new(1, -76, 0, 8),
     Size = UDim2.fromOffset(30, 30),
@@ -991,7 +943,7 @@ local aboutPage    = createPage("ABOUT")
 
 -- ============ UI COMPONENTS ============
 local function section(parent, text)
-    local lbl = create("TextLabel", {
+    return create("TextLabel", {
         Size = UDim2.new(1, 0, 0, 18),
         BackgroundTransparency = 1,
         Text = text,
@@ -1000,7 +952,6 @@ local function section(parent, text)
         TextSize = 10,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, parent)
-    return lbl
 end
 
 local function infoCard(parent, heading, body)
@@ -1082,27 +1033,28 @@ local function soonCard(parent)
     return frame
 end
 
--- ============ HOME PAGE ============
+-- ============ HOME ============
 section(homePage, "ГЛАВНАЯ")
 infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
 infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
-infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "Нажми «—» в хедере для показа оверлея RH | FPS | PING. Нажми «⌄» — свёрнётся в кружок HUB.")
+infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа. Когда заканчивается — перезапуск на авторизацию.")
+infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
 
--- ============ MOVE PAGE ============
+-- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ")
 soonCard(movePage)
 
--- ============ VISUAL PAGE ============
+-- ============ VISUAL ============
 section(visualPage, "ВИЗУАЛИЗАЦИЯ")
 soonCard(visualPage)
 
--- ============ TELEPORT PAGE ============
+-- ============ TELEPORT ============
 section(tpPage, "ТЕЛЕПОРТ")
 soonCard(tpPage)
 
--- ============ SETTINGS PAGE ============
+-- ============ SETTINGS ============
 section(settingsPage, "НАСТРОЙКИ")
-infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена.")
+infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена. При следующем запуске — экран авторизации.")
 
 local logoutBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 38),
@@ -1136,7 +1088,7 @@ logoutBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ ABOUT PAGE ============
+-- ============ ABOUT ============
 section(aboutPage, "О ПРОЕКТЕ")
 infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
@@ -1144,8 +1096,9 @@ infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024
 
 -- [КОНЕЦ ЧАСТИ 2]
 
+
 -- ============ DRAG MAIN WINDOW ============
-local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
@@ -1154,7 +1107,6 @@ header.InputBegan:Connect(function(input)
         dragMain.input = input
         dragMain.startPointer = input.Position
         dragMain.startPos = main.Position
-        dragMain.moved = false
     end
 end)
 
@@ -1205,9 +1157,8 @@ local overlayFrame = create("TextButton", {
 corner(overlayFrame, 8)
 stroke(overlayFrame, C.accent, 1, 0.2)
 
--- FPS/PING обновление
 local statsService = game:GetService("Stats")
-local fpsFrames, fpsElapsed, currentFPS = 0, 0, 0
+local fpsFrames, fpsElapsed = 0, 0
 
 local function readPing()
     local ping = nil
@@ -1224,7 +1175,7 @@ RunService.RenderStepped:Connect(function(dt)
     fpsFrames += 1
     fpsElapsed += dt
     if fpsElapsed >= 0.5 then
-        currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
+        local currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
         local ping = readPing()
         overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s",
             currentFPS,
@@ -1286,7 +1237,7 @@ local circleGui = create("ScreenGui", {
 })
 safeParent(circleGui)
 
-local circleBtn = create("TextButton", {
+local circleButton = create("TextButton", {
     Name = "CircleBtn",
     AnchorPoint = Vector2.new(0, 0),
     Position = UDim2.fromOffset(20, 360),
@@ -1299,21 +1250,20 @@ local circleBtn = create("TextButton", {
     Font = Enum.Font.GothamBlack,
     AutoButtonColor = false,
 }, circleGui)
-corner(circleBtn, 27)
-stroke(circleBtn, C.pink, 1.5, 0.2)
+corner(circleButton, 27)
+stroke(circleButton, C.pink, 1.5, 0.2)
 
--- Пульсация кружка
 local pulseRunning = false
 local function startCirclePulse()
     if pulseRunning then return end
     pulseRunning = true
     task.spawn(function()
         while circleGui.Enabled do
-            TweenService:Create(circleBtn, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            TweenService:Create(circleButton, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
                 { Size = UDim2.fromOffset(58, 58) }):Play()
             task.wait(0.9)
             if not circleGui.Enabled then break end
-            TweenService:Create(circleBtn, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            TweenService:Create(circleButton, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
                 { Size = UDim2.fromOffset(54, 54) }):Play()
             task.wait(0.9)
         end
@@ -1321,17 +1271,16 @@ local function startCirclePulse()
     end)
 end
 
--- Драг + тап кружка
 local dragCircle = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
 local CIRCLE_THRESHOLD = 6
 
-circleBtn.InputBegan:Connect(function(input)
+circleButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = true
         dragCircle.input = input
         dragCircle.startPointer = input.Position
-        dragCircle.startPos = Vector2.new(circleBtn.Position.X.Offset, circleBtn.Position.Y.Offset)
+        dragCircle.startPos = Vector2.new(circleButton.Position.X.Offset, circleButton.Position.Y.Offset)
         dragCircle.moved = false
     end
 end)
@@ -1349,9 +1298,9 @@ UserInputService.InputChanged:Connect(function(input)
     if dragCircle.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
-        local x = math.clamp(dragCircle.startPos.X + d.X, 0, vp.X - circleBtn.AbsoluteSize.X)
-        local y = math.clamp(dragCircle.startPos.Y + d.Y, 0, vp.Y - circleBtn.AbsoluteSize.Y)
-        circleBtn.Position = UDim2.fromOffset(x, y)
+        local x = math.clamp(dragCircle.startPos.X + d.X, 0, vp.X - circleButton.AbsoluteSize.X)
+        local y = math.clamp(dragCircle.startPos.Y + d.Y, 0, vp.Y - circleButton.AbsoluteSize.Y)
+        circleButton.Position = UDim2.fromOffset(x, y)
     end
 end)
 
@@ -1361,8 +1310,8 @@ UserInputService.InputEnded:Connect(function(input)
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = false
 
-        -- Тап (не двигал) — вернуть окно
         if not dragCircle.moved then
+            -- Тап по кружку → вернуть окно
             circleGui.Enabled = false
             mainGui.Enabled = true
             STATE.mode = "window"
@@ -1370,95 +1319,214 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ MINIMIZE / CIRCLE LOGIC ============
--- Кнопка «—» → оверлей
+-- ============ MINIMIZE / CIRCLE / OVERLAY LOGIC ============
+
+local function setMode(newMode)
+    if STATE.mode == newMode then return end
+
+    mainGui.Enabled = false
+    overlayGui.Enabled = false
+    circleGui.Enabled = false
+
+    if newMode == "window" then
+        mainGui.Enabled = true
+    elseif newMode == "overlay" then
+        overlayGui.Enabled = true
+    elseif newMode == "circle" then
+        circleGui.Enabled = true
+        startCirclePulse()
+    end
+
+    STATE.mode = newMode
+end
+
+-- «—» → оверлей (туда-обратно)
 minimizeBtn.MouseButton1Click:Connect(function()
-    if STATE.mode ~= "window" then return end
-
-    mainGui.Enabled = false
-    overlayGui.Enabled = true
-    STATE.mode = "overlay"
+    if STATE.mode == "window" then
+        setMode("overlay")
+    elseif STATE.mode == "overlay" then
+        setMode("window")
+    end
 end)
 
--- Кнопка «⌄» → кружок
-circleBtn.MouseButton1Click:Connect(function() end)  -- не используется, обрабатываем через InputEnded
-
+-- «⌄» → кружок HUB
 circleBtn.MouseButton1Click:Connect(function()
-    -- Обрабатывается через InputBegan/InputEnded
+    if STATE.mode == "window" then
+        setMode("circle")
+    end
 end)
 
--- Отдельная привязка для кнопки «⌄» в хедере
-circleBtn.MouseButton1Click:Connect(function() end)  -- заглушка
-
--- Обработчик кнопки «⌄» (в хедере)
-local function switchToCircle()
-    if STATE.mode ~= "window" then return end
-    mainGui.Enabled = false
-    circleGui.Enabled = true
-    STATE.mode = "circle"
-    startCirclePulse()
-end
-
--- Привязка кнопки хедера «⌄»
-local headerCircleBtn = header:FindFirstChild("CircleBtn")
--- (см. Часть 2 — circleBtn)
-
--- Переопределяем обработчик для кнопки в хедере
-local function bindHeaderButtons()
-    -- Кнопка «—»
-    minimizeBtn.MouseButton1Click:Connect(function()
-        if STATE.mode == "window" then
-            mainGui.Enabled = false
-            overlayGui.Enabled = true
-            STATE.mode = "overlay"
-        elseif STATE.mode == "overlay" then
-            overlayGui.Enabled = false
-            mainGui.Enabled = true
-            STATE.mode = "window"
-        end
-    end)
-
-    -- Кнопка «⌄»
-    circleBtn.MouseButton1Click:Connect(function()
-        if STATE.mode == "window" then
-            mainGui.Enabled = false
-            circleGui.Enabled = true
-            STATE.mode = "circle"
-            startCirclePulse()
-        end
-    end)
-end
-
--- ============ OVERLAY → ОБРАТНО В ОКНО ============
--- Двойной тап по оверлею возвращает окно
+-- Двойной тап по оверлею → вернуть окно
 local lastOverlayTap = 0
 overlayFrame.MouseButton1Click:Connect(function()
     local now = os.clock()
-    if now - lastOverlayTap < 0.5 then
-        -- Двойной тап
-        overlayGui.Enabled = false
-        mainGui.Enabled = true
-        STATE.mode = "window"
+    if now - lastOverlayTap < 0.6 then
+        setMode("window")
     end
     lastOverlayTap = now
 end)
 
--- ============ AUTH CALLBACK ============
-_G.RH_HUB_ON_AUTH_SUCCESS = function(token)
-    mainGui.Enabled = true
-    STATE.mode = "window"
-    print("[RH-HUB] Меню открыто.")
+-- ============ TIMER HELPERS ============
+local function formatRemaining(sec)
+    if sec == nil then return "∞" end
+    sec = tonumber(sec)
+    if not sec then return "--" end
+    if sec <= 0 then return "истек" end
+
+    local d = math.floor(sec / 86400)
+    local h = math.floor((sec % 86400) / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    local s = math.floor(sec % 60)
+
+    if d > 0 then return string.format("%dд %dч", d, h) end
+    if h > 0 then return string.format("%dч %dм", h, m) end
+    if m > 0 then return string.format("%dм %dс", m, s) end
+    return string.format("%dс", s)
 end
 
--- Если уже авторизован (при перезапуске скрипта с сохранённым токеном)
-if STATE.authed then
-    mainGui.Enabled = true
-    STATE.mode = "window"
+local function updateTimerLabel(remaining)
+    if not timerLabel then return end
+
+    timerLabel.Text = "⏱ " .. formatRemaining(remaining)
+
+    if remaining == nil then
+        timerLabel.TextColor3 = C.muted       -- ∞
+    elseif remaining <= 60 then
+        timerLabel.TextColor3 = C.red         -- срочно
+    elseif remaining <= 300 then
+        timerLabel.TextColor3 = C.yellow      -- 5 мин
+    else
+        timerLabel.TextColor3 = C.green       -- долго
+    end
 end
+
+-- ============ AUTH CALLBACK ============
+local onAuthSuccess = function(token)
+    STATE.authed = true
+    STATE.token = token
+
+    if token then saveToken(token) end
+
+    setStatus("Успешная авторизация!", "ok")
+    authToast("Добро пожаловать!", "ok")
+
+    task.spawn(function()
+        task.wait(0.7)
+
+        if authMain and authMain.Parent then
+            local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                BackgroundTransparency = 1,
+                Size = UDim2.fromOffset(authMain.Size.X.Offset * 0.88, authMain.Size.Y.Offset * 0.88),
+            })
+            tw:Play()
+            tw.Completed:Wait()
+        end
+
+        if authGui and authGui.Parent then
+            pcall(function() authGui:Destroy() end)
+        end
+
+        -- Открываем меню + запускаем таймер
+        mainGui.Enabled = true
+        STATE.mode = "window"
+
+        task.spawn(function()
+            local result = api("/verify", { token = token })
+            if result and result.valid == true and result.remaining_seconds then
+                updateTimerLabel(tonumber(result.remaining_seconds))
+            else
+                updateTimerLabel(nil)
+            end
+        end)
+
+        print("[RH-HUB] Меню открыто.")
+    end)
+end
+
+-- ============ HEARTBEAT (5 сек) + ТАЙМЕР ============
+task.spawn(function()
+    task.wait(2)
+
+    local localRemaining = nil
+    local heartbeatActive = true
+
+    -- Локальный счётчик — раз в секунду
+    task.spawn(function()
+        while heartbeatActive do
+            if STATE.authed and localRemaining and localRemaining > 0 then
+                localRemaining = localRemaining - 1
+                updateTimerLabel(localRemaining)
+
+                if localRemaining <= 0 then
+                    clearToken()
+                    STATE.authed = false
+                    STATE.token = nil
+
+                    if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
+                    if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
+                    if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+
+                    pcall(function()
+                        loadstring(game:HttpGet(
+                            "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
+                        ))()
+                    end)
+                    heartbeatActive = false
+                    return
+                end
+            end
+            task.wait(1)
+        end
+    end)
+
+    -- Опрос сервера раз в 5 секунд
+    while heartbeatActive do
+        if STATE.authed and STATE.token then
+            local result, err = api("/verify", { token = STATE.token })
+
+            if result and result.valid == true then
+                localRemaining = tonumber(result.remaining_seconds)
+                updateTimerLabel(localRemaining)
+            else
+                local errText = tostring(err or ""):lower()
+                local shouldKick = false
+
+                if not result then
+                    if errText:find("expired") or errText:find("invalid") or errText:find("403") then
+                        shouldKick = true
+                    end
+                else
+                    if result.valid ~= true then
+                        shouldKick = true
+                    end
+                end
+
+                if shouldKick then
+                    clearToken()
+                    STATE.authed = false
+                    STATE.token = nil
+
+                    if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
+                    if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
+                    if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+
+                    pcall(function()
+                        loadstring(game:HttpGet(
+                            "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
+                        ))()
+                    end)
+                    heartbeatActive = false
+                    return
+                end
+            end
+        end
+
+        task.wait(5)
+    end
+end)
 
 -- ============ INIT ============
 selectTab("HOME")
-bindHeaderButtons()
 
 _G.RH_HUB_AUTH = {
     authed = STATE.authed,
