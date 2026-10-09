@@ -828,6 +828,9 @@ local espEnabled = false
 local espObjects = {}
 local espCharacterConnections = {}
 local espVisuals = {}
+-- NPC/model ESP is kept separate from Player ESP so the stable player path stays intact.
+local espNpcVisuals = {}
+local espNpcHighlights = {}
 local espBoxesEnabled = false
 local espLinesEnabled = false
 local espChamsEnabled = false
@@ -889,10 +892,63 @@ local function ensureESPVisual(player)
     espVisuals[player] = visual
     return visual
 end
+local function isPlayerCharacterModel(model)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character == model then return true end
+    end
+    return false
+end
+local function getModelRoot(model)
+    if not model or not model:IsA("Model") then return nil end
+    return model:FindFirstChild("HumanoidRootPart")
+        or model.PrimaryPart
+        or model:FindFirstChild("UpperTorso")
+        or model:FindFirstChild("Torso")
+        or model:FindFirstChildWhichIsA("BasePart")
+end
+local function removeNPCESP(model)
+    local visual = espNpcVisuals[model]
+    if visual then
+        if visual.boxFrame then pcall(function() visual.boxFrame:Destroy() end) end
+        if visual.line then pcall(function() visual.line:Destroy() end) end
+        espNpcVisuals[model] = nil
+    end
+    local highlight = espNpcHighlights[model]
+    if highlight then pcall(function() highlight:Destroy() end) end
+    espNpcHighlights[model] = nil
+end
+local function ensureNPCVisual(model)
+    local visual = espNpcVisuals[model]
+    if visual and visual.boxFrame and visual.boxFrame.Parent and visual.line and visual.line.Parent then return visual end
+    if visual then removeNPCESP(model) end
+    local suffix = tostring(model:GetFullName()):gsub("[^%w]", "")
+    local boxFrame = make("Frame", {
+        Name = "RaherESPBox_NPC_" .. suffix, AnchorPoint = Vector2.new(0, 0),
+        Position = UDim2.fromOffset(0, 0), Size = UDim2.fromOffset(1, 1),
+        BackgroundTransparency = 1, BorderSizePixel = 0, Visible = false,
+        Active = false, ZIndex = 100001
+    }, espGui)
+    local boxStroke = stroke(boxFrame, BOX_COLOR, 1, 0)
+    local line = make("Frame", {
+        Name = "RaherESPLine_NPC_" .. suffix, AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = LINE_COLOR, BorderSizePixel = 0, Visible = false,
+        Active = false, ZIndex = 100000
+    }, espGui)
+    visual = {boxFrame = boxFrame, boxStroke = boxStroke, line = line}
+    espNpcVisuals[model] = visual
+    return visual
+end
 local function refreshESPColors()
     local color = currentESPColor()
     -- The palette controls chams only. Boxes and tracers stay visually distinct.
     for _, highlight in pairs(espObjects) do
+        if highlight and highlight.Parent then
+            highlight.FillColor = color
+            highlight.OutlineColor = color
+            highlight.Enabled = espEnabled and espChamsEnabled
+        end
+    end
+    for _, highlight in pairs(espNpcHighlights) do
         if highlight and highlight.Parent then
             highlight.FillColor = color
             highlight.OutlineColor = color
@@ -1058,9 +1114,106 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
+    -- NPC/model targets: scan Workspace periodically, excluding all actual Player characters.
     if os.clock() - lastESPReconcile > 1 then
         lastESPReconcile = os.clock()
         updateESP()
+        if espEnabled then
+            local seen = {}
+            for _, descendant in ipairs(workspace:GetDescendants()) do
+                if descendant:IsA("Model") and descendant.Parent and not isPlayerCharacterModel(descendant) then
+                    local humanoid = descendant:FindFirstChildOfClass("Humanoid")
+                    local root = getModelRoot(descendant)
+                    if humanoid and humanoid.Health > 0 and root then
+                        seen[descendant] = true
+                        local visual = ensureNPCVisual(descendant)
+                        if espChamsEnabled then
+                            local highlight = espNpcHighlights[descendant]
+                            if not (highlight and highlight.Parent and highlight.Adornee == descendant) then
+                                if highlight then pcall(function() highlight:Destroy() end) end
+                                highlight = Instance.new("Highlight")
+                                highlight.Name = "RaherESPChams_NPC"
+                                highlight.Adornee = descendant
+                                highlight.FillColor = currentESPColor()
+                                highlight.OutlineColor = currentESPColor()
+                                highlight.FillTransparency = 0.48
+                                highlight.OutlineTransparency = 0
+                                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                                highlight.Parent = espGui
+                                espNpcHighlights[descendant] = highlight
+                            end
+                            highlight.Enabled = true
+                        else
+                            local highlight = espNpcHighlights[descendant]
+                            if highlight then pcall(function() highlight:Destroy() end) end
+                            espNpcHighlights[descendant] = nil
+                        end
+                    end
+                end
+            end
+            for model in pairs(espNpcVisuals) do
+                if not seen[model] or not model.Parent then removeNPCESP(model) end
+            end
+            for model in pairs(espNpcHighlights) do
+                if not seen[model] or not model.Parent then
+                    pcall(function() espNpcHighlights[model]:Destroy() end)
+                    espNpcHighlights[model] = nil
+                end
+            end
+        else
+            for model in pairs(espNpcVisuals) do removeNPCESP(model) end
+            for model in pairs(espNpcHighlights) do
+                pcall(function() espNpcHighlights[model]:Destroy() end)
+                espNpcHighlights[model] = nil
+            end
+        end
+    end
+    -- Update NPC screen-space visuals every frame using model bounds.
+    for model, visual in pairs(espNpcVisuals) do
+        local humanoid = model and model.Parent and model:FindFirstChildOfClass("Humanoid")
+        local root = getModelRoot(model)
+        local valid = espEnabled and humanoid and humanoid.Health > 0 and root
+        local showBox, showLine = false, false
+        if valid and espBoxesEnabled then
+            local ok, boundsCF, boundsSize = pcall(function() return model:GetBoundingBox() end)
+            if ok and boundsCF and boundsSize then
+                local half = boundsSize * 0.5
+                local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+                local frontCorners = 0
+                for _, x in ipairs({-half.X, half.X}) do
+                    for _, y in ipairs({-half.Y, half.Y}) do
+                        for _, z in ipairs({-half.Z, half.Z}) do
+                            local point = camera:WorldToViewportPoint(boundsCF:PointToWorldSpace(Vector3.new(x,y,z)))
+                            if point.Z > 0 then
+                                frontCorners += 1
+                                minX = math.min(minX, point.X); minY = math.min(minY, point.Y)
+                                maxX = math.max(maxX, point.X); maxY = math.max(maxY, point.Y)
+                            end
+                        end
+                    end
+                end
+                if frontCorners > 0 and maxX > minX and maxY > minY and maxX >= 0 and minX <= viewport.X and maxY >= 0 and minY <= viewport.Y then
+                    minX = math.clamp(minX, 0, viewport.X); maxX = math.clamp(maxX, 0, viewport.X)
+                    minY = math.clamp(minY, 0, viewport.Y); maxY = math.clamp(maxY, 0, viewport.Y)
+                    visual.boxFrame.Position = UDim2.fromOffset(minX, minY)
+                    visual.boxFrame.Size = UDim2.fromOffset(math.max(1,maxX-minX), math.max(1,maxY-minY))
+                    visual.boxFrame.Visible = true; visual.boxStroke.Color = BOX_COLOR; showBox = true
+                end
+            end
+        end
+        if not showBox then visual.boxFrame.Visible = false end
+        if valid and espLinesEnabled then
+            local point = camera:WorldToViewportPoint(root.Position)
+            showLine = point.Z > 0 and point.X >= 0 and point.X <= viewport.X and point.Y >= 0 and point.Y <= viewport.Y
+            if showLine then
+                local fromX, fromY = viewport.X/2, viewport.Y-2
+                local dx, dy = point.X-fromX, point.Y-fromY
+                visual.line.Position = UDim2.fromOffset((fromX+point.X)/2,(fromY+point.Y)/2)
+                visual.line.Size = UDim2.fromOffset(math.max(1,math.sqrt(dx*dx+dy*dy)),1)
+                visual.line.Rotation = math.deg(math.atan2(dy,dx)); visual.line.BackgroundColor3 = LINE_COLOR
+            end
+        end
+        visual.line.Visible = showLine
     end
 end)
 
@@ -1082,6 +1235,7 @@ espChamsToggleButton, espChamsToggleSetter = makeToggle(pages["VISUAL"], "ESP: Ğ
     espChamsEnabled = value
     if not value then
         for player in pairs(espObjects) do removeESP(player) end
+        for model in pairs(espNpcHighlights) do pcall(function() espNpcHighlights[model]:Destroy() end); espNpcHighlights[model] = nil end
     elseif espEnabled then
         updateESP()
     end
