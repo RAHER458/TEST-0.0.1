@@ -898,6 +898,63 @@ local function isPlayerCharacterModel(model)
     end
     return false
 end
+
+-- Friendly-fire filter. Prefer explicit Team/TeamColor data; for NPCs also
+-- recognize common faction/team attributes and BoolValue markers.
+local function getTeamIdentity(instance)
+    if not instance then return nil end
+    local team = instance:FindFirstChild("Team")
+    if team and team:IsA("ObjectValue") and team.Value then
+        return "team:" .. team.Value.Name
+    elseif team and (team:IsA("StringValue") or team:IsA("IntValue") or team:IsA("NumberValue")) then
+        return "team:" .. tostring(team.Value)
+    end
+    for _, key in ipairs({"Team", "TeamName", "Faction", "FactionName", "Side", "Camp"}) do
+        local value = instance:GetAttribute(key)
+        if value ~= nil and tostring(value) ~= "" then
+            return string.lower(key) .. ":" .. tostring(value)
+        end
+    end
+    return nil
+end
+local function hasFriendlyMarker(model)
+    if not model then return false end
+    for _, key in ipairs({"IsAlly", "IsFriendly", "Friendly", "Ally", "IsTeammate"}) do
+        if model:GetAttribute(key) == true then return true end
+        local marker = model:FindFirstChild(key, true)
+        if marker and marker:IsA("BoolValue") and marker.Value then return true end
+    end
+    return false
+end
+local function isAllyPlayer(player)
+    if not player or player == LocalPlayer then return true end
+    if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then return true end
+    -- TeamColor is only trusted when both players are assigned to non-neutral teams.
+    if not LocalPlayer.Neutral and not player.Neutral
+        and LocalPlayer.TeamColor and player.TeamColor
+        and LocalPlayer.TeamColor == player.TeamColor then return true end
+    local mine, theirs = getTeamIdentity(LocalPlayer), getTeamIdentity(player)
+    return mine ~= nil and theirs ~= nil and mine == theirs
+end
+local function isAllyNPC(model)
+    if hasFriendlyMarker(model) then return true end
+    local mine, theirs = getTeamIdentity(LocalPlayer), getTeamIdentity(model)
+    if mine ~= nil and theirs ~= nil and mine == theirs then return true end
+    -- A humanoid model may carry its team/faction marker on a descendant.
+    for _, descendant in ipairs(model:GetDescendants()) do
+        if descendant:IsA("ObjectValue") and descendant.Name == "Team" and descendant.Value then
+            local team = LocalPlayer.Team
+            if team and descendant.Value == team then return true end
+            if team and descendant.Value.Name == team.Name then return true end
+        elseif (descendant:IsA("StringValue") or descendant:IsA("IntValue"))
+            and (descendant.Name == "Team" or descendant.Name == "Faction" or descendant.Name == "Side") then
+            local value = tostring(descendant.Value)
+            local localValue = getTeamIdentity(LocalPlayer)
+            if localValue and string.lower(localValue) == string.lower(descendant.Name .. ":" .. value) then return true end
+        end
+    end
+    return false
+end
 local function getModelRoot(model)
     if not model or not model:IsA("Model") then return nil end
     return model:FindFirstChild("HumanoidRootPart")
@@ -985,6 +1042,15 @@ local function refreshESPColors()
 end
 local function createESP(player)
     if not espEnabled or player == LocalPlayer then return end
+    if isAllyPlayer(player) then
+        removeESP(player)
+        local oldVisual = espVisuals[player]
+        if oldVisual then
+            if oldVisual.boxFrame then oldVisual.boxFrame.Visible = false end
+            if oldVisual.line then oldVisual.line.Visible = false end
+        end
+        return
+    end
     local character = player.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -1084,6 +1150,14 @@ RunService.RenderStepped:Connect(function()
     local viewport = camera.ViewportSize
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
+            if isAllyPlayer(player) then
+                removeESP(player)
+                local friendlyVisual = espVisuals[player]
+                if friendlyVisual then
+                    if friendlyVisual.boxFrame then friendlyVisual.boxFrame.Visible = false end
+                    if friendlyVisual.line then friendlyVisual.line.Visible = false end
+                end
+            else
             local character = player.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -1117,6 +1191,7 @@ RunService.RenderStepped:Connect(function()
                 end
                 visual.line.Visible = showLine
             end
+            end -- not an ally
         end
     end
     -- NPC/model targets: scan Workspace periodically, excluding all actual Player characters.
@@ -1126,7 +1201,8 @@ RunService.RenderStepped:Connect(function()
         if espEnabled then
             local seen = {}
             for _, descendant in ipairs(workspace:GetDescendants()) do
-                if descendant:IsA("Model") and descendant.Parent and not isPlayerCharacterModel(descendant) then
+                if descendant:IsA("Model") and descendant.Parent and not isPlayerCharacterModel(descendant)
+                    and not isAllyNPC(descendant) then
                     local humanoid = descendant:FindFirstChildOfClass("Humanoid")
                     local root = getModelRoot(descendant)
                     if humanoid and humanoid.Health > 0 and root then
