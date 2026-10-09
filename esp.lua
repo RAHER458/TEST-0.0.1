@@ -215,6 +215,61 @@ local compactButton = make("TextButton", {
 }, header)
 corner(compactButton, 10)
 
+-- Tiny performance overlay shown when the main menu is collapsed.
+-- Tapping the overlay restores the full RAHERHUB menu.
+local statsOverlay = make("TextButton", {
+    Name = "PerformanceOverlay",
+    Visible = false,
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.fromOffset(18, 300),
+    Size = UDim2.fromOffset(190, 58),
+    BackgroundColor3 = COLORS.panel,
+    BorderSizePixel = 0,
+    Text = "FPS: --   PING: --\nЗАДЕРЖКА: -- ms",
+    TextColor3 = COLORS.text,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextWrapped = true,
+    AutoButtonColor = true,
+    ZIndex = 50
+}, gui)
+corner(statsOverlay, 12)
+stroke(statsOverlay, COLORS.accent, 1, 0.1)
+
+local statsService = game:GetService("Stats")
+local fpsFrames, fpsElapsed, currentFPS = 0, 0, 0
+local function readPing()
+    local ping = nil
+    pcall(function()
+        ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if typeof(ping) == "number" then
+        return math.max(0, math.floor(ping + 0.5))
+    end
+    pcall(function()
+        local valueText = statsService.Network.ServerStatsItem["Data Ping"]:GetValueString()
+        ping = tonumber(string.match(valueText, "%d+%.?%d*"))
+    end)
+    return typeof(ping) == "number" and math.max(0, math.floor(ping + 0.5)) or nil
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    fpsFrames += 1
+    fpsElapsed += dt
+    if fpsElapsed >= 0.5 then
+        currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
+        local frameDelay = currentFPS > 0 and (1000 / currentFPS) or 0
+        local ping = readPing()
+        statsOverlay.Text = string.format("FPS: %d   PING: %s\nЗАДЕРЖКА: %.1f ms", currentFPS, ping and (tostring(ping) .. " ms") or "--", frameDelay)
+        fpsFrames, fpsElapsed = 0, 0
+    end
+end)
+
+statsOverlay.Activated:Connect(function()
+    statsOverlay.Visible = false
+    main.Visible = true
+end)
+
 local tabsBar, content, tabLayout, pages, tabButtons
 local function applyMenuLayout()
     fitPanel()
@@ -268,8 +323,10 @@ local function applyMenuLayout()
     end
 end
 compactButton.Activated:Connect(function()
-    compactMode = not compactMode
-    applyMenuLayout()
+    -- Collapse into a tiny FPS / ping / frame-delay overlay.
+    main.Visible = false
+    statsOverlay.Visible = true
+    statsOverlay.Position = UDim2.fromOffset(savedUI.rhPosition.x or 18, savedUI.rhPosition.y or 300)
 end)
 
 -- Rainbow title animation.
