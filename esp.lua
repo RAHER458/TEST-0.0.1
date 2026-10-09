@@ -682,9 +682,9 @@ infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохран�
 -- RAHERHUB UI sound system (short electronic interface cues).
 local uiSounds = {}
 local SOUND_IDS = {
-    click = "rbxassetid://9118823101",
-    confirm = "rbxassetid://9118828562",
-    error = "rbxassetid://9118826045"
+    click = "rbxassetid://4499400560", -- futuristic / sci-fi button click
+    confirm = "rbxassetid://4807489774", -- futuristic UI cue
+    error = "rbxassetid://9119541054" -- electronic synth beep
 }
 for name, soundId in pairs(SOUND_IDS) do
     local sound = Instance.new("Sound")
