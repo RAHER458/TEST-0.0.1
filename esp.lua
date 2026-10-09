@@ -1,4 +1,4 @@
--- RAHERHUB 0.2 | MULTI-TOOL HUB + ROBLOX RESOLVER LAB | Private testing UI
+-- RAHERHUB 0.2 | UNIVERSAL COMPATIBILITY BUILD | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -9,7 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2"
+local VERSION = "0.2-COMPAT"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -557,8 +557,8 @@ content = make("Frame", {
     BackgroundTransparency = 1
 }, main)
 
-local tabNames = {"HOME", "MOVE", "VISUAL", "RESOLVER", "TELEPORT", "EDIT", "SETTINGS", "ABOUT"}
-local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", RESOLVER = "R", TELEPORT = "➤", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
+local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "COMPAT", "EDIT", "SETTINGS", "ABOUT"}
+local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", COMPAT = "✓", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
 for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
@@ -747,136 +747,6 @@ local function makeToggle(parent, label, initial, callback)
     table.insert(toggleRegistry, {label = label, get = function() return enabled end, set = setValue})
     return button, setValue
 end
-
--- Roblox Resolver Lab: observational movement/yaw diagnostics only.
--- It does not alter aim, hit registration, remote calls, or another player's state.
-section(pages["RESOLVER"], "ROBLOX MOVEMENT / ROTATION ANALYSIS")
-infoCard(pages["RESOLVER"], "RESOLVER LAB", "Анализирует только доступные клиенту CFrame, скорость и Humanoid-состояния. Это прогноз движения, не восстановление скрытого серверного угла.")
-local resolverEnabled = false
-local resolverPredictionMs = 150
-local resolverRows = {}
-local resolverHistory = {}
-local resolverLastUpdate = 0
-local resolverList = make("Frame", {
-    Name = "ResolverResults", Size = UDim2.new(1, -2, 0, 8), AutomaticSize = Enum.AutomaticSize.Y,
-    BackgroundTransparency = 1, BorderSizePixel = 0
-}, pages["RESOLVER"])
-make("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder}, resolverList)
-local resolverSummary = make("TextLabel", {
-    LayoutOrder = 1, Size = UDim2.new(1, -2, 0, 32), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
-    Text = "ОЖИДАНИЕ ЗАПУСКА АНАЛИЗА", TextColor3 = COLORS.muted, TextSize = 10,
-    Font = Enum.Font.GothamBold, TextWrapped = true
-}, pages["RESOLVER"])
-corner(resolverSummary, 10)
-resolverList.LayoutOrder = 2
-local function resolverClearRows()
-    for _, row in pairs(resolverRows) do if row and row.Parent then row:Destroy() end end
-    table.clear(resolverRows)
-end
-local function resolverWrapAngle(degrees)
-    return (degrees + 180) % 360 - 180
-end
-local function resolverYaw(root)
-    local look = root.CFrame.LookVector
-    return math.deg(math.atan2(-look.X, -look.Z))
-end
-local function resolverState(humanoid, velocity)
-    if humanoid.FloorMaterial == Enum.Material.Air then
-        local state = humanoid:GetState()
-        if state == Enum.HumanoidStateType.Freefall or velocity.Y < -2 then return "FALLING" end
-        if state == Enum.HumanoidStateType.Jumping or velocity.Y > 2 then return "JUMPING" end
-        return "AIRBORNE"
-    end
-    if Vector3.new(velocity.X, 0, velocity.Z).Magnitude > 0.75 then return "MOVING" end
-    return "STANDING"
-end
-local function resolverRender()
-    if not resolverEnabled then return end
-    local now = os.clock()
-    if now - resolverLastUpdate < 0.12 then return end
-    resolverLastUpdate = now
-    local present = {}
-    local count = 0
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local character = player.Character
-            local root = character and character:FindFirstChild("HumanoidRootPart")
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            if root and humanoid and humanoid.Health > 0 then
-                present[player] = true
-                count += 1
-                local pos = root.Position
-                local yaw = resolverYaw(root)
-                local velocity = root.AssemblyLinearVelocity
-                local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-                local state = resolverState(humanoid, velocity)
-                local previous = resolverHistory[player]
-                local dt = previous and math.max(now - previous.time, 0.001) or 0
-                local measuredVelocity = previous and (pos - previous.pos) / dt or velocity
-                local yawRate = previous and resolverWrapAngle(yaw - previous.yaw) / dt or 0
-                local predictionVelocity = velocity
-                if predictionVelocity.Magnitude < 0.05 and previous and dt > 0 then predictionVelocity = measuredVelocity end
-                local horizon = resolverPredictionMs / 1000
-                local predicted = pos + predictionVelocity * horizon
-                -- Confidence measures consistency of available samples, not server truth.
-                local confidence = previous and math.clamp(100 - math.abs(speed - Vector3.new(measuredVelocity.X, 0, measuredVelocity.Z).Magnitude) * 5 - math.abs(yawRate) * 0.03, 0, 99) or 25
-                resolverHistory[player] = {pos = pos, yaw = yaw, time = now}
-                local row = resolverRows[player]
-                if not row or not row.Parent then
-                    row = make("TextLabel", {
-                        Name = "Resolver_" .. tostring(player.UserId), Size = UDim2.new(1, -2, 0, 69),
-                        BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, Text = "", TextColor3 = COLORS.text,
-                        TextSize = 9, Font = Enum.Font.Code, TextWrapped = true,
-                        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
-                        LayoutOrder = count
-                    }, resolverList)
-                    corner(row, 9)
-                    resolverRows[player] = row
-                end
-                row.LayoutOrder = count
-                row.Text = string.format("%s  |  %s\nDIST %.1f  |  SPEED %.1f studs/s\nYAW %+.1f°  |  TURN %+.1f°/s\nPRED %+.1f, %+.1f, %+.1f  |  CONF %.0f%%",
-                    string.sub(player.DisplayName or player.Name, 1, 18), state,
-                    (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - pos).Magnitude or 0),
-                    speed, yaw, yawRate, predicted.X, predicted.Y, predicted.Z, confidence)
-            end
-        end
-    end
-    for player, row in pairs(resolverRows) do
-        if not present[player] then if row and row.Parent then row:Destroy() end; resolverRows[player] = nil; resolverHistory[player] = nil end
-    end
-    resolverSummary.Text = string.format("АНАЛИЗ АКТИВЕН  |  ЦЕЛЕЙ: %d  |  ИНТЕРВАЛ: 120 мс  |  ПРОГНОЗ: %d мс", count, resolverPredictionMs)
-    if count == 0 then resolverSummary.Text = "АНАЛИЗ АКТИВЕН — ДРУГИЕ ПЕРСОНАЖИ НЕ НАЙДЕНЫ" end
-end
-makeToggle(pages["RESOLVER"], "Анализ движения и поворотов", false, function(value)
-    resolverEnabled = value
-    if not value then
-        resolverSummary.Text = "АНАЛИЗ ОСТАНОВЛЕН"
-        resolverClearRows()
-        table.clear(resolverHistory)
-    else
-        resolverSummary.Text = "СБОР НАЧАЛЬНЫХ НАБЛЮДЕНИЙ…"
-        resolverLastUpdate = 0
-    end
-end)
-makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 50 мс", function() resolverPredictionMs = 50 end)
-makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 100 мс", function() resolverPredictionMs = 100 end)
-makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 150 мс", function() resolverPredictionMs = 150 end)
-makeActionButton(pages["RESOLVER"], "ОЧИСТИТЬ ИСТОРИЮ", function()
-    table.clear(resolverHistory)
-    resolverSummary.Text = "ИСТОРИЯ ОЧИЩЕНА — СОБИРАЮ НОВЫЕ НАБЛЮДЕНИЯ"
-end)
-RunService.Heartbeat:Connect(function()
-    if resolverEnabled then
-        local ok, err = pcall(resolverRender)
-        if not ok then resolverSummary.Text = "ОШИБКА АНАЛИЗА: " .. tostring(err):sub(1, 100) end
-    end
-end)
-Players.PlayerRemoving:Connect(function(player)
-    resolverHistory[player] = nil
-    local row = resolverRows[player]
-    if row and row.Parent then row:Destroy() end
-    resolverRows[player] = nil
-end)
 
 section(pages["MOVE"], "ДВИЖЕНИЕ И ПЕРЕМЕЩЕНИЕ")
 infoCard(pages["MOVE"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
@@ -2342,7 +2212,133 @@ makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗ
 end)
 makeActionButton(pages["SETTINGS"], "ОТКРЫТЬ СПИСОК ПРОФИЛЕЙ", openProfilePicker)
 
+-- UNIVERSAL COMPATIBILITY DIAGNOSTICS
+-- Observes client-visible state only. It does not bypass server authority or anti-cheat.
+section(pages["COMPAT"], "ПРОВЕРКА СОВМЕСТИМОСТИ")
+infoCard(pages["COMPAT"], "Диагностика проекта", "Проверяет доступные объекты и состояние функций. Серверные ограничения нельзя достоверно определить только с клиента.")
+local compatSummary = make("TextLabel", {
+    Size = UDim2.new(1, -2, 0, 36), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
+    Text = "Проверка ожидает запуска…", TextColor3 = COLORS.green, TextSize = 10,
+    Font = Enum.Font.GothamBold, TextWrapped = true
+}, pages["COMPAT"])
+corner(compatSummary, 10)
+local compatRows = {}
+local compatRowLayoutOrder = 0
+local function compatRow(key, label)
+    compatRowLayoutOrder += 1
+    local row = make("Frame", {
+        Name = "Compat_" .. key, Size = UDim2.new(1, -2, 0, 31),
+        BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, LayoutOrder = compatRowLayoutOrder
+    }, pages["COMPAT"])
+    corner(row, 9)
+    make("TextLabel", {
+        Position = UDim2.new(0, 9, 0, 0), Size = UDim2.new(0.56, -9, 1, 0),
+        BackgroundTransparency = 1, Text = label, TextColor3 = COLORS.text, TextSize = 9,
+        Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left
+    }, row)
+    local value = make("TextLabel", {
+        Position = UDim2.new(0.56, 0, 0, 0), Size = UDim2.new(0.44, -8, 1, 0),
+        BackgroundTransparency = 1, Text = "WAITING", TextColor3 = COLORS.muted, TextSize = 9,
+        Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right,
+        TextTruncate = Enum.TextTruncate.AtEnd
+    }, row)
+    compatRows[key] = value
+end
+compatRow("character", "Персонаж")
+compatRow("humanoid", "Humanoid")
+compatRow("root", "Корневая часть")
+compatRow("speed", "Скорость")
+compatRow("fly", "Fly")
+compatRow("teleport", "Сохранённые точки")
+compatRow("visual", "Визуальный интерфейс")
+compatRow("resolver", "Данные для анализа")
+compatRow("files", "Файловое API")
+compatRow("respawn", "Возрождение")
+infoCard(pages["COMPAT"], "Как читать статусы", "WORKING — объект доступен; LIMITED — функция включена, но результат не гарантирован; BLOCKED — нужный объект отсутствует; WAITING — пока нет данных.")
+local compatLastCharacter = nil
+local compatLastRoot = nil
+local compatRespawnSeen = false
+local function setCompat(key, value, color)
+    local label = compatRows[key]
+    if not label then return end
+    label.Text = value
+    label.TextColor3 = color or COLORS.muted
+end
+local function refreshCompatibility()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local green = COLORS.green
+    local yellow = Color3.fromRGB(255, 190, 70)
+    local red = Color3.fromRGB(255, 95, 110)
+    setCompat("character", character and "WORKING" or "WAITING", character and green or yellow)
+    setCompat("humanoid", humanoid and "WORKING" or (character and "BLOCKED" or "WAITING"), humanoid and green or red)
+    setCompat("root", root and "WORKING" or (character and "BLOCKED" or "WAITING"), root and green or red)
+    if humanoid then
+        if speedEnabled then
+            local actual = humanoid.WalkSpeed
+            local delta = math.abs(actual - walkSpeed)
+            setCompat("speed", delta < 0.5 and ("WORKING · " .. tostring(math.floor(actual + 0.5))) or ("LIMITED · " .. tostring(math.floor(actual + 0.5))), delta < 0.5 and green or yellow)
+        else
+            setCompat("speed", "OFF · " .. tostring(math.floor(humanoid.WalkSpeed + 0.5)), COLORS.muted)
+        end
+    else
+        setCompat("speed", "WAITING", yellow)
+    end
+    if flyEnabled then
+        setCompat("fly", root and "LIMITED · client" or "BLOCKED", root and yellow or red)
+    else
+        setCompat("fly", "OFF", COLORS.muted)
+    end
+    local pointCount = 0
+    if type(teleportPoints) == "table" then for _ in pairs(teleportPoints) do pointCount += 1 end end
+    setCompat("teleport", tostring(pointCount) .. " точек", pointCount > 0 and green or COLORS.muted)
+    setCompat("visual", gui and gui.Parent and "WORKING" or "BLOCKED", gui and gui.Parent and green or red)
+    setCompat("resolver", root and humanoid and "WORKING · client data" or "WAITING", root and humanoid and green or yellow)
+    local fileAPI = type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function"
+    setCompat("files", fileAPI and "WORKING" or "LIMITED · no file API", fileAPI and green or yellow)
+    if character and character ~= compatLastCharacter then
+        if compatLastCharacter ~= nil then compatRespawnSeen = true end
+        compatLastCharacter = character
+    end
+    setCompat("respawn", compatRespawnSeen and "WORKING · detected" or (character and "READY" or "WAITING"), compatRespawnSeen and green or COLORS.muted)
+    if not character then
+        compatSummary.Text = "Ожидание персонажа. Проверьте, что игра завершила загрузку."
+        compatSummary.TextColor3 = yellow
+    elseif not humanoid or not root then
+        compatSummary.Text = "Персонаж загружен не полностью: часть функций недоступна."
+        compatSummary.TextColor3 = red
+    elseif speedEnabled and math.abs(humanoid.WalkSpeed - walkSpeed) >= 0.5 then
+        compatSummary.Text = "Обнаружено отличие WalkSpeed от заданного значения. Возможны ограничения проекта или другой локальный скрипт."
+        compatSummary.TextColor3 = yellow
+    elseif flyEnabled then
+        compatSummary.Text = "Fly включён. Клиентская проверка не может подтвердить принятие перемещения сервером."
+        compatSummary.TextColor3 = yellow
+    else
+        compatSummary.Text = "Базовые объекты доступны. Для проверки движения включите нужную функцию в MOVE."
+        compatSummary.TextColor3 = green
+    end
+    compatLastRoot = root
+end
+makeActionButton(pages["COMPAT"], "ОБНОВИТЬ ПРОВЕРКУ", refreshCompatibility)
+makeActionButton(pages["COMPAT"], "СБРОСИТЬ СТАТУС ВОЗРОЖДЕНИЯ", function()
+    compatLastCharacter = LocalPlayer.Character
+    compatRespawnSeen = false
+    refreshCompatibility()
+end)
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    refreshCompatibility()
+end)
+task.spawn(function()
+    while gui and gui.Parent do
+        pcall(refreshCompatibility)
+        task.wait(0.75)
+    end
+end)
+
 refreshPoints()
+refreshCompatibility()
 selectTab("HOME")
 
 -- Keep touch fly control visible independently of selected page and menu state.
