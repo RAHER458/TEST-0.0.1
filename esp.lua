@@ -1,8 +1,7 @@
 --[[
-    RH-AUTH  |  v0.2 "Neon"
-    Standalone License Administration Panel
-    Platform: Delta Executor / Roblox
-    Backend: Cloudflare Workers + D1
+    RH-AUTH  |  v0.3 "Neon Compact"
+    Standalone License Admin Panel
+    Delta Executor / Roblox
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -16,43 +15,39 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     SERVER_URL = "https://raherauth.raher458.workers.dev",
-    VERSION    = "0.2",
+    VERSION    = "0.3",
     NAME       = "RH-AUTH",
-    TAGLINE    = "LICENSE CONTROL PANEL",
 }
 
 local C = {
-    Background  = Color3.fromRGB(8, 9, 16),
-    Surface     = Color3.fromRGB(16, 18, 30),
-    Surface2    = Color3.fromRGB(24, 27, 44),
-    Surface3    = Color3.fromRGB(32, 36, 58),
-    Border      = Color3.fromRGB(44, 49, 74),
-    BorderFocus = Color3.fromRGB(120, 100, 255),
-    Accent      = Color3.fromRGB(120, 90, 255),
-    Accent2     = Color3.fromRGB(90, 200, 255),
-    Accent3     = Color3.fromRGB(255, 100, 220),
-    Text        = Color3.fromRGB(240, 242, 255),
-    TextDim     = Color3.fromRGB(160, 168, 195),
-    TextMuted   = Color3.fromRGB(110, 118, 145),
-    Green       = Color3.fromRGB(60, 220, 140),
-    Yellow      = Color3.fromRGB(255, 200, 70),
-    Red         = Color3.fromRGB(255, 90, 110),
-    Gray        = Color3.fromRGB(100, 108, 135),
+    Bg       = Color3.fromRGB(8, 9, 16),
+    Surf     = Color3.fromRGB(16, 18, 30),
+    Surf2    = Color3.fromRGB(24, 27, 44),
+    Surf3    = Color3.fromRGB(32, 36, 58),
+    Bord     = Color3.fromRGB(44, 49, 74),
+    Accent   = Color3.fromRGB(120, 90, 255),
+    Accent2  = Color3.fromRGB(90, 200, 255),
+    Text     = Color3.fromRGB(240, 242, 255),
+    Dim      = Color3.fromRGB(160, 168, 195),
+    Muted    = Color3.fromRGB(110, 118, 145),
+    Green    = Color3.fromRGB(60, 220, 140),
+    Yellow   = Color3.fromRGB(255, 200, 70),
+    Red      = Color3.fromRGB(255, 90, 110),
+    Gray     = Color3.fromRGB(100, 108, 135),
 }
 
 local STATE = {
     adminSecret = "",
-    authed = false,
-    screens = {},
-    currentScreen = nil,
-    cache = { licenses = {}, stats = nil },
-    filter = "all",
-    search = "",
+    authed      = false,
+    screens     = {},
+    current     = nil,
+    licenses    = {},
+    filter      = "all",
 }
 
 -- HTTP =========================================================
 
-local function GetRequestFunction()
+local function GetReq()
     if typeof(request) == "function" then return request end
     if typeof(http_request) == "function" then return http_request end
     if syn and typeof(syn.request) == "function" then return syn.request end
@@ -61,8 +56,8 @@ local function GetRequestFunction()
     return nil
 end
 
-local function APIRequest(path, body, useAdmin)
-    local req = GetRequestFunction()
+local function API(path, body, useAdmin)
+    local req = GetReq()
     if not req then return false, "HTTP недоступен" end
 
     local headers = { ["Content-Type"] = "application/json" }
@@ -71,34 +66,29 @@ local function APIRequest(path, body, useAdmin)
         headers["X-Admin-Secret"] = STATE.adminSecret
     end
 
-    local options = {
-        Url = CONFIG.SERVER_URL .. path,
-        Method = body and "POST" or "GET",
-        Headers = headers,
-    }
-    if body then options.Body = HttpService:JSONEncode(body) end
+    local opts = { Url = CONFIG.SERVER_URL .. path, Method = body and "POST" or "GET", Headers = headers }
+    if body then opts.Body = HttpService:JSONEncode(body) end
 
-    local ok, response = pcall(req, options)
-    if not ok then return false, "Ошибка соединения: " .. tostring(response) end
-    if not response then return false, "Пустой ответ" end
+    local ok, res = pcall(req, opts)
+    if not ok then return false, "Ошибка соединения: " .. tostring(res) end
+    if not res then return false, "Пустой ответ" end
 
-    local statusCode = tonumber(response.StatusCode or response.status or 0) or 0
-    local responseBody = response.Body or response.body or ""
+    local code = tonumber(res.StatusCode or res.status or 0) or 0
+    local rbody = res.Body or res.body or ""
+    local dok, decoded = pcall(function() return HttpService:JSONDecode(rbody) end)
+    if not dok then return false, "Некорректный JSON" end
 
-    local decodedOK, decoded = pcall(function() return HttpService:JSONDecode(responseBody) end)
-    if not decodedOK then return false, "Некорректный JSON: " .. tostring(responseBody) end
-
-    if statusCode < 200 or statusCode >= 300 then
-        return false, decoded.error or ("HTTP " .. tostring(statusCode)), statusCode
+    if code < 200 or code >= 300 then
+        return false, decoded.error or ("HTTP " .. tostring(code)), code
     end
-    return true, decoded, statusCode
+    return true, decoded, code
 end
 
--- HELPERS ======================================================
+-- Helpers ======================================================
 
 local function trim(s) return (string.gsub(s or "", "^%s*(.-)%s*$", "%1")) end
 
-local function fmtDuration(sec)
+local function fmtDur(sec)
     sec = tonumber(sec)
     if not sec then return "—" end
     if sec <= 0 then return "истёк" end
@@ -111,21 +101,12 @@ local function fmtDuration(sec)
     return string.format("%dс", sec)
 end
 
-local function fmtDate(iso)
-    if not iso or iso == "" then return "—" end
-    local y, mo, d, h, mi = string.match(iso, "(%d+)-(%d+)-(%d+)T(%d+):(%d+)")
-    if not y then return iso end
-    return string.format("%s.%s.%s %s:%s", d, mo, y, h, mi)
-end
-
-local function copyToClipboard(text)
-    if typeof(setclipboard) == "function" then
-        return pcall(setclipboard, text)
-    end
+local function copyClip(text)
+    if typeof(setclipboard) == "function" then return pcall(setclipboard, text) end
     return false
 end
 
-local function pasteFromClipboard()
+local function pasteClip()
     if typeof(getclipboard) == "function" then
         local ok, v = pcall(getclipboard)
         if ok and v and v ~= "" then return v end
@@ -133,60 +114,62 @@ local function pasteFromClipboard()
     return nil
 end
 
--- ROOT UI ======================================================
+-- Root GUI =====================================================
 
 local old = game:GetService("CoreGui"):FindFirstChild("RHAuth")
 if old then old:Destroy() end
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RHAuth"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.IgnoreGuiInset = true
+local SG = Instance.new("ScreenGui")
+SG.Name = "RHAuth"
+SG.ResetOnSpawn = false
+SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+SG.IgnoreGuiInset = true
 
-local okParent = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
-if not okParent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+local okP = pcall(function() SG.Parent = game:GetService("CoreGui") end)
+if not okP then SG.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
-local function New(class, props, parent)
-    local o = Instance.new(class)
+local function New(cls, props, parent)
+    local o = Instance.new(cls)
     for k, v in pairs(props or {}) do o[k] = v end
     if parent then o.Parent = parent end
     return o
 end
 
-local W, H = 340, 540
+-- Main window ==================================================
+
+local WIN_W, WIN_H = 340, 520
+local MINI_H = 66
 
 local Main = New("Frame", {
     Name = "Main",
-    Size = UDim2.new(0, W*0.9, 0, H*0.9),
-    Position = UDim2.new(0.5, -W*0.45, 0.5, -H*0.45),
-    BackgroundColor3 = C.Background,
-    BackgroundTransparency = 1,
+    Size = UDim2.new(0, WIN_W, 0, WIN_H),
+    Position = UDim2.new(0.5, -WIN_W/2, 0.5, -WIN_H/2),
+    BackgroundColor3 = C.Bg,
     BorderSizePixel = 0,
     ClipsDescendants = true,
-}, ScreenGui)
+}, SG)
+New("UICorner", { CornerRadius = UDim.new(0, 18) }, Main)
+New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.3 }, Main)
 
-New("UICorner", { CornerRadius = UDim.new(0, 20) }, Main)
-New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.3 }, Main)
-
-TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+Main.BackgroundTransparency = 1
+Main.Size = UDim2.new(0, WIN_W * 0.9, 0, WIN_H * 0.9)
+TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
     BackgroundTransparency = 0,
-    Size = UDim2.new(0, W, 0, H),
-    Position = UDim2.new(0.5, -W/2, 0.5, -H/2),
+    Size = UDim2.new(0, WIN_W, 0, WIN_H),
 }):Play()
 
--- HEADER =======================================================
+-- Header =======================================================
 
 local Header = New("Frame", {
     Size = UDim2.new(1, 0, 0, 66),
-    BackgroundColor3 = C.Surface,
+    BackgroundColor3 = C.Surf,
     BorderSizePixel = 0,
 }, Main)
-New("UICorner", { CornerRadius = UDim.new(0, 20) }, Header)
+New("UICorner", { CornerRadius = UDim.new(0, 18) }, Header)
 New("Frame", {
-    Size = UDim2.new(1, 0, 0, 20),
-    Position = UDim2.new(0, 0, 1, -20),
-    BackgroundColor3 = C.Surface,
+    Size = UDim2.new(1, 0, 0, 22),
+    Position = UDim2.new(0, 0, 1, -22),
+    BackgroundColor3 = C.Surf,
     BorderSizePixel = 0,
 }, Header)
 
@@ -205,102 +188,195 @@ New("TextLabel", {
     TextSize = 15,
     Font = Enum.Font.GothamBold,
 }, LogoDot)
-New("UIStroke", { Color = C.Accent3, Thickness = 1, Transparency = 0.5 }, LogoDot)
-
-task.spawn(function()
-    while LogoDot.Parent do
-        local pulse = New("Frame", {
-            Size = UDim2.new(1, 0, 1, 0),
-            BackgroundColor3 = C.Accent,
-            BackgroundTransparency = 0.6,
-            BorderSizePixel = 0,
-            ZIndex = -1,
-        }, LogoDot)
-        New("UICorner", { CornerRadius = UDim.new(0, 10) }, pulse)
-        TweenService:Create(pulse, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, 20, 1, 20),
-            Position = UDim2.new(0, -10, 0, -10),
-            BackgroundTransparency = 1,
-        }):Play()
-        task.wait(1.5)
-        pulse:Destroy()
-    end
-end)
 
 New("TextLabel", {
     Position = UDim2.new(0, 60, 0, 14),
-    Size = UDim2.new(1, -110, 0, 24),
+    Size = UDim2.new(1, -160, 0, 24),
     BackgroundTransparency = 1,
     Text = CONFIG.NAME,
     TextColor3 = C.Text,
-    TextSize = 21,
+    TextSize = 20,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, Header)
 
 New("TextLabel", {
     Position = UDim2.new(0, 61, 0, 38),
-    Size = UDim2.new(1, -110, 0, 16),
+    Size = UDim2.new(1, -160, 0, 16),
     BackgroundTransparency = 1,
-    Text = CONFIG.TAGLINE .. "  •  v" .. CONFIG.VERSION,
-    TextColor3 = C.TextMuted,
+    Text = "v" .. CONFIG.VERSION .. "  •  LICENSE PANEL",
+    TextColor3 = C.Muted,
     TextSize = 9,
     Font = Enum.Font.GothamMedium,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, Header)
 
-local CloseBtn = New("TextButton", {
-    Position = UDim2.new(1, -42, 0, 16),
-    Size = UDim2.new(0, 30, 0, 30),
-    BackgroundColor3 = C.Surface2,
-    Text = "×",
-    TextColor3 = C.Text,
-    TextSize = 22,
-    Font = Enum.Font.GothamBold,
-    BorderSizePixel = 0,
-    AutoButtonColor = false,
-}, Header)
-New("UICorner", { CornerRadius = UDim.new(0, 8) }, CloseBtn)
+-- Buttons (minimize + close)
+local function HeaderBtn(xOffset, glyph)
+    local b = New("TextButton", {
+        Position = UDim2.new(1, xOffset, 0, 16),
+        Size = UDim2.new(0, 30, 0, 30),
+        BackgroundColor3 = C.Surf2,
+        Text = glyph,
+        TextColor3 = C.Text,
+        TextSize = 18,
+        Font = Enum.Font.GothamBold,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+    }, Header)
+    New("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
+    return b
+end
 
+local MinBtn = HeaderBtn(-76, "—")
+local CloseBtn = HeaderBtn(-42, "×")
+
+MinBtn.MouseEnter:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.15), { BackgroundColor3 = C.Surf3 }):Play()
+end)
+MinBtn.MouseLeave:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.15), { BackgroundColor3 = C.Surf2 }):Play()
+end)
 CloseBtn.MouseEnter:Connect(function()
     TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = C.Red }):Play()
 end)
 CloseBtn.MouseLeave:Connect(function()
-    TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = C.Surface2 }):Play()
-end)
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = C.Surf2 }):Play()
 end)
 
--- DRAGGING =====================================================
+-- Floating bubble ==============================================
 
-local dragging, dragStart, startPos
+local Bubble = New("Frame", {
+    Name = "Bubble",
+    Size = UDim2.new(0, 54, 0, 54),
+    Position = UDim2.new(1, -74, 0, 100),
+    BackgroundColor3 = C.Accent,
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 100,
+}, SG)
+New("UICorner", { CornerRadius = UDim.new(1, 0) }, Bubble)
+New("UIStroke", { Color = C.Accent2, Thickness = 2, Transparency = 0.3 }, Bubble)
+
+local BubbleLabel = New("TextLabel", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "RH",
+    TextColor3 = C.Text,
+    TextSize = 16,
+    Font = Enum.Font.GothamBold,
+}, Bubble)
+
+-- Bubble dragging (tap to open, drag to move)
+local bubbleDragging = false
+local bubbleMoved = false
+local bubbleStart, bubbleStartPos
+
+Bubble.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        bubbleDragging = true
+        bubbleMoved = false
+        bubbleStart = input.Position
+        bubbleStartPos = Bubble.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if bubbleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch) then
+        local d = input.Position - bubbleStart
+        if math.abs(d.X) > 4 or math.abs(d.Y) > 4 then
+            bubbleMoved = true
+        end
+        Bubble.Position = UDim2.new(
+            bubbleStartPos.X.Scale, bubbleStartPos.X.Offset + d.X,
+            bubbleStartPos.Y.Scale, bubbleStartPos.Y.Offset + d.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if bubbleDragging and (input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch) then
+        bubbleDragging = false
+        if not bubbleMoved then
+            -- tap → open window
+            Bubble.Visible = false
+            Main.Visible = true
+            Main.Size = UDim2.new(0, WIN_W * 0.9, 0, WIN_H * 0.9)
+            Main.BackgroundTransparency = 1
+            TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, WIN_W, 0, WIN_H),
+                BackgroundTransparency = 0,
+            }):Play()
+        end
+    end
+end)
+
+-- Window dragging ==============================================
+
+local wDrag, wStart, wStartPos
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = Main.Position
+        wDrag = true
+        wStart = input.Position
+        wStartPos = Main.Position
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            if input.UserInputState == Enum.UserInputState.End then wDrag = false end
         end)
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+    if wDrag and (input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch) then
-        local d = input.Position - dragStart
+        local d = input.Position - wStart
         Main.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + d.X,
-            startPos.Y.Scale, startPos.Y.Offset + d.Y
+            wStartPos.X.Scale, wStartPos.X.Offset + d.X,
+            wStartPos.Y.Scale, wStartPos.Y.Offset + d.Y
         )
     end
 end)
 
--- [КОНЕЦ ЧАСТИ 1]
+-- Minimize / Close =============================================
 
--- TOAST ========================================================
+local isMinimized = false
+
+MinBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetH = isMinimized and MINI_H or WIN_H
+    if ScreenContainer then ScreenContainer.Visible = not isMinimized end
+    if ToastC then ToastC.Visible = not isMinimized end
+    TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, WIN_W, 0, targetH),
+    }):Play()
+    MinBtn.Text = isMinimized and "+" or "—"
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, WIN_W * 0.85, 0, WIN_H * 0.85),
+        BackgroundTransparency = 1,
+    }):Play()
+    task.wait(0.2)
+    Main.Visible = false
+    Bubble.Visible = true
+    -- pulse bubble
+    task.spawn(function()
+        while Bubble.Visible do
+            TweenService:Create(Bubble, TweenInfo.new(0.8), { Size = UDim2.new(0, 60, 0, 60) }):Play()
+            task.wait(0.8)
+            if not Bubble.Visible then break end
+            TweenService:Create(Bubble, TweenInfo.new(0.8), { Size = UDim2.new(0, 54, 0, 54) }):Play()
+            task.wait(0.8)
+        end
+    end)
+end)
+
+-- [КОНЕЦ ЧАСТИ 1]
+-- Toast =======================================================
 
 local ToastC = New("Frame", {
     Position = UDim2.new(0, 0, 1, -190),
@@ -321,10 +397,10 @@ New("UIPadding", {
     PaddingRight = UDim.new(0, 14),
 }, ToastC)
 
-local toastOrder = 0
+local toastN = 0
 
 local function Toast(text, kind)
-    toastOrder = toastOrder + 1
+    toastN = toastN + 1
     local color = kind == "success" and C.Green
               or kind == "error"   and C.Red
               or kind == "warn"    and C.Yellow
@@ -332,10 +408,10 @@ local function Toast(text, kind)
 
     local t = New("Frame", {
         Size = UDim2.new(1, 0, 0, 0),
-        BackgroundColor3 = C.Surface3,
+        BackgroundColor3 = C.Surf3,
         BorderSizePixel = 0,
         ClipsDescendants = true,
-        LayoutOrder = toastOrder,
+        LayoutOrder = toastN,
     }, ToastC)
     New("UICorner", { CornerRadius = UDim.new(0, 10) }, t)
     New("Frame", {
@@ -371,7 +447,7 @@ local function Toast(text, kind)
     end)
 end
 
--- COMPONENTS ===================================================
+-- Components ===================================================
 
 local ScreenContainer = New("Frame", {
     Position = UDim2.new(0, 0, 0, 66),
@@ -403,19 +479,19 @@ local function Scroll(parent)
     return s
 end
 
-local function Btn(text, parent, color, onClick, height)
+local function Btn(text, parent, color, onClick, h)
     color = color or C.Accent
-    height = height or 44
+    h = h or 44
 
-    local btn = New("TextButton", {
-        Size = UDim2.new(1, 0, 0, height),
+    local b = New("TextButton", {
+        Size = UDim2.new(1, 0, 0, h),
         BackgroundColor3 = color,
         Text = "",
         BorderSizePixel = 0,
         AutoButtonColor = false,
         ClipsDescendants = true,
     }, parent)
-    New("UICorner", { CornerRadius = UDim.new(0, 10) }, btn)
+    New("UICorner", { CornerRadius = UDim.new(0, 10) }, b)
 
     local lbl = New("TextLabel", {
         Size = UDim2.new(1, 0, 1, 0),
@@ -424,37 +500,35 @@ local function Btn(text, parent, color, onClick, height)
         TextColor3 = C.Text,
         TextSize = 12,
         Font = Enum.Font.GothamBold,
-    }, btn)
+    }, b)
 
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), { Size = UDim2.new(1, 4, 0, height) }):Play()
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), { Size = UDim2.new(1, 4, 0, h) }):Play()
     end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), { Size = UDim2.new(1, 0, 0, height) }):Play()
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.15), { Size = UDim2.new(1, 0, 0, h) }):Play()
     end)
-    btn.MouseButton1Down:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), { Size = UDim2.new(1, -8, 0, height) }):Play()
+    b.MouseButton1Down:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.08), { Size = UDim2.new(1, -8, 0, h) }):Play()
     end)
-    btn.MouseButton1Up:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.12), { Size = UDim2.new(1, 0, 0, height) }):Play()
+    b.MouseButton1Up:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.12), { Size = UDim2.new(1, 0, 0, h) }):Play()
     end)
-
-    btn.MouseButton1Click:Connect(function()
-        if onClick then task.spawn(function() onClick(btn, lbl) end) end
+    b.MouseButton1Click:Connect(function()
+        if onClick then task.spawn(function() onClick(b, lbl) end) end
     end)
-
-    return btn, lbl
+    return b, lbl
 end
 
 local function Input(placeholder, default, parent, opts)
     opts = opts or {}
     local wrap = New("Frame", {
         Size = UDim2.new(1, 0, 0, 44),
-        BackgroundColor3 = C.Surface2,
+        BackgroundColor3 = C.Surf2,
         BorderSizePixel = 0,
     }, parent)
     New("UICorner", { CornerRadius = UDim.new(0, 10) }, wrap)
-    local stroke = New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.3 }, wrap)
+    local stroke = New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.3 }, wrap)
 
     local box = New("TextBox", {
         Position = UDim2.new(0, 12, 0, 0),
@@ -462,7 +536,7 @@ local function Input(placeholder, default, parent, opts)
         BackgroundTransparency = 1,
         Text = default or "",
         PlaceholderText = placeholder or "",
-        PlaceholderColor3 = C.TextMuted,
+        PlaceholderColor3 = C.Muted,
         TextColor3 = C.Text,
         TextSize = 12,
         Font = Enum.Font.Gotham,
@@ -471,17 +545,17 @@ local function Input(placeholder, default, parent, opts)
     }, wrap)
 
     box.Focused:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.15), { Color = C.BorderFocus, Transparency = 0 }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), { Color = C.Accent, Transparency = 0 }):Play()
     end)
     box.FocusLost:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.15), { Color = C.Border, Transparency = 0.3 }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), { Color = C.Bord, Transparency = 0.3 }):Play()
     end)
 
     if opts.paste then
         local pb = New("TextButton", {
             Position = UDim2.new(1, -40, 0, 6),
             Size = UDim2.new(0, 32, 0, 32),
-            BackgroundColor3 = C.Surface3,
+            BackgroundColor3 = C.Surf3,
             Text = "📋",
             TextColor3 = C.Text,
             TextSize = 14,
@@ -491,28 +565,23 @@ local function Input(placeholder, default, parent, opts)
         }, wrap)
         New("UICorner", { CornerRadius = UDim.new(0, 8) }, pb)
         pb.MouseButton1Click:Connect(function()
-            local v = pasteFromClipboard()
-            if v and v ~= "" then
-                box.Text = v
-                Toast("Вставлено", "info")
-            else
-                Toast("Буфер пуст", "warn")
-            end
+            local v = pasteClip()
+            if v and v ~= "" then box.Text = v; Toast("Вставлено", "info")
+            else Toast("Буфер пуст", "warn") end
         end)
     end
-
     return box, wrap
 end
 
 local function Toggle(parent, defaultOn, labelText)
-    local state = defaultOn and true or false
+    local st = defaultOn and true or false
     local wrap = New("Frame", {
         Size = UDim2.new(1, 0, 0, 46),
-        BackgroundColor3 = C.Surface2,
+        BackgroundColor3 = C.Surf2,
         BorderSizePixel = 0,
     }, parent)
     New("UICorner", { CornerRadius = UDim.new(0, 10) }, wrap)
-    New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.3 }, wrap)
+    New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.3 }, wrap)
 
     New("TextLabel", {
         Position = UDim2.new(0, 14, 0, 0),
@@ -528,13 +597,13 @@ local function Toggle(parent, defaultOn, labelText)
     local track = New("Frame", {
         Position = UDim2.new(1, -62, 0.5, -12),
         Size = UDim2.new(0, 46, 0, 24),
-        BackgroundColor3 = state and C.Accent or C.Surface3,
+        BackgroundColor3 = st and C.Accent or C.Surf3,
         BorderSizePixel = 0,
     }, wrap)
     New("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
 
     local knob = New("Frame", {
-        Position = state and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+        Position = st and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
         Size = UDim2.new(0, 20, 0, 20),
         BackgroundColor3 = C.Text,
         BorderSizePixel = 0,
@@ -548,21 +617,20 @@ local function Toggle(parent, defaultOn, labelText)
     }, wrap)
 
     btn.MouseButton1Click:Connect(function()
-        state = not state
+        st = not st
         TweenService:Create(track, TweenInfo.new(0.2), {
-            BackgroundColor3 = state and C.Accent or C.Surface3,
+            BackgroundColor3 = st and C.Accent or C.Surf3,
         }):Play()
         TweenService:Create(knob, TweenInfo.new(0.2), {
-            Position = state and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+            Position = st and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
         }):Play()
     end)
-
-    return { Get = function() return state end }, wrap
+    return { Get = function() return st end }, wrap
 end
 
-local function TextLabel(text, size, color, parent, order)
+local function Label(text, h, color, parent, order)
     return New("TextLabel", {
-        Size = UDim2.new(1, 0, 0, size or 20),
+        Size = UDim2.new(1, 0, 0, h or 20),
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = color or C.Text,
@@ -574,14 +642,14 @@ local function TextLabel(text, size, color, parent, order)
     }, parent)
 end
 
-local function SectionHeader(text, parent, order)
-    local l = TextLabel(text, 20, C.Accent2, parent, order or 0)
+local function Section(text, parent, order)
+    local l = Label(text, 20, C.Accent2, parent, order or 0)
     l.Font = Enum.Font.GothamBold
     l.TextSize = 11
     return l
 end
 
--- SCREEN ROUTER ================================================
+-- Router ======================================================
 
 local SCREENS = STATE.screens
 
@@ -601,36 +669,34 @@ local function ShowScreen(name)
     end
     sc.Root.Visible = true
     sc.Root.Position = UDim2.new(0, 30, 0, 0)
-    TweenService:Create(sc.Root, TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+    TweenService:Create(sc.Root, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Position = UDim2.new(0, 0, 0, 0),
     }):Play()
-    STATE.currentScreen = name
+    STATE.current = name
 end
 
--- [КОНЕЦ ЧАСТИ 2]
-
--- SCREEN: AUTH =================================================
+-- Screen: AUTH =================================================
 
 SCREENS.auth = {
     Build = function(root)
         local card = New("Frame", {
             Position = UDim2.new(0, 16, 0.5, -170),
             Size = UDim2.new(1, -32, 0, 320),
-            BackgroundColor3 = C.Surface,
+            BackgroundColor3 = C.Surf,
             BorderSizePixel = 0,
         }, root)
         New("UICorner", { CornerRadius = UDim.new(0, 14) }, card)
-        New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.5 }, card)
+        New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.5 }, card)
 
-        local t1 = TextLabel("🔐  Авторизация", 26, C.Text, card)
+        local t1 = Label("🔐  Авторизация", 26, C.Text, card)
         t1.Position = UDim2.new(0, 20, 0, 22)
         t1.Font = Enum.Font.GothamBold
         t1.TextSize = 18
 
-        local t2 = TextLabel("Введите Admin Secret для доступа к панели.", 36, C.TextDim, card)
+        local t2 = Label("Введите Admin Secret для доступа.", 36, C.Dim, card)
         t2.Position = UDim2.new(0, 20, 0, 56)
 
-        local t3 = TextLabel("ADMIN SECRET", 16, C.TextMuted, card)
+        local t3 = Label("ADMIN SECRET", 16, C.Muted, card)
         t3.Position = UDim2.new(0, 20, 0, 100)
         t3.Font = Enum.Font.GothamBold
         t3.TextSize = 9
@@ -639,7 +705,7 @@ SCREENS.auth = {
         wrap.Position = UDim2.new(0, 20, 0, 120)
         wrap.Size = UDim2.new(1, -40, 0, 44)
 
-        local status = TextLabel("", 30, C.TextMuted, card)
+        local status = Label("", 30, C.Muted, card)
         status.Position = UDim2.new(0, 20, 0, 178)
 
         local loginBtn, loginLbl = Btn("ВОЙТИ", card, C.Accent, function()
@@ -651,10 +717,10 @@ SCREENS.auth = {
             STATE.adminSecret = v
 
             task.spawn(function()
-                local ok, result = APIRequest("/admin/list", {}, true)
+                local ok, result = API("/admin/list", {}, true)
                 if ok then
                     STATE.authed = true
-                    STATE.cache.licenses = result.keys or {}
+                    STATE.licenses = result.keys or {}
                     status.Text = "Успешный вход"
                     status.TextColor3 = C.Green
                     Toast("Добро пожаловать!", "success")
@@ -672,8 +738,8 @@ SCREENS.auth = {
         loginBtn.Position = UDim2.new(0, 20, 0, 218)
         loginBtn.Size = UDim2.new(1, -40, 0, 46)
 
-        local srvBtn = Btn("ПРОВЕРИТЬ СЕРВЕР", card, C.Surface3, function()
-            local ok, _, code = APIRequest("", nil, false)
+        local srvBtn = Btn("ПРОВЕРИТЬ СЕРВЕР", card, C.Surf3, function()
+            local ok, _, code = API("", nil, false)
             if ok then Toast("Сервер онлайн (" .. tostring(code) .. ")", "success")
             else Toast("Сервер недоступен", "error") end
         end)
@@ -681,13 +747,13 @@ SCREENS.auth = {
     end,
 }
 
--- SCREEN: MAIN =================================================
+-- Screen: MAIN =================================================
 
 SCREENS.main = {
     Build = function(root)
         local scroll = Scroll(root)
 
-        local title = TextLabel("📊  Обзор", 24, C.Text, scroll)
+        local title = Label("📊  Обзор", 24, C.Text, scroll)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 16
 
@@ -703,21 +769,16 @@ SCREENS.main = {
         }, statsFrame)
 
         local function StatCard(label, value, color)
-            local c = New("Frame", {
-                BackgroundColor3 = C.Surface,
-                BorderSizePixel = 0,
-            }, statsFrame)
+            local c = New("Frame", { BackgroundColor3 = C.Surf, BorderSizePixel = 0 }, statsFrame)
             New("UICorner", { CornerRadius = UDim.new(0, 12) }, c)
-            New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.5 }, c)
-
+            New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.5 }, c)
             New("Frame", {
                 Size = UDim2.new(0, 3, 0, 24),
                 Position = UDim2.new(0, 0, 0, 14),
                 BackgroundColor3 = color,
                 BorderSizePixel = 0,
             }, c)
-
-            local valLabel = New("TextLabel", {
+            local vl = New("TextLabel", {
                 Position = UDim2.new(0, 14, 0, 12),
                 Size = UDim2.new(1, -20, 0, 26),
                 BackgroundTransparency = 1,
@@ -727,81 +788,74 @@ SCREENS.main = {
                 Font = Enum.Font.GothamBold,
                 TextXAlignment = Enum.TextXAlignment.Left,
             }, c)
-
             New("TextLabel", {
                 Position = UDim2.new(0, 14, 0, 42),
                 Size = UDim2.new(1, -20, 0, 16),
                 BackgroundTransparency = 1,
                 Text = label,
-                TextColor3 = C.TextMuted,
+                TextColor3 = C.Muted,
                 TextSize = 9,
                 Font = Enum.Font.GothamMedium,
                 TextXAlignment = Enum.TextXAlignment.Left,
             }, c)
-
-            return valLabel
+            return vl
         end
 
-        local statTotal    = StatCard("ВСЕГО", "—", C.Accent)
-        local statActive   = StatCard("АКТИВНЫХ", "—", C.Green)
-        local statExpired  = StatCard("ИСТЁКШИХ", "—", C.Yellow)
-        local statRevoked  = StatCard("ОТОЗВАНО", "—", C.Red)
-        local statBound    = StatCard("ПРИВЯЗАНО", "—", C.Accent2)
-        local statLifetime = StatCard("БЕССРОЧНЫХ", "—", C.Accent3)
+        local sTotal    = StatCard("ВСЕГО", "—", C.Accent)
+        local sActive   = StatCard("АКТИВНЫХ", "—", C.Green)
+        local sExpired  = StatCard("ИСТЁКШИХ", "—", C.Yellow)
+        local sRevoked  = StatCard("ОТОЗВАНО", "—", C.Red)
+        local sBound    = StatCard("ПРИВЯЗАНО", "—", C.Accent2)
+        local sLifetime = StatCard("БЕССРОЧНЫХ", "—", C.Accent2)
 
         local function loadStats()
-            local ok, result = APIRequest("/admin/stats", {}, true)
+            local ok, result = API("/admin/stats", {}, true)
             if ok and result.stats then
                 local s = result.stats
-                statTotal.Text    = tostring(s.total or 0)
-                statActive.Text   = tostring(s.active or 0)
-                statExpired.Text  = tostring(s.expired or 0)
-                statRevoked.Text  = tostring(s.revoked or 0)
-                statBound.Text    = tostring(s.bound or 0)
-                statLifetime.Text = tostring(s.lifetime or 0)
+                sTotal.Text    = tostring(s.total or 0)
+                sActive.Text   = tostring(s.active or 0)
+                sExpired.Text  = tostring(s.expired or 0)
+                sRevoked.Text  = tostring(s.revoked or 0)
+                sBound.Text    = tostring(s.bound or 0)
+                sLifetime.Text = tostring(s.lifetime or 0)
             end
         end
 
-        local refreshBtn, refreshLbl = Btn("🔄  ОБНОВИТЬ СТАТИСТИКУ", scroll, C.Surface2, function()
-            refreshLbl.Text = "⏳  ЗАГРУЗКА..."
+        local rBtn, rLbl = Btn("🔄  ОБНОВИТЬ СТАТИСТИКУ", scroll, C.Surf2, function()
+            rLbl.Text = "⏳  ЗАГРУЗКА..."
             task.spawn(function()
                 loadStats()
-                Toast("Статистика обновлена", "success")
-                refreshLbl.Text = "🔄  ОБНОВИТЬ СТАТИСТИКУ"
+                Toast("Обновлено", "success")
+                rLbl.Text = "🔄  ОБНОВИТЬ СТАТИСТИКУ"
             end)
         end)
-        refreshBtn.LayoutOrder = 2
+        rBtn.LayoutOrder = 2
 
-        local createBtn = Btn("➕  СОЗДАТЬ КЛЮЧ", scroll, C.Accent, function()
-            ShowScreen("create")
-        end)
-        createBtn.LayoutOrder = 3
+        local cBtn = Btn("➕  СОЗДАТЬ КЛЮЧ", scroll, C.Accent, function() ShowScreen("create") end)
+        cBtn.LayoutOrder = 3
 
-        local listBtn = Btn("📋  СПИСОК КЛЮЧЕЙ", scroll, C.Surface2, function()
-            ShowScreen("list")
-        end)
-        listBtn.LayoutOrder = 4
+        local lBtn = Btn("📋  СПИСОК КЛЮЧЕЙ", scroll, C.Surf2, function() ShowScreen("list") end)
+        lBtn.LayoutOrder = 4
 
-        local settingsBtn = Btn("⚙️  НАСТРОЙКИ", scroll, C.Surface2, function()
-            ShowScreen("settings")
-        end)
-        settingsBtn.LayoutOrder = 5
+        local setBtn = Btn("⚙️  НАСТРОЙКИ", scroll, C.Surf2, function() ShowScreen("settings") end)
+        setBtn.LayoutOrder = 5
 
         task.spawn(loadStats)
     end,
 }
 
--- SCREEN: CREATE ===============================================
+-- [КОНЕЦ ЧАСТИ 2]
+-- Screen: CREATE ===============================================
 
 SCREENS.create = {
     Build = function(root)
         local scroll = Scroll(root)
 
-        local title = TextLabel("➕  Создать лицензии", 24, C.Text, scroll)
+        local title = Label("➕  Создать лицензии", 24, C.Text, scroll)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 16
 
-        SectionHeader("СРОК ДЕЙСТВИЯ", scroll)
+        Section("СРОК ДЕЙСТВИЯ", scroll)
 
         local lifetime, lw = Toggle(scroll, false, "Бессрочная лицензия")
         lw.LayoutOrder = 2
@@ -813,7 +867,7 @@ SCREENS.create = {
         hw.LayoutOrder = 4
         mw.LayoutOrder = 5
 
-        SectionHeader("ПАРАМЕТРЫ", scroll)
+        Section("ПАРАМЕТРЫ", scroll)
 
         local countBox, cw = Input("Количество ключей", "1", scroll)
         cw.LayoutOrder = 7
@@ -821,7 +875,7 @@ SCREENS.create = {
         local robloxBox, rw = Input("Roblox User ID (необязательно)", "", scroll, { paste = true })
         rw.LayoutOrder = 8
 
-        local status = TextLabel("", 30, C.TextMuted, scroll)
+        local status = Label("", 30, C.Muted, scroll)
         status.LayoutOrder = 9
 
         local createBtn, createLbl = Btn("✨  СОЗДАТЬ", scroll, C.Accent, function()
@@ -841,10 +895,10 @@ SCREENS.create = {
             end
 
             local body = {
-                days    = math.floor(days),
-                hours   = math.floor(hours),
-                minutes = math.floor(minutes),
-                count   = math.floor(count),
+                days     = math.floor(days),
+                hours    = math.floor(hours),
+                minutes  = math.floor(minutes),
+                count    = math.floor(count),
                 lifetime = isLife,
             }
 
@@ -860,10 +914,10 @@ SCREENS.create = {
 
             createLbl.Text = "⏳  СОЗДАНИЕ..."
             status.Text = "Отправка на сервер..."
-            status.TextColor3 = C.TextDim
+            status.TextColor3 = C.Dim
 
             task.spawn(function()
-                local ok, result = APIRequest("/admin/create", body, true)
+                local ok, result = API("/admin/create", body, true)
 
                 if not ok then
                     status.Text = tostring(result)
@@ -876,24 +930,23 @@ SCREENS.create = {
                 local keys = result.keys or {}
                 local failed = result.failed or {}
 
-                status.Text = "Создано: " .. #keys .. (#failed > 0 and (", ошибок: " .. #failed) or "")
+                status.Text = "Создано: " .. #keys .. (#failed > 0 and ("  •  ошибок: " .. #failed) or "")
                 status.TextColor3 = #keys > 0 and C.Green or C.Red
                 createLbl.Text = "✨  СОЗДАТЬ"
 
                 if #keys > 0 then
                     Toast("Создано ключей: " .. #keys, "success")
 
-                    -- Result box
-                    local resultWrap = New("Frame", {
+                    local rw2 = New("Frame", {
                         Size = UDim2.new(1, 0, 0, 140),
-                        BackgroundColor3 = C.Surface2,
+                        BackgroundColor3 = C.Surf2,
                         BorderSizePixel = 0,
                         LayoutOrder = 11,
                     }, scroll)
-                    New("UICorner", { CornerRadius = UDim.new(0, 10) }, resultWrap)
-                    New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.3 }, resultWrap)
+                    New("UICorner", { CornerRadius = UDim.new(0, 10) }, rw2)
+                    New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.3 }, rw2)
 
-                    local resultBox = New("TextBox", {
+                    New("TextBox", {
                         Position = UDim2.new(0, 10, 0, 10),
                         Size = UDim2.new(1, -20, 1, -60),
                         BackgroundTransparency = 1,
@@ -906,7 +959,7 @@ SCREENS.create = {
                         MultiLine = true,
                         TextEditable = false,
                         TextWrapped = true,
-                    }, resultWrap)
+                    }, rw2)
 
                     local copyBtn = New("TextButton", {
                         Position = UDim2.new(0, 10, 1, -46),
@@ -918,10 +971,10 @@ SCREENS.create = {
                         Font = Enum.Font.GothamBold,
                         BorderSizePixel = 0,
                         AutoButtonColor = false,
-                    }, resultWrap)
+                    }, rw2)
                     New("UICorner", { CornerRadius = UDim.new(0, 8) }, copyBtn)
                     copyBtn.MouseButton1Click:Connect(function()
-                        local ok2 = copyToClipboard(table.concat(keys, "\n"))
+                        local ok2 = copyClip(table.concat(keys, "\n"))
                         if ok2 then Toast("Скопировано", "success")
                         else Toast("Буфер недоступен", "warn") end
                     end)
@@ -936,30 +989,24 @@ SCREENS.create = {
         end)
         createBtn.LayoutOrder = 10
 
-        local backBtn = Btn("←  НАЗАД", scroll, C.Surface2, function()
-            ShowScreen("main")
-        end)
+        local backBtn = Btn("←  НАЗАД", scroll, C.Surf2, function() ShowScreen("main") end)
         backBtn.LayoutOrder = 12
     end,
 }
 
--- [КОНЕЦ ЧАСТИ 3]
-
--- SCREEN: LIST =================================================
+-- Screen: LIST =================================================
 
 SCREENS.list = {
     Build = function(root)
         local scroll = Scroll(root)
 
-        local title = TextLabel("📋  Список ключей", 24, C.Text, scroll)
+        local title = Label("📋  Список ключей", 24, C.Text, scroll)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 16
 
-        -- Search
         local searchBox, searchWrap = Input("Поиск по ключу или Roblox ID", "", scroll, { paste = true })
         searchWrap.LayoutOrder = 1
 
-        -- Filter row
         local filterRow = New("Frame", {
             Size = UDim2.new(1, 0, 0, 36),
             BackgroundTransparency = 1,
@@ -972,18 +1019,19 @@ SCREENS.list = {
         }, filterRow)
 
         local filters = {
-            {id = "all",     label = "ВСЕ",       color = C.Surface3},
-            {id = "active",  label = "АКТИВ",     color = C.Green},
-            {id = "expired", label = "ИСТЕКЛИ",   color = C.Yellow},
-            {id = "revoked", label = "ОТОЗВАНЫ",  color = C.Red},
+            {id = "all",     label = "ВСЕ",      color = C.Surf3},
+            {id = "active",  label = "АКТИВ",    color = C.Green},
+            {id = "expired", label = "ИСТЕКЛИ",  color = C.Yellow},
+            {id = "revoked", label = "ОТОЗВАНЫ", color = C.Red},
         }
 
-        local filterButtons = {}
+        local filterBtns = {}
 
         for i, f in ipairs(filters) do
             local fb = New("TextButton", {
                 Size = UDim2.new(0, 76, 1, 0),
                 BackgroundColor3 = f.color,
+                BackgroundTransparency = (f.id == "all") and 0 or 0.55,
                 Text = f.label,
                 TextColor3 = C.Text,
                 TextSize = 10,
@@ -993,22 +1041,9 @@ SCREENS.list = {
                 LayoutOrder = i,
             }, filterRow)
             New("UICorner", { CornerRadius = UDim.new(0, 8) }, fb)
-            filterButtons[f.id] = fb
-
-            fb.MouseButton1Click:Connect(function()
-                STATE.filter = f.id
-                for id, btn in pairs(filterButtons) do
-                    btn.BackgroundTransparency = (id == f.id) and 0 or 0.55
-                end
-                renderList()
-            end)
+            filterBtns[f.id] = fb
         end
-        filterButtons.all.BackgroundTransparency = 0
-        filterButtons.active.BackgroundTransparency = 0.55
-        filterButtons.expired.BackgroundTransparency = 0.55
-        filterButtons.revoked.BackgroundTransparency = 0.55
 
-        -- Container for cards
         local cardsWrap = New("Frame", {
             Size = UDim2.new(1, 0, 0, 0),
             BackgroundTransparency = 1,
@@ -1020,37 +1055,37 @@ SCREENS.list = {
             SortOrder = Enum.SortOrder.LayoutOrder,
         }, cardsWrap)
 
-        local countLabel = TextLabel("", 22, C.TextMuted, scroll, 4)
+        local countLabel = Label("", 22, C.Muted, scroll, 4)
 
         local function getStatus(item)
             if item.is_active == 0 then return "revoked", "ОТОЗВАН", C.Red end
             if item.expired then return "expired", "ИСТЁК", C.Yellow end
             if not item.activated_at and item.duration_seconds ~= nil then
-                return "pending", "НЕ АКТИВИРОВАН", C.Gray
+                return "pending", "НЕ АКТИВЕН", C.Gray
             end
             return "active", "АКТИВЕН", C.Green
         end
 
+        local renderList
+
         local function buildCard(item)
-            local status, statusText, statusColor = getStatus(item)
+            local _, statusText, statusColor = getStatus(item)
 
             local card = New("Frame", {
                 Size = UDim2.new(1, 0, 0, 130),
-                BackgroundColor3 = C.Surface,
+                BackgroundColor3 = C.Surf,
                 BorderSizePixel = 0,
             }, cardsWrap)
             New("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
-            New("UIStroke", { Color = C.Border, Thickness = 1, Transparency = 0.5 }, card)
+            New("UIStroke", { Color = C.Bord, Thickness = 1, Transparency = 0.5 }, card)
 
-            -- Status stripe
             New("Frame", {
                 Size = UDim2.new(0, 3, 1, 0),
                 BackgroundColor3 = statusColor,
                 BorderSizePixel = 0,
             }, card)
 
-            -- Key (monospace)
-            local keyBox = New("TextLabel", {
+            New("TextLabel", {
                 Position = UDim2.new(0, 14, 0, 10),
                 Size = UDim2.new(1, -100, 0, 20),
                 BackgroundTransparency = 1,
@@ -1062,7 +1097,6 @@ SCREENS.list = {
                 TextTruncate = Enum.TextTruncate.AtEnd,
             }, card)
 
-            -- Status pill
             local pill = New("TextLabel", {
                 Position = UDim2.new(1, -86, 0, 8),
                 Size = UDim2.new(0, 74, 0, 22),
@@ -1077,16 +1111,15 @@ SCREENS.list = {
             New("UICorner", { CornerRadius = UDim.new(1, 0) }, pill)
             New("UIStroke", { Color = statusColor, Thickness = 1, Transparency = 0.5 }, pill)
 
-            -- Meta info
             local meta = {}
             if item.roblox_user_id then table.insert(meta, "👤 " .. tostring(item.roblox_user_id)) end
-            if item.install_hash then table.insert(meta, "💻 привязан") else table.insert(meta, "💻 свободен") end
+            table.insert(meta, item.install_hash and "💻 привязан" or "💻 свободен")
             if item.duration_seconds == nil then
                 table.insert(meta, "∞ бессрочно")
             elseif item.expires_at then
-                table.insert(meta, "⏱ " .. fmtDuration(item.remaining_seconds))
+                table.insert(meta, "⏱ " .. fmtDur(item.remaining_seconds))
             else
-                table.insert(meta, "⏱ " .. fmtDuration(item.duration_seconds))
+                table.insert(meta, "⏱ " .. fmtDur(item.duration_seconds))
             end
 
             New("TextLabel", {
@@ -1094,7 +1127,7 @@ SCREENS.list = {
                 Size = UDim2.new(1, -20, 0, 32),
                 BackgroundTransparency = 1,
                 Text = table.concat(meta, "   •   "),
-                TextColor3 = C.TextDim,
+                TextColor3 = C.Dim,
                 TextSize = 10,
                 Font = Enum.Font.Gotham,
                 TextXAlignment = Enum.TextXAlignment.Left,
@@ -1102,8 +1135,7 @@ SCREENS.list = {
                 TextYAlignment = Enum.TextYAlignment.Top,
             }, card)
 
-            -- Actions row (4 small buttons)
-            local actionsWrap = New("Frame", {
+            local actions = New("Frame", {
                 Position = UDim2.new(0, 10, 1, -42),
                 Size = UDim2.new(1, -20, 0, 34),
                 BackgroundTransparency = 1,
@@ -1112,66 +1144,50 @@ SCREENS.list = {
                 FillDirection = Enum.FillDirection.Horizontal,
                 Padding = UDim.new(0, 5),
                 SortOrder = Enum.SortOrder.LayoutOrder,
-            }, actionsWrap)
+            }, actions)
 
-            local function smallAction(text, color, onClick)
+            local function act(text, cb)
                 local b = New("TextButton", {
                     Size = UDim2.new(0.25, -4, 1, 0),
-                    BackgroundColor3 = color,
+                    BackgroundColor3 = C.Surf3,
                     Text = text,
                     TextColor3 = C.Text,
                     TextSize = 9,
                     Font = Enum.Font.GothamBold,
                     BorderSizePixel = 0,
                     AutoButtonColor = false,
-                }, actionsWrap)
+                }, actions)
                 New("UICorner", { CornerRadius = UDim.new(0, 6) }, b)
-                b.MouseButton1Click:Connect(function()
-                    task.spawn(function() onClick() end)
-                end)
-                return b
+                b.MouseButton1Click:Connect(function() task.spawn(cb) end)
             end
 
-            smallAction("📋", C.Surface3, function()
-                local ok = copyToClipboard(item.key or "")
-                if ok then Toast("Ключ скопирован", "success")
-                else Toast("Буфер недоступен", "warn") end
+            act("📋", function()
+                local ok = copyClip(item.key or "")
+                Toast(ok and "Копия" or "Буфер недоступен", ok and "success" or "warn")
             end)
 
-            smallAction("🚫", C.Surface3, function()
-                local ok, res = APIRequest("/admin/revoke", { key = item.key }, true)
-                if ok and res.success then
-                    Toast("Отозван", "success")
-                    renderList()
-                else
-                    Toast(tostring(res), "error")
-                end
+            act("🚫", function()
+                local ok, res = API("/admin/revoke", { key = item.key }, true)
+                if ok and res.success then Toast("Отозван", "success"); renderList()
+                else Toast(tostring(res), "error") end
             end)
 
-            smallAction("🔄", C.Surface3, function()
-                local ok, res = APIRequest("/admin/reset-device", { key = item.key }, true)
-                if ok and res.success then
-                    Toast("HWID сброшен", "success")
-                    renderList()
-                else
-                    Toast(tostring(res), "error")
-                end
+            act("🔄", function()
+                local ok, res = API("/admin/reset-device", { key = item.key }, true)
+                if ok and res.success then Toast("HWID сброшен", "success"); renderList()
+                else Toast(tostring(res), "error") end
             end)
 
-            smallAction("🗑", C.Surface3, function()
-                local ok, res = APIRequest("/admin/delete", { key = item.key }, true)
-                if ok and res.success then
-                    Toast("Удалён", "success")
-                    renderList()
-                else
-                    Toast(tostring(res), "error")
-                end
+            act("🗑", function()
+                local ok, res = API("/admin/delete", { key = item.key }, true)
+                if ok and res.success then Toast("Удалён", "success"); renderList()
+                else Toast(tostring(res), "error") end
             end)
         end
 
         local loading = false
 
-        function renderList()
+        renderList = function()
             if loading then return end
             loading = true
 
@@ -1179,25 +1195,25 @@ SCREENS.list = {
                 if ch:IsA("GuiObject") then ch:Destroy() end
             end
 
-            local searchText = string.lower(trim(searchBox.Text))
+            local search = string.lower(trim(searchBox.Text))
             local filter = STATE.filter
 
-            local all = STATE.cache.licenses or {}
+            local all = STATE.licenses or {}
             local shown = 0
 
             for _, item in ipairs(all) do
                 local status = getStatus(item)
-                local matchesFilter = (filter == "all") or (status == filter)
-                local matchesSearch = true
+                local okF = (filter == "all") or (status == filter)
+                local okS = true
 
-                if searchText ~= "" then
+                if search ~= "" then
                     local k = string.lower(item.key or "")
                     local u = string.lower(tostring(item.roblox_user_id or ""))
-                    matchesSearch = (string.find(k, searchText, 1, true) ~= nil)
-                                 or (string.find(u, searchText, 1, true) ~= nil)
+                    okS = (string.find(k, search, 1, true) ~= nil)
+                       or (string.find(u, search, 1, true) ~= nil)
                 end
 
-                if matchesFilter and matchesSearch then
+                if okF and okS then
                     buildCard(item)
                     shown = shown + 1
                 end
@@ -1207,105 +1223,106 @@ SCREENS.list = {
             loading = false
         end
 
-        local refreshBtn, refreshLbl = Btn("🔄  ОБНОВИТЬ СПИСОК", scroll, C.Accent, function()
-            refreshLbl.Text = "⏳  ЗАГРУЗКА..."
+        for id, btn in pairs(filterBtns) do
+            btn.MouseButton1Click:Connect(function()
+                STATE.filter = id
+                for fid, fb in pairs(filterBtns) do
+                    fb.BackgroundTransparency = (fid == id) and 0 or 0.55
+                end
+                renderList()
+            end)
+        end
+
+        local rBtn, rLbl = Btn("🔄  ОБНОВИТЬ СПИСОК", scroll, C.Accent, function()
+            rLbl.Text = "⏳  ЗАГРУЗКА..."
             task.spawn(function()
-                local ok, result = APIRequest("/admin/list", {}, true)
+                local ok, result = API("/admin/list", {}, true)
                 if ok then
-                    STATE.cache.licenses = result.keys or {}
+                    STATE.licenses = result.keys or {}
                     renderList()
-                    Toast("Загружено: " .. #STATE.cache.licenses, "success")
+                    Toast("Загружено: " .. #STATE.licenses, "success")
                 else
                     Toast(tostring(result), "error")
                 end
-                refreshLbl.Text = "🔄  ОБНОВИТЬ СПИСОК"
+                rLbl.Text = "🔄  ОБНОВИТЬ СПИСОК"
             end)
         end)
-        refreshBtn.LayoutOrder = 5
+        rBtn.LayoutOrder = 5
 
-        searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-            renderList()
-        end)
+        searchBox:GetPropertyChangedSignal("Text"):Connect(renderList)
 
-        local backBtn = Btn("←  НАЗАД", scroll, C.Surface2, function()
-            ShowScreen("main")
-        end)
+        local backBtn = Btn("←  НАЗАД", scroll, C.Surf2, function() ShowScreen("main") end)
         backBtn.LayoutOrder = 6
 
-        -- auto render cached
         task.spawn(renderList)
     end,
 }
 
--- SCREEN: SETTINGS =============================================
+-- Screen: SETTINGS =============================================
 
 SCREENS.settings = {
     Build = function(root)
         local scroll = Scroll(root)
 
-        local title = TextLabel("⚙️  Настройки", 24, C.Text, scroll)
+        local title = Label("⚙️  Настройки", 24, C.Text, scroll)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 16
 
-        SectionHeader("СЕРВЕР", scroll)
+        Section("СЕРВЕР", scroll)
 
-        local urlLabel = TextLabel(CONFIG.SERVER_URL, 36, C.TextDim, scroll, 3)
+        local urlLabel = Label(CONFIG.SERVER_URL, 36, C.Dim, scroll, 3)
         urlLabel.Font = Enum.Font.Code
         urlLabel.TextSize = 10
 
-        local pingBtn, pingLbl = Btn("🌐  ПРОВЕРИТЬ СВЯЗЬ", scroll, C.Surface2, function()
-            pingLbl.Text = "⏳  ПРОВЕРКА..."
+        local pBtn, pLbl = Btn("🌐  ПРОВЕРИТЬ СВЯЗЬ", scroll, C.Surf2, function()
+            pLbl.Text = "⏳  ПРОВЕРКА..."
             task.spawn(function()
                 local t = os.clock()
-                local ok, _, code = APIRequest("", nil, false)
+                local ok = API("", nil, false)
                 local ms = math.floor((os.clock() - t) * 1000)
                 if ok then Toast("Онлайн • " .. ms .. " мс", "success")
                 else Toast("Ошибка соединения", "error") end
-                pingLbl.Text = "🌐  ПРОВЕРИТЬ СВЯЗЬ"
+                pLbl.Text = "🌐  ПРОВЕРИТЬ СВЯЗЬ"
             end)
         end)
-        pingBtn.LayoutOrder = 4
+        pBtn.LayoutOrder = 4
 
-        SectionHeader("СЕССИЯ", scroll)
+        Section("СЕССИЯ", scroll)
 
-        local infoLabel = TextLabel(
-            "Admin Secret хранится только в памяти текущей сессии и не сохраняется на диск.",
-            40, C.TextDim, scroll, 6
+        Label(
+            "Admin Secret хранится только в памяти текущей сессии.",
+            40, C.Dim, scroll, 6
         )
 
-        local logoutBtn, logoutLbl = Btn("🔓  ВЫЙТИ ИЗ АККАУНТА", scroll, C.Red, function()
+        local outBtn = Btn("🔓  ВЫЙТИ ИЗ АККАУНТА", scroll, C.Red, function()
             STATE.adminSecret = ""
             STATE.authed = false
-            STATE.cache.licenses = {}
-            STATE.cache.stats = nil
+            STATE.licenses = {}
             Toast("Сессия завершена", "success")
             task.wait(0.3)
             ShowScreen("auth")
         end)
-        logoutBtn.LayoutOrder = 7
+        outBtn.LayoutOrder = 7
 
-        SectionHeader("О ПАНЕЛИ", scroll)
+        Section("О ПАНЕЛИ", scroll)
 
-        TextLabel(CONFIG.NAME .. "  •  v" .. CONFIG.VERSION, 20, C.Text, scroll, 9).Font = Enum.Font.GothamBold
-        TextLabel("Standalone License Administration Panel", 20, C.TextMuted, scroll, 10).TextSize = 10
-        TextLabel("Cloudflare Workers + D1 backend", 20, C.TextMuted, scroll, 11).TextSize = 10
+        local about1 = Label(CONFIG.NAME .. "  •  v" .. CONFIG.VERSION, 20, C.Text, scroll, 9)
+        about1.Font = Enum.Font.GothamBold
 
-        local backBtn = Btn("←  НАЗАД", scroll, C.Surface2, function()
-            ShowScreen("main")
-        end)
+        Label("Standalone License Admin Panel", 20, C.Muted, scroll, 10).TextSize = 10
+        Label("Cloudflare Workers + D1", 20, C.Muted, scroll, 11).TextSize = 10
+
+        local backBtn = Btn("←  НАЗАД", scroll, C.Surf2, function() ShowScreen("main") end)
         backBtn.LayoutOrder = 12
     end,
 }
 
--- =========================================================
--- INITIALIZATION
--- =========================================================
+-- INIT ========================================================
 
 ShowScreen("auth")
 
-print("[RH-AUTH] Panel initialized")
-print("[RH-AUTH] Standalone version " .. CONFIG.VERSION)
+print("[RH-AUTH] v" .. CONFIG.VERSION .. " initialized")
 print("[RH-AUTH] Server: " .. CONFIG.SERVER_URL)
 
--- [КОНЕЦ ЧАСТИ 4]
+-- [КОНЕЦ ЧАСТИ 3]
 -- [[ КОНЕЦ ФАЙЛА ]]
