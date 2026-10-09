@@ -9,7 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2-COMPAT"
+local VERSION = "0.2-COMPAT-ESP-ALL-PLAYERS-NPCS-FIX"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -866,21 +866,81 @@ local function removeESPVisual(player)
     end
     espVisuals[player] = nil
 end
+local function getTargetCharacter(target)
+    if typeof(target) ~= "Instance" then return nil end
+    if target:IsA("Player") then
+        if target == LocalPlayer then return nil end
+        return target.Character
+    end
+    if target:IsA("Model") then
+        if LocalPlayer.Character and target == LocalPlayer.Character then return nil end
+        if not target:IsDescendantOf(workspace) then return nil end
+        -- Ignore nested accessory/effect models inside a character rig.
+        local ancestor = target.Parent
+        while ancestor and ancestor ~= workspace do
+            if ancestor:IsA("Model") and ancestor:FindFirstChildOfClass("Humanoid") then return nil end
+            ancestor = ancestor.Parent
+        end
+        return target
+    end
+    return nil
+end
+local function getTargetRoot(character)
+    if not character then return nil end
+    return character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
+        or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+        or character:FindFirstChild("Head")
+end
+local function isValidTargetModel(model)
+    if not model or not model:IsA("Model") or not model:IsDescendantOf(workspace) then return false end
+    if LocalPlayer.Character and model == LocalPlayer.Character then return false end
+    local humanoid = model:FindFirstChildOfClass("Humanoid")
+    return humanoid ~= nil and humanoid.Health > 0 and getTargetRoot(model) ~= nil
+end
+local function targetLabel(target)
+    if target:IsA("Player") then return tostring(target.UserId) end
+    local ok, id = pcall(function() return target:GetDebugId(4) end)
+    if ok and id then return tostring(id):gsub("[^%w_]", "") end
+    return tostring(target.Name):gsub("[^%w_]", "") .. "_" .. tostring(math.floor(os.clock()*1000))
+end
+local function isPlayerTarget(target)
+    return typeof(target) == "Instance" and target:IsA("Player")
+end
+local function collectESPTargets()
+    local targets = {}
+    local seen = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            targets[#targets+1] = player
+            if player.Character then seen[player.Character] = true end
+        end
+    end
+    -- Include NPCs/fake-player rigs represented as Models in Workspace.
+    -- Accept nonstandard rigs that expose Torso, UpperTorso, or Head instead of HRP.
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item:IsA("Model") and not seen[item] and isValidTargetModel(item) then
+            targets[#targets+1] = item
+            seen[item] = true
+        end
+    end
+    return targets
+end
 local function ensureESPVisual(player)
-    if player == LocalPlayer then return nil end
+    if not getTargetCharacter(player) then return nil end
     local visual = espVisuals[player]
     if visual and visual.boxFrame and visual.boxFrame.Parent and visual.line and visual.line.Parent then return visual end
     removeESPVisual(player)
 
+    local label = targetLabel(player)
     local boxFrame = make("Frame", {
-        Name = "RaherESPBox_" .. tostring(player.UserId),
+        Name = "RaherESPBox_" .. label,
         AnchorPoint = Vector2.new(0, 0), Position = UDim2.fromOffset(0, 0),
         Size = UDim2.fromOffset(1, 1), BackgroundTransparency = 1,
         BorderSizePixel = 0, Visible = false, Active = false, ZIndex = 100001
     }, espGui)
     local boxStroke = stroke(boxFrame, BOX_COLOR, 1, 0)
     local line = make("Frame", {
-        Name = "RaherESPLine_" .. tostring(player.UserId),
+        Name = "RaherESPLine_" .. label,
         AnchorPoint = Vector2.new(0.5, 0.5),
         BackgroundColor3 = LINE_COLOR, BorderSizePixel = 0,
         Visible = false, Active = false, ZIndex = 100000
@@ -901,9 +961,9 @@ local function refreshESPColors()
     end
 end
 local function createESP(player)
-    if not espEnabled or player == LocalPlayer then return end
-    local character = player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not espEnabled or (isPlayerTarget(player) and player == LocalPlayer) then return end
+    local character = getTargetCharacter(player)
+    local root = getTargetRoot(character)
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if not character or not character.Parent or not root or not humanoid or humanoid.Health <= 0 then
         removeESP(player)
@@ -947,7 +1007,7 @@ local function bindESPPlayer(player)
             for _ = 1, 40 do
                 if not espEnabled or player.Parent ~= Players then return end
                 if player.Character == character and character.Parent
-                    and character:FindFirstChild("HumanoidRootPart")
+                    and getTargetRoot(character)
                     and character:FindFirstChildOfClass("Humanoid") then
                     createESP(player)
                     return
@@ -961,10 +1021,10 @@ end
 local function updateESP()
     if espEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                bindESPPlayer(player)
-                createESP(player)
-            end
+            if player ~= LocalPlayer then bindESPPlayer(player) end
+        end
+        for _, target in ipairs(collectESPTargets()) do
+            createESP(target)
         end
     else
         for player in pairs(espObjects) do removeESP(player) end
@@ -999,10 +1059,9 @@ RunService.RenderStepped:Connect(function()
         return
     end
     local viewport = camera.ViewportSize
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local character = player.Character
-            local root = character and character:FindFirstChild("HumanoidRootPart")
+    for _, player in ipairs(collectESPTargets()) do
+            local character = getTargetCharacter(player)
+            local root = getTargetRoot(character)
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             local visual = ensureESPVisual(player)
             if visual then
@@ -1055,8 +1114,6 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
                 visual.line.Visible = showLine
-            end
-        end
     end
     if os.clock() - lastESPReconcile > 1 then
         lastESPReconcile = os.clock()
