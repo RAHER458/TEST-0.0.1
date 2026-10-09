@@ -427,7 +427,7 @@ end)
 
 -- Circular RAHERHUB launcher portrait. Upload the generated neon logo to Roblox
 -- and replace the placeholder ID below with the uploaded image asset ID.
-local LAUNCHER_IMAGE = "rbxassetid://77157407370511" -- uploaded RH CHEAT neon logo
+local LAUNCHER_IMAGE = "rbxassetid://126952267001309" -- uploaded RH CHEAT neon logo
 local openButton = make("ImageButton", {
     Name = "OpenButton",
     Visible = false,
