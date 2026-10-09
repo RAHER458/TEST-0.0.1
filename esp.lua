@@ -1843,6 +1843,152 @@ local function applySettingsData(data)
         if statsOverlay then statsOverlay.Position = UDim2.fromOffset(data.launcherPosition.x, data.launcherPosition.y) end
     end
 end
+-- Profile picker: opens as a separate compact panel with selectable saved profiles.
+local selectedProfileName = nil
+local profilePicker = make("Frame", {
+    Name = "ProfilePicker", AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.86, 0, 0.68, 0),
+    BackgroundColor3 = COLORS.background or Color3.fromRGB(14, 16, 25),
+    BorderSizePixel = 0, Visible = false, ZIndex = 300
+}, gui)
+profilePicker.Size = UDim2.new(0.86, 0, 0, 350)
+corner(profilePicker, 14)
+stroke(profilePicker, COLORS.accent or Color3.fromRGB(255, 70, 190), 1.5, 0.1)
+local pickerTitle = make("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -52, 0, 28),
+    BackgroundTransparency = 1, Text = "ВЫБОР ПРОФИЛЯ", TextColor3 = COLORS.text,
+    TextSize = 13, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 301
+}, profilePicker)
+local pickerClose = make("TextButton", {
+    Position = UDim2.new(1, -38, 0, 7), Size = UDim2.fromOffset(30, 30),
+    BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = "×",
+    TextColor3 = COLORS.text, TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 301
+}, profilePicker)
+corner(pickerClose, 9)
+local pickerHint = make("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 38), Size = UDim2.new(1, -24, 0, 28),
+    BackgroundTransparency = 1, Text = "Выбери профиль из списка, затем нажми «ЗАГРУЗИТЬ».",
+    TextColor3 = COLORS.muted, TextSize = 9, Font = Enum.Font.Gotham,
+    TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 301
+}, profilePicker)
+local profileList = make("ScrollingFrame", {
+    Position = UDim2.new(0, 10, 0, 70), Size = UDim2.new(1, -20, 1, -130),
+    BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, ScrollBarThickness = 4,
+    CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    ScrollingDirection = Enum.ScrollingDirection.Y, ZIndex = 301
+}, profilePicker)
+corner(profileList, 9)
+local profileListLayout = make("UIListLayout", {
+    Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder
+}, profileList)
+make("UIPadding", {
+    PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6),
+    PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6)
+}, profileList)
+local pickerLoad = make("TextButton", {
+    Position = UDim2.new(0, 10, 1, -50), Size = UDim2.new(0.5, -13, 0, 38),
+    BackgroundColor3 = COLORS.green or Color3.fromRGB(60, 190, 130), BorderSizePixel = 0,
+    Text = "ЗАГРУЗИТЬ", TextColor3 = Color3.new(1, 1, 1), TextSize = 10,
+    Font = Enum.Font.GothamBold, ZIndex = 301
+}, profilePicker)
+corner(pickerLoad, 10)
+local pickerDelete = make("TextButton", {
+    Position = UDim2.new(0.5, 3, 1, -50), Size = UDim2.new(0.5, -13, 0, 38),
+    BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = "УДАЛИТЬ",
+    TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.GothamBold, ZIndex = 301
+}, profilePicker)
+corner(pickerDelete, 10)
+local function refreshProfilePicker()
+    for _, child in ipairs(profileList:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("TextLabel") then child:Destroy() end
+    end
+    local store, err = readProfileStore()
+    if not store then
+        local row = make("TextLabel", {
+            Size = UDim2.new(1, -4, 0, 42), BackgroundTransparency = 1,
+            Text = err or "Не удалось прочитать профили.", TextColor3 = COLORS.muted,
+            TextSize = 10, Font = Enum.Font.Gotham, TextWrapped = true, ZIndex = 302
+        }, profileList)
+        selectedProfileName = nil
+        return
+    end
+    local names = {}
+    for name in pairs(store.profiles) do table.insert(names, name) end
+    table.sort(names, function(a, b) return a:lower() < b:lower() end)
+    if #names == 0 then
+        make("TextLabel", {
+            Size = UDim2.new(1, -4, 0, 42), BackgroundTransparency = 1,
+            Text = "Сохранённых профилей нет. Сначала сохрани профиль в настройках.",
+            TextColor3 = COLORS.muted, TextSize = 10, Font = Enum.Font.Gotham,
+            TextWrapped = true, ZIndex = 302
+        }, profileList)
+        selectedProfileName = nil
+        pickerHint.Text = "Список сохранённых профилей пуст."
+        return
+    end
+    if not selectedProfileName or store.profiles[selectedProfileName] == nil then
+        selectedProfileName = names[1]
+    end
+    pickerHint.Text = "Выбрано: " .. selectedProfileName
+    for index, name in ipairs(names) do
+        local isSelected = name == selectedProfileName
+        local row = make("TextButton", {
+            Name = "Profile_" .. tostring(index), Size = UDim2.new(1, -4, 0, 34),
+            BackgroundColor3 = isSelected and (COLORS.accent or Color3.fromRGB(120, 65, 190)) or COLORS.button,
+            BorderSizePixel = 0, Text = (isSelected and "✓  " or "    ") .. name,
+            TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.GothamBold,
+            TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+            ZIndex = 302, LayoutOrder = index
+        }, profileList)
+        corner(row, 8)
+        row.Activated:Connect(function()
+            selectedProfileName = name
+            refreshProfilePicker()
+        end)
+    end
+end
+local function openProfilePicker()
+    refreshProfilePicker()
+    profilePicker.Visible = true
+end
+pickerClose.Activated:Connect(function() profilePicker.Visible = false end)
+pickerLoad.Activated:Connect(function()
+    if not selectedProfileName then
+        pickerHint.Text = "Сначала выбери профиль из списка."
+        return
+    end
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); pickerHint.Text = err; return end
+    local data = store.profiles[selectedProfileName]
+    if type(data) ~= "table" then
+        pickerHint.Text = "Профиль больше не найден. Обновляю список…"
+        refreshProfilePicker()
+        return
+    end
+    applySettingsData(data)
+    profileMessage("Профиль «" .. selectedProfileName .. "» загружен.", true)
+    profilePicker.Visible = false
+end)
+pickerDelete.Activated:Connect(function()
+    if not selectedProfileName then pickerHint.Text = "Сначала выбери профиль для удаления."; return end
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); pickerHint.Text = err; return end
+    if store.profiles[selectedProfileName] == nil then
+        refreshProfilePicker()
+        return
+    end
+    local deletedName = selectedProfileName
+    store.profiles[deletedName] = nil
+    if writeProfileStore(store) then
+        selectedProfileName = nil
+        profileMessage("Профиль «" .. deletedName .. "» удалён.", true)
+        refreshProfilePicker()
+    else
+        pickerHint.Text = "Не удалось обновить файл профилей."
+    end
+end)
+
 makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗВАНИЕМ", function()
     local name = cleanProfileName()
     if name == "" then profileMessage("Сначала введи название профиля.", false); return end
@@ -1852,27 +1998,19 @@ makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗ
     if writeProfileStore(store) then profileMessage("Профиль «" .. name .. "» сохранён.", true)
     else profileMessage("Не удалось сохранить профиль в файл.", false) end
 end)
-makeActionButton(pages["SETTINGS"], "ЗАГРУЗИТЬ ПРОФИЛЬ ПО НАЗВАНИЮ", function()
-    local name = cleanProfileName()
-    if name == "" then profileMessage("Введи название профиля для загрузки.", false); return end
-    local store, err = readProfileStore()
-    if not store then profileMessage(err, false); return end
-    local data = store.profiles[name]
-    if type(data) ~= "table" then profileMessage("Профиль «" .. name .. "» не найден.", false); return end
-    applySettingsData(data)
-    profileMessage("Профиль «" .. name .. "» загружен.", true)
-end)
-makeActionButton(pages["SETTINGS"], "УДАЛИТЬ ВЫБРАННЫЙ ПРОФИЛЬ", function()
+makeActionButton(pages["SETTINGS"], "ВЫБРАТЬ И ЗАГРУЗИТЬ ПРОФИЛЬ", openProfilePicker)
+makeActionButton(pages["SETTINGS"], "УДАЛИТЬ ПРОФИЛЬ ПО НАЗВАНИЮ", function()
     local name = cleanProfileName()
     if name == "" then profileMessage("Введи название профиля для удаления.", false); return end
     local store, err = readProfileStore()
     if not store then profileMessage(err, false); return end
     if store.profiles[name] == nil then profileMessage("Профиль «" .. name .. "» не найден.", false); return end
     store.profiles[name] = nil
-    if writeProfileStore(store) then profileMessage("Профиль «" .. name .. "» удалён.", true)
+    if writeProfileStore(store) then
+        if selectedProfileName == name then selectedProfileName = nil end
+        profileMessage("Профиль «" .. name .. "» удалён.", true)
     else profileMessage("Не удалось обновить файл профилей.", false) end
 end)
-makeActionButton(pages["SETTINGS"], "ПОКАЗАТЬ СПИСОК ПРОФИЛЕЙ", listProfileNames)
 
 refreshPoints()
 selectTab("HOME")
