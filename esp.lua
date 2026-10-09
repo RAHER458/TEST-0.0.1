@@ -806,9 +806,9 @@ local espEnabled = false
 local espObjects = {}
 local espCharacterConnections = {}
 local espVisuals = {}
-local espBoxesEnabled = true
+local espBoxesEnabled = false
 local espLinesEnabled = false
-local espChamsEnabled = true
+local espChamsEnabled = false
 local espColorIndex = 1
 local espPalette = {
     {name = "КРАСНЫЙ", color = Color3.fromRGB(255, 65, 85)},
@@ -841,13 +841,13 @@ local function ensureESPVisual(player)
     removeESPVisual(player)
     local box = make("Frame", {
         Name = "RaherESPBox_" .. player.UserId, BackgroundTransparency = 1,
-        BorderSizePixel = 0, Visible = false, Active = false, ZIndex = 2
+        BorderSizePixel = 0, Visible = false, Active = false, ZIndex = 5000
     }, gui)
     local boxStroke = stroke(box, currentESPColor(), 1.5, 0)
     local line = make("Frame", {
-        Name = "RaherESPLine_" .. player.UserId, AnchorPoint = Vector2.new(0, 0.5),
+        Name = "RaherESPLine_" .. player.UserId, AnchorPoint = Vector2.new(0.5, 0.5),
         BackgroundColor3 = currentESPColor(), BorderSizePixel = 0, Visible = false,
-        Active = false, ZIndex = 2
+        Active = false, ZIndex = 5000
     }, gui)
     visual = {box = box, boxStroke = boxStroke, line = line}
     espVisuals[player] = visual
@@ -978,7 +978,7 @@ RunService.RenderStepped:Connect(function()
                         visible = allInFront and maxX > 0 and minX < viewport.X and maxY > 0 and minY < viewport.Y
                     end
                 end
-                local show = visible and not main.Visible
+                local show = visible
                 visual.box.Visible = show and espBoxesEnabled
                 visual.line.Visible = show and espLinesEnabled
                 if show then
@@ -989,8 +989,8 @@ RunService.RenderStepped:Connect(function()
                     local fromX, fromY = viewport.X/2, viewport.Y-2
                     local toX, toY = (minX+maxX)/2, maxY
                     local dx, dy = toX-fromX, toY-fromY
-                    visual.line.Position = UDim2.fromOffset(fromX, fromY)
-                    visual.line.Size = UDim2.fromOffset(math.sqrt(dx*dx+dy*dy), 1.5)
+                    visual.line.Position = UDim2.fromOffset((fromX + toX) / 2, (fromY + toY) / 2)
+                    visual.line.Size = UDim2.fromOffset(math.sqrt(dx*dx+dy*dy), 2)
                     visual.line.Rotation = math.deg(math.atan2(dy, dx))
                     if visual.boxStroke then visual.boxStroke.Color = currentESPColor() end
                 end
@@ -1007,15 +1007,19 @@ makeToggle(pages["VISUAL"], "ESP — ВКЛЮЧИТЬ ВСЁ", false, function(v
     espEnabled = value
     updateESP()
 end)
-makeToggle(pages["VISUAL"], "ESP: БОКСЫ", true, function(value)
+makeToggle(pages["VISUAL"], "ESP: БОКСЫ", false, function(value)
     espBoxesEnabled = value
-    for _, visual in pairs(espVisuals) do if visual.box then visual.box.Visible = espEnabled and value end end
+    if not value then
+        for _, visual in pairs(espVisuals) do if visual.box then visual.box.Visible = false end end
+    end
 end)
 makeToggle(pages["VISUAL"], "ESP: ЛИНИИ К ИГРОКАМ", false, function(value)
     espLinesEnabled = value
-    for _, visual in pairs(espVisuals) do if visual.line then visual.line.Visible = espEnabled and value end end
+    if not value then
+        for _, visual in pairs(espVisuals) do if visual.line then visual.line.Visible = false end end
+    end
 end)
-makeToggle(pages["VISUAL"], "ESP: ЧАМСЫ / ПОДСВЕТКА", true, function(value)
+makeToggle(pages["VISUAL"], "ESP: ЧАМСЫ / ПОДСВЕТКА", false, function(value)
     espChamsEnabled = value
     if not value then
         for player in pairs(espObjects) do removeESP(player) end
@@ -2161,4 +2165,3 @@ minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
 print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
- 
