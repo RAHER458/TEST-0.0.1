@@ -1,4 +1,4 @@
--- RAHERHUB 0.0.2 | STABLE BUILD 3 | Private testing UI
+-- RAHERHUB 0.2 | MULTI-TOOL HUB | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -9,15 +9,16 @@ local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.0.2"
-local SETTINGS_KEY = "RAHERHUB_01_SETTINGS"
-_G[SETTINGS_KEY] = _G[SETTINGS_KEY] or {}
+local VERSION = "0.2"
+local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
+_G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
 savedUI.flySize = savedUI.flySize or 66
 savedUI.flyOpacity = savedUI.flyOpacity or 0.12
 savedUI.flyPosition = savedUI.flyPosition or {x = -24, y = -150}
 savedUI.rhPosition = savedUI.rhPosition or {x = 18, y = 300}
 local POINTS_FILE = "raherhub_teleport_points.json"
+local CONFIG_FILE = "raherhub_02_config.json"
 
 -- Remove an older copy if the script is re-run.
 pcall(function()
@@ -74,7 +75,7 @@ local loadingTitle = make("TextLabel", {
 }, loadingFrame)
 local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.0.2 • STABLE BUILD 3", TextColor3 = Color3.fromRGB(160, 165, 190),
+    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.2 • MULTI-TOOL HUB", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
 local loadingTrack = make("Frame", {
@@ -669,7 +670,7 @@ local statusLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 30),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "RAHERHUB 0.0.2  |  STABLE BUILD 3  |  ЗАКРЫТЫЙ ALPHA-ТЕСТ",
+    Text = "RAHERHUB 0.2  |  MULTI-TOOL HUB  |  PRIVATE ALPHA",
     TextColor3 = COLORS.green,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -678,7 +679,7 @@ local statusLabel = make("TextLabel", {
 corner(statusLabel, 11)
 
 section(pages["HOME"], "ПАНЕЛЬ УПРАВЛЕНИЯ")
-infoCard(pages["HOME"], "RAHERHUB 0.0.2 — STABLE BUILD 3", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
+infoCard(pages["HOME"], "RAHERHUB 0.2 — MULTI-TOOL HUB", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
 infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
 infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
@@ -702,6 +703,7 @@ local function makeActionButton(parent, text, callback, height)
     return button
 end
 
+local toggleRegistry = {}
 local function makeToggle(parent, label, initial, callback)
     local enabled = initial or false
     local button
@@ -715,11 +717,13 @@ local function makeToggle(parent, label, initial, callback)
         if callback then callback(enabled) end
     end)
     paint()
-    return button, function(value)
+    local function setValue(value)
         enabled = value and true or false
         paint()
         if callback then callback(enabled) end
     end
+    table.insert(toggleRegistry, {label = label, get = function() return enabled end, set = setValue})
+    return button, setValue
 end
 
 section(pages["MOVE"], "ДВИЖЕНИЕ И ПЕРЕМЕЩЕНИЕ")
@@ -893,6 +897,34 @@ makeToggle(pages["VISUAL"], "Подсветка игроков (ESP)", false, fu
     updateESP()
 end)
 
+local coordinateHud = make("TextLabel", {
+    Name = "CoordinateHUD", Visible = false, AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.fromOffset(18, 334), Size = UDim2.fromOffset(190, 24),
+    BackgroundColor3 = COLORS.panel, BackgroundTransparency = 0.08, BorderSizePixel = 0,
+    Text = "X --  Y --  Z --", TextColor3 = COLORS.text, TextSize = 10,
+    Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 49
+}, gui)
+corner(coordinateHud, 8)
+stroke(coordinateHud, COLORS.accent, 1, 0.12)
+local coordsEnabled = false
+makeToggle(pages["VISUAL"], "Координаты персонажа", false, function(value)
+    coordsEnabled = value
+    coordinateHud.Visible = value
+end)
+local lastCoordsUpdate = 0
+RunService.RenderStepped:Connect(function()
+    if not coordsEnabled or os.clock() - lastCoordsUpdate < 0.15 then return end
+    lastCoordsUpdate = os.clock()
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root then
+        local p = root.Position
+        coordinateHud.Text = string.format("X %.1f   Y %.1f   Z %.1f", p.X, p.Y, p.Z)
+    else
+        coordinateHud.Text = "Координаты недоступны"
+    end
+end)
+
 -- FLY: one floating button. Hold to rise; release to fall. Drag it in edit mode.
 local flyTouch
 local flyEditMode = false
@@ -908,7 +940,7 @@ makeToggle(pages["MOVE"], "Полёт (удерживать для подъём�
     if speedLabel then speedLabel.Visible = value end
     if speedTrack then speedTrack.Visible = value end
     if flyTouch then
-        flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "MOVE" and flyEnabled)
+        flyTouch.Visible = flyEditMode or flyEnabled
     end
 end)
 
@@ -977,6 +1009,34 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then speedDragging = false end
 end)
 
+section(pages["MOVE"], "БЫСТРЫЕ ПРОФИЛИ")
+local presetRow = make("Frame", {Size = UDim2.new(1, -2, 0, 34), BackgroundTransparency = 1}, pages["MOVE"])
+local presetLayout = make("UIListLayout", {FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder}, presetRow)
+local function movementPreset(label, walk, fly)
+    local button = make("TextButton", {Size = UDim2.new(1/3, -4, 1, 0), BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = label, TextColor3 = COLORS.text, TextSize = 9, Font = Enum.Font.GothamBold}, presetRow)
+    corner(button, 9)
+    button.Activated:Connect(function()
+        walkSpeed = walk
+        flySpeed = fly
+        if walkSpeedLabel then walkSpeedLabel.Text = "СКОРОСТЬ: " .. walkSpeed end
+        if speedLabel then speedLabel.Text = "СИЛА ПОЛЁТА: " .. flySpeed end
+        if walkSpeedBar and walkSpeedTrack then
+            local a = (walkSpeed - 16) / (1000 - 16)
+            walkSpeedBar.Size = UDim2.new(a, 0, 0, 4)
+            walkSpeedKnob.Position = UDim2.new(a, 10, 0.5, 0)
+        end
+        if speedBar and speedKnob then
+            local a = (flySpeed - 1) / 19
+            speedBar.Size = UDim2.new(a, 0, 0, 4)
+            speedKnob.Position = UDim2.new(a, 10, 0.5, 0)
+        end
+        if speedEnabled then applyWalkSpeed() end
+    end)
+end
+movementPreset("SLOW", 32, 3)
+movementPreset("NORMAL", 80, 8)
+movementPreset("FAST", 160, 16)
+
 local flyPos = savedUI.flyPosition
 flyTouch = make("TextButton", {
     Name = "FlyHoldButton",
@@ -1002,7 +1062,7 @@ local _, setFlyEditToggle = makeToggle(pages["EDIT"], "Редактироват�
     flyHeld = false
     if flyTouch then
         flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
-        flyTouch.Visible = value or (main.Visible and activeTab == "MOVE" and flyEnabled)
+        flyTouch.Visible = value or flyEnabled
     end
 end)
 
@@ -1096,10 +1156,10 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Show the single FLY button while the feature is enabled or being edited.
+-- Keep the single FLY button visible across every tab and while the menu is minimized, as long as FLY is enabled or edit mode is active.
 local function updateFlyButton()
     if not flyTouch then return end
-    flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "MOVE" and flyEnabled)
+    flyTouch.Visible = flyEditMode or flyEnabled
 end
 for _, button in pairs(tabButtons) do
     button.Activated:Connect(function() task.defer(updateFlyButton) end)
@@ -1138,8 +1198,27 @@ local function savePoints()
 end
 loadPoints()
 
+local lastTeleportCFrame = nil
+local function teleportToPosition(position)
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    lastTeleportCFrame = root.CFrame
+    root.CFrame = CFrame.new(position + Vector3.new(0, 3, 0))
+    return true
+end
+
 section(pages["TELEPORT"], "УПРАВЛЕНИЕ ТОЧКАМИ")
 infoCard(pages["TELEPORT"], "Сохранённые места", "Сохраните текущее место, чтобы позже вернуться к нему.")
+makeActionButton(pages["TELEPORT"], "↩ TELEPORT BACK — ВЕРНУТЬСЯ", function()
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root and lastTeleportCFrame then
+        local current = root.CFrame
+        root.CFrame = lastTeleportCFrame
+        lastTeleportCFrame = current
+    end
+end)
 local pointNameBox = make("TextBox", {
     Size = UDim2.new(1, -2, 0, 34),
     BackgroundColor3 = COLORS.panel,
@@ -1228,6 +1307,7 @@ local function refreshPoints()
                 return
             end
             -- Local character movement: use only in your own place / authorized tests.
+            lastTeleportCFrame = root.CFrame
             root.CFrame = CFrame.new(point.x, point.y + 3, point.z)
         end)
         local delete = make("TextButton", {
@@ -1394,7 +1474,7 @@ end)
 section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
 infoCard(pages["EDIT"], "Перемещение кнопки FLY", "Включи режим редактирования, затем перетащи кнопку FLY в удобное место. Отключи режим, чтобы снова использовать полёт.")
 section(pages["ABOUT"], "О ПРОЕКТЕ")
-infoCard(pages["ABOUT"], "RAHERHUB 0.0.2 — STABLE BUILD 3", "Личная сборка. Стабильная сборка №3.")
+infoCard(pages["ABOUT"], "RAHERHUB 0.2 — MULTI-TOOL HUB", "Личная сборка. Стабильная сборка №3.")
 
 -- Developer contact card: Telegram icon, link, copy action, and mobile fallback.
 local TELEGRAM_LINK = "https://t.me/generalvaneska2024"
@@ -1533,14 +1613,135 @@ copyTelegramButton.Activated:Connect(function()
     end)
 end)
 
-infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
-infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
+infoCard(pages["ABOUT"], "Навигация", "HOME — быстрые действия; MOVE — движение; VISUAL — HUD/FOV/ESP; TELEPORT — точки; SETTINGS — профили.")
 infoCard(pages["ABOUT"], "Совместимость", "Некоторые функции зависят от доступных возможностей среды и прав в текущем Roblox-проекте.")
+
+-- Camera FOV control; restores the original FOV when disabled/reset.
+local cameraFovOriginal = (workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView) or 70
+local cameraFovEnabled = false
+makeToggle(pages["VISUAL"], "Настройка угла обзора (FOV)", false, function(value)
+    cameraFovEnabled = value
+    local camera = workspace.CurrentCamera
+    if camera then camera.FieldOfView = value and (savedUI.cameraFov or 80) or cameraFovOriginal end
+end)
+createSettingSlider(pages["SETTINGS"], "Угол обзора FOV", 50, 120, savedUI.cameraFov or 80, function(v) return tostring(v) .. "°" end, function(value)
+    savedUI.cameraFov = value
+    if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = value end
+end)
+
+section(pages["SETTINGS"], "ПРОФИЛЬ И БЕЗОПАСНЫЙ СБРОС")
+local function setAllToggles(value)
+    for _, entry in ipairs(toggleRegistry) do
+        pcall(entry.set, value)
+    end
+end
+makeActionButton(pages["HOME"], "PANIC BUTTON — ВЫКЛЮЧИТЬ ВСЁ", function()
+    setAllToggles(false)
+    speedEnabled = false
+    noclipEnabled = false
+    flyEnabled = false
+    flyHeld = false
+    espEnabled = false
+    coordsEnabled = false
+    cameraFovEnabled = false
+    if coordinateHud then coordinateHud.Visible = false end
+    if flyTouch then flyTouch.Visible = flyEditMode end
+    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = cameraFovOriginal end
+    for part, oldValue in pairs(originalCollision) do
+        if part and part.Parent then pcall(function() part.CanCollide = oldValue end) end
+    end
+    table.clear(originalCollision)
+    updateESP()
+end)
+
+section(pages["HOME"], "ИЗБРАННОЕ / QUICK TOGGLE")
+local function findToggle(label)
+    for _, entry in ipairs(toggleRegistry) do if entry.label == label then return entry end end
+    return nil
+end
+local quickRow = make("Frame", {Size = UDim2.new(1, -2, 0, 64), BackgroundTransparency = 1}, pages["HOME"])
+make("UIGridLayout", {CellSize = UDim2.new(0.5, -4, 0, 29), CellPadding = UDim2.fromOffset(6, 5), SortOrder = Enum.SortOrder.LayoutOrder}, quickRow)
+local quickLabels = {"Полёт (удерживать для подъёма)", "Ускорение ходьбы", "Подсветка игроков (ESP)", "Координаты персонажа"}
+for _, label in ipairs(quickLabels) do
+    local entry = findToggle(label)
+    if entry then
+        local button = make("TextButton", {BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = label, TextColor3 = COLORS.text, TextSize = 9, TextWrapped = true, Font = Enum.Font.GothamBold}, quickRow)
+        corner(button, 8)
+        button.Activated:Connect(function()
+            entry.set(not entry.get())
+            button.BackgroundColor3 = entry.get() and COLORS.green or COLORS.button
+        end)
+    end
+end
+
+section(pages["HOME"], "ПОИСК ФУНКЦИЙ")
+local functionBox = make("TextBox", {Size = UDim2.new(1, -2, 0, 32), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, Text = "", PlaceholderText = "Например: скорость, FOV, координаты…", PlaceholderColor3 = COLORS.muted, TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.Gotham, ClearTextOnFocus = false}, pages["HOME"])
+corner(functionBox, 10)
+local searchResults = make("Frame", {Size = UDim2.new(1, -2, 0, 4), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1}, pages["HOME"])
+make("UIListLayout", {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder}, searchResults)
+local function searchPageText(page, query)
+    for _, child in ipairs(page:GetChildren()) do
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+            local fragments = {child.Name}
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then table.insert(fragments, child.Text) end
+            for _, desc in ipairs(child:GetDescendants()) do
+                if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then table.insert(fragments, desc.Text) end
+            end
+            local haystack = table.concat(fragments, " "):lower()
+            if string.find(haystack, query, 1, true) then return true end
+        end
+    end
+    return false
+end
+local function refreshSearch()
+    for _, child in ipairs(searchResults:GetChildren()) do if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end end
+    local query = functionBox.Text:lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if query == "" then return end
+    local found = 0
+    for _, tabName in ipairs(tabNames) do
+        if tabName ~= "HOME" and searchPageText(pages[tabName], query) then
+            found += 1
+            local result = make("TextButton", {Size = UDim2.new(1, -2, 0, 27), BackgroundColor3 = COLORS.button, BorderSizePixel = 0, Text = "Открыть раздел  ›  " .. tabName, TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.GothamBold}, searchResults)
+            corner(result, 8)
+            result.Activated:Connect(function() selectTab(tabName) end)
+            if found >= 5 then break end
+        end
+    end
+    if found == 0 then
+        local none = make("TextLabel", {Size = UDim2.new(1, -2, 0, 25), BackgroundTransparency = 1, Text = "Ничего не найдено", TextColor3 = COLORS.muted, TextSize = 10, Font = Enum.Font.Gotham}, searchResults)
+    end
+end
+functionBox:GetPropertyChangedSignal("Text"):Connect(refreshSearch)
+
+makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ", function()
+    if not canUseFiles() then return end
+    local data = {version = VERSION, toggles = {}, walkSpeed = walkSpeed, flySpeed = flySpeed, flySize = savedUI.flySize, flyOpacity = savedUI.flyOpacity, cameraFov = savedUI.cameraFov}
+    for _, entry in ipairs(toggleRegistry) do data.toggles[entry.label] = entry.get() end
+    local ok, raw = pcall(function() return HttpService:JSONEncode(data) end)
+    if ok then pcall(writefile, CONFIG_FILE, raw) end
+end)
+makeActionButton(pages["SETTINGS"], "ЗАГРУЗИТЬ ПРОФИЛЬ", function()
+    if not canUseFiles() then return end
+    local okRead, raw = pcall(readfile, CONFIG_FILE)
+    if not okRead or type(raw) ~= "string" then return end
+    local okDecode, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not okDecode or type(data) ~= "table" then return end
+    if type(data.toggles) == "table" then
+        for _, entry in ipairs(toggleRegistry) do
+            if type(data.toggles[entry.label]) == "boolean" then pcall(entry.set, data.toggles[entry.label]) end
+        end
+    end
+    if type(data.walkSpeed) == "number" then walkSpeed = math.clamp(data.walkSpeed, 16, 1000); if speedEnabled then applyWalkSpeed() end end
+    if type(data.flySpeed) == "number" then flySpeed = math.clamp(data.flySpeed, 1, 20) end
+    if type(data.flySize) == "number" then savedUI.flySize = math.clamp(data.flySize, 44, 110); applyFlyAppearance() end
+    if type(data.flyOpacity) == "number" then savedUI.flyOpacity = math.clamp(data.flyOpacity, 0, 0.85); applyFlyAppearance() end
+    if type(data.cameraFov) == "number" then savedUI.cameraFov = math.clamp(data.cameraFov, 50, 120); if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = savedUI.cameraFov end end
+end)
 
 refreshPoints()
 selectTab("HOME")
 
--- Keep touch fly control visibility in sync with the selected page and minimized state.
+-- Keep touch fly control visible independently of selected page and menu state.
 local function syncFlyButton()
     updateFlyButton()
 end
@@ -1548,4 +1749,4 @@ for _, button in pairs(tabButtons) do button.Activated:Connect(function() task.d
 minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
-print("RAHERHUB " .. VERSION .. " запущен.")
+print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
