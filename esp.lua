@@ -1,10 +1,11 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.2 "Heartbeat"
+    Version: 1.3
     Platform: Roblox / Delta Executor / iOS
 
-    CHANGELOG 1.2:
+    CHANGELOG 1.3:
+      - Таймаут запроса (15 сек) — не зависает вечно
       - Таймер оставшегося времени в хедере
       - Heartbeat: проверка каждые 5 секунд
       - Авто-выкид на авторизацию при истечении ключа
@@ -22,7 +23,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "1.2",
+    VERSION     = "1.3",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -49,7 +50,6 @@ local C = {
     yellow  = Color3.fromRGB(255, 195, 80),
 }
 
--- CLEANUP
 pcall(function()
     local core = game:GetService("CoreGui")
     for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
@@ -70,7 +70,7 @@ local STATE = {
     token    = nil,
     deviceId = nil,
     busy     = false,
-    mode     = "window",  -- "window" / "circle" / "overlay"
+    mode     = "window",
 }
 
 local function create(class, props, parent)
@@ -167,6 +167,7 @@ local function getRequestFn()
     return nil
 end
 
+-- ==== API С ТАЙМАУТОМ (15 секунд) ====
 local function api(path, body)
     local req = getRequestFn()
     if not req then return nil, "Executor не поддерживает HTTP-запросы" end
@@ -177,20 +178,46 @@ local function api(path, body)
     end)
     if not encOK then return nil, "Ошибка JSON: " .. tostring(encErr) end
 
-    local callOK, response = pcall(function()
-        return req({
-            Url = CONFIG.API_BASE .. path,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["Accept"] = "application/json",
-            },
-            Body = payload,
-        })
+    local response = nil
+    local requestDone = false
+
+    task.spawn(function()
+        local callOK, res = pcall(function()
+            return req({
+                Url = CONFIG.API_BASE .. path,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Accept"] = "application/json",
+                },
+                Body = payload,
+            })
+        end)
+
+        if callOK then
+            response = res
+        else
+            response = { __error = tostring(res) }
+        end
+        requestDone = true
     end)
 
-    if not callOK or type(response) ~= "table" then
+    -- Ждём ответ максимум 15 секунд
+    local startTime = os.clock()
+    while not requestDone and os.clock() - startTime < 15 do
+        task.wait(0.1)
+    end
+
+    if not requestDone then
+        return nil, "Таймаут запроса (сервер не отвечает)"
+    end
+
+    if not response or type(response) ~= "table" then
         return nil, "Не удалось выполнить запрос"
+    end
+
+    if response.__error then
+        return nil, response.__error
     end
 
     local status = tonumber(response.StatusCode or response.Status or 0) or 0
@@ -777,7 +804,7 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, header)
 
--- Таймер оставшегося времени (в хедере)
+-- Таймер оставшегося времени
 local timerLabel = create("TextLabel", {
     Position = UDim2.new(1, -170, 0, 8),
     Size = UDim2.new(0, 90, 0, 30),
@@ -1096,7 +1123,6 @@ infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024
 
 -- [КОНЕЦ ЧАСТИ 2]
 
-
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
@@ -1185,7 +1211,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Драг оверлея
 local dragOverlay = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
 local OVERLAY_THRESHOLD = 6
 
@@ -1311,7 +1336,6 @@ UserInputService.InputEnded:Connect(function(input)
         dragCircle.active = false
 
         if not dragCircle.moved then
-            -- Тап по кружку → вернуть окно
             circleGui.Enabled = false
             mainGui.Enabled = true
             STATE.mode = "window"
@@ -1320,7 +1344,6 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ============ MINIMIZE / CIRCLE / OVERLAY LOGIC ============
-
 local function setMode(newMode)
     if STATE.mode == newMode then return end
 
@@ -1340,7 +1363,6 @@ local function setMode(newMode)
     STATE.mode = newMode
 end
 
--- «—» → оверлей (туда-обратно)
 minimizeBtn.MouseButton1Click:Connect(function()
     if STATE.mode == "window" then
         setMode("overlay")
@@ -1349,14 +1371,12 @@ minimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- «⌄» → кружок HUB
 circleBtn.MouseButton1Click:Connect(function()
     if STATE.mode == "window" then
         setMode("circle")
     end
 end)
 
--- Двойной тап по оверлею → вернуть окно
 local lastOverlayTap = 0
 overlayFrame.MouseButton1Click:Connect(function()
     local now = os.clock()
@@ -1390,18 +1410,18 @@ local function updateTimerLabel(remaining)
     timerLabel.Text = "⏱ " .. formatRemaining(remaining)
 
     if remaining == nil then
-        timerLabel.TextColor3 = C.muted       -- ∞
+        timerLabel.TextColor3 = C.muted
     elseif remaining <= 60 then
-        timerLabel.TextColor3 = C.red         -- срочно
+        timerLabel.TextColor3 = C.red
     elseif remaining <= 300 then
-        timerLabel.TextColor3 = C.yellow      -- 5 мин
+        timerLabel.TextColor3 = C.yellow
     else
-        timerLabel.TextColor3 = C.green       -- долго
+        timerLabel.TextColor3 = C.green
     end
 end
 
 -- ============ AUTH CALLBACK ============
-local onAuthSuccess = function(token)
+onAuthSuccess = function(token)
     STATE.authed = true
     STATE.token = token
 
@@ -1426,7 +1446,6 @@ local onAuthSuccess = function(token)
             pcall(function() authGui:Destroy() end)
         end
 
-        -- Открываем меню + запускаем таймер
         mainGui.Enabled = true
         STATE.mode = "window"
 
