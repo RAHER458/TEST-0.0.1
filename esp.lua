@@ -606,7 +606,7 @@ local function createNavButton(name, text, order)
 
     navButtons[name] = button
 
-    button.Activated:Connect(function()
+    button.MouseButtonClick(function()
         selectPage(name)
     end)
 
@@ -747,7 +747,7 @@ local function createButton(parent, text, callback, color, height)
 
     addCorner(button, 7)
 
-    button.Activated:Connect(function()
+    button.MouseButtonClick(function()
         local ok, err = pcall(callback)
 
         if not ok then
@@ -829,7 +829,7 @@ local function createToggle(parent, labelText, defaultOn)
         Text = "",
     }, wrap)
 
-    btn.Activated:Connect(function()
+    btn.MouseButtonClick(function()
         state = not state
 
         TweenService:Create(track, TweenInfo.new(0.2), {
@@ -948,7 +948,7 @@ local function closeModal()
     modalCallback = nil
 end
 
-modalCancel.Activated:Connect(closeModal)
+modalCancel.MouseButtonClick(closeModal)
 modalOverlay.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -956,7 +956,7 @@ modalOverlay.InputBegan:Connect(function(input)
     end
 end)
 
-modalConfirm.Activated:Connect(function()
+modalConfirm.MouseButtonClick(function()
     local cb = modalCallback
     closeModal()
     if cb then
@@ -1162,7 +1162,7 @@ end
 
 lifetimeToggleWrap = lifetimeWrap
 -- Навесим обработку на toggle — перехватываем через активацию кнопки
-lifetimeWrap:FindFirstChildOfClass("TextButton").Activated:Connect(function()
+lifetimeWrap:FindFirstChildOfClass("TextButton").MouseButtonClick(function()
     applyLifetimeBlock()
 end)
 
@@ -1323,7 +1323,7 @@ for i, f in ipairs(filterDefs) do
     addCorner(fb, 7)
     filterBtns[f.id] = fb
 
-    fb.Activated:Connect(function()
+    fb.MouseBittonClick(function()
         STATE.filters = f.id
         for id, b in pairs(filterBtns) do
             b.BackgroundTransparency = (id == f.id) and 0 or 0.6
@@ -1497,7 +1497,7 @@ local function buildKeyCard(item)
                 LayoutOrder = order,
             }, actionsRow)
             addCorner(b, 7)
-            b.Activated:Connect(function()
+            b.MouseButtonClick(function()
                 task.spawn(cb)
             end)
         end
@@ -1560,7 +1560,7 @@ local function buildKeyCard(item)
         }):Play()
     end
 
-    tapBtn.Activated:Connect(function()
+    tapBtn.MouseButtonClick(function()
         if expanded then
             collapse()
         else
@@ -1960,7 +1960,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- Кнопка «—»
-minimizeButton.Activated:Connect(function()
+minimizeButton.MouseButtonClick(function()
     isMinimized = not isMinimized
 
     if isMinimized then
@@ -1991,7 +1991,7 @@ minimizeButton.Activated:Connect(function()
 end)
 
 -- Кнопка «×»
-closeButton.Activated:Connect(function()
+closeButton.MouseButtonClick(function()
     TweenService:Create(
         main,
         TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
