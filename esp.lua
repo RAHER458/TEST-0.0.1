@@ -1,4 +1,4 @@
--- RAHERHUB 0.2.1 | AUTH BUILD | Private testing UI
+-- RAHERHUB 0.2.1 | AUTH FIX | based on UNIVERSAL COMPATIBILITY BUILD
 -- Intended for use in your own Roblox place / authorized test environment.
 
 local Players = game:GetService("Players")
@@ -6,11 +6,9 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
-
--- Ждём загрузки LocalPlayer (защита для iOS Delta)
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2.1-AUTH"
+local VERSION = "0.2.1-AUTH-FIX"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -37,6 +35,8 @@ pcall(function()
         local oldPlayerAuth = playerGui:FindFirstChild("RAHERHUB_AUTH_GUI")
         if oldPlayerAuth then oldPlayerAuth:Destroy() end
     end
+    -- BillboardGui boxes live beside ScreenGui in CoreGui/PlayerGui, so clean
+    -- those siblings too when the script is rerun.
     for _, container in ipairs({core, playerGui}) do
         if container then
             for _, child in ipairs(container:GetChildren()) do
@@ -100,7 +100,7 @@ local loadingTitle = make("TextLabel", {
 }, loadingFrame)
 local loadingSubtitle = make("TextLabel", {
     Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 0.36, 45),
-    BackgroundTransparency = 1, Text = "ВЕРСИЯ " .. VERSION .. " • MULTI-TOOL HUB", TextColor3 = Color3.fromRGB(160, 165, 190),
+    BackgroundTransparency = 1, Text = "ВЕРСИЯ 0.2 • MULTI-TOOL HUB", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 1001
 }, loadingFrame)
 local loadingTrack = make("Frame", {
@@ -123,7 +123,6 @@ local loadingHint = make("TextLabel", {
     BackgroundTransparency = 1, Text = "Подготавливаем интерфейс...", TextColor3 = Color3.fromRGB(160, 165, 190),
     TextSize = 12, Font = Enum.Font.Gotham, ZIndex = 1001
 }, loadingFrame)
-
 task.spawn(function()
     local started = os.clock()
     while loadingFrame.Parent and os.clock() - started < 5 do
@@ -135,14 +134,11 @@ task.spawn(function()
         task.wait(0.03)
     end
 end)
-
 task.wait(5)
 if loadingFrame then loadingFrame:Destroy() end
 
--- [КОНЕЦ ЧАСТИ 1]
-
 -- =====================================================================
--- RAHERHUB AUTH SYSTEM  |  v1.1.2
+-- RAHERHUB AUTH SYSTEM  |  v1.1.2 FIX
 -- Встроено после loading screen, до основного меню.
 -- Основное меню НЕ создаётся пока не пройдена авторизация.
 -- =====================================================================
@@ -741,6 +737,7 @@ local function authActivate(rawKey)
         local body = {
             key = key,
             install_hash = AUTH.deviceId,
+            roblox_user_id = tostring(LocalPlayer.UserId),
         }
 
         local result, err = authApi("/activate", body)
@@ -867,13 +864,6 @@ end
 
 print("[RAHERHUB] Авторизация успешна. Запуск основного меню...")
 
--- [КОНЕЦ ЧАСТИ 2]
-
--- =====================================================================
--- RAHERHUB MAIN CODE  |  Начинается после авторизации
--- Точка входа: local COLORS = { ... }
--- =====================================================================
-
 local COLORS = {
     background = Color3.fromRGB(13, 15, 22),
     panel = Color3.fromRGB(21, 24, 34),
@@ -900,6 +890,8 @@ main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
 stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
 
+-- Compact-first mobile layout. The compact switch makes the whole window smaller,
+-- not merely narrower, and the layout remains scrollable on small screens.
 local compactMode = false
 local function fitPanel()
     local camera = workspace.CurrentCamera
@@ -977,6 +969,8 @@ local compactButton = make("TextButton", {
 }, header)
 corner(compactButton, 10)
 
+-- Tiny performance overlay shown when the main menu is collapsed.
+-- Tapping the overlay restores the full RAHERHUB menu.
 local statsOverlay = make("TextButton", {
     Name = "PerformanceOverlay",
     Visible = false,
@@ -1025,6 +1019,8 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
+-- The minimized performance overlay can be moved around the screen.
+-- A short tap opens the full menu; dragging only moves the overlay.
 local overlayDrag = {
     active = false,
     input = nil,
@@ -1116,6 +1112,7 @@ local function applyMenuLayout()
     compactButton.Size = UDim2.fromOffset(compactMode and 31 or 34, compactMode and 31 or 34)
     minimize.Size = UDim2.fromOffset(compactMode and 31 or 34, compactMode and 31 or 34)
     compactButton.Text = compactMode and "↗" or "▣"
+    -- Persistent left navigation rail: category names stay in one place on every page.
     tabsBar.Position = UDim2.new(0, 8, 0, compactMode and 58 or 66)
     tabsBar.Size = UDim2.new(0, 78, 1, compactMode and -66 or -76)
     content.Position = UDim2.new(0, 94, 0, compactMode and 58 or 66)
@@ -1137,6 +1134,7 @@ local menuAnimating = false
 compactButton.Activated:Connect(function()
     if menuAnimating then return end
     menuAnimating = true
+    -- Animate the panel down into the draggable performance overlay.
     local shrink = TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
         Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1
     })
@@ -1149,6 +1147,7 @@ compactButton.Activated:Connect(function()
     menuAnimating = false
 end)
 
+-- Rainbow title animation.
 local hue = 0
 local rgbConnection
 rgbConnection = RunService.RenderStepped:Connect(function(dt)
@@ -1160,6 +1159,7 @@ rgbConnection = RunService.RenderStepped:Connect(function(dt)
     title.TextColor3 = Color3.fromHSV(hue, 0.68, 1)
 end)
 
+-- Drag by the header on mouse or touch.
 local dragging, dragStart, startPos = false, nil, nil
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1178,7 +1178,9 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
-local LAUNCHER_IMAGE = "rbxassetid://126952267001309"
+-- Circular RAHERHUB launcher portrait. Upload the generated neon logo to Roblox
+-- and replace the placeholder ID below with the uploaded image asset ID.
+local LAUNCHER_IMAGE = "rbxassetid://126952267001309" -- uploaded RH CHEAT neon logo
 local openButton = make("ImageButton", {
     Name = "OpenButton",
     Visible = false,
@@ -1351,6 +1353,7 @@ for name, button in pairs(tabButtons) do
 end
 applyMenuLayout()
 
+-- Soft hover/press feedback for navigation and controls.
 local function animateButton(button)
     if not button:IsA("TextButton") then return end
     local original = button.BackgroundColor3
@@ -1419,7 +1422,7 @@ local statusLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 30),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "RAHERHUB " .. VERSION .. "  |  MULTI-TOOL HUB  |  PRIVATE ALPHA",
+    Text = "RAHERHUB 0.2  |  MULTI-TOOL HUB  |  PRIVATE ALPHA",
     TextColor3 = COLORS.green,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -1428,7 +1431,7 @@ local statusLabel = make("TextLabel", {
 corner(statusLabel, 11)
 
 section(pages["HOME"], "ПАНЕЛЬ УПРАВЛЕНИЯ")
-infoCard(pages["HOME"], "RAHERHUB " .. VERSION .. " — MULTI-TOOL HUB", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
+infoCard(pages["HOME"], "RAHERHUB 0.2 — MULTI-TOOL HUB", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
 infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
 infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
@@ -1475,12 +1478,10 @@ local function makeToggle(parent, label, initial, callback)
     return button, setValue
 end
 
--- [КОНЕЦ ЧАСТИ 3]
-
--- ============ MOVE TAB ============
 section(pages["MOVE"], "ДВИЖЕНИЕ И ПЕРЕМЕЩЕНИЕ")
 infoCard(pages["MOVE"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
 
+-- Скорость ходьбы: диапазон 16–1000
 local speedEnabled = false
 local walkSpeed = 16
 local walkSpeedLabel, walkSpeedTrack
@@ -1551,7 +1552,8 @@ LocalPlayer.CharacterAdded:Connect(function()
     if speedEnabled then applyWalkSpeed() end
 end)
 
--- ============ ESP ============
+-- ESP suite: screen-space boxes that scale with the character's projected bounds.
+-- Box/line colors are deliberately independent from the chams palette.
 local espEnabled = false
 local espObjects = {}
 local espCharacterConnections = {}
@@ -1619,6 +1621,7 @@ local function ensureESPVisual(player)
 end
 local function refreshESPColors()
     local color = currentESPColor()
+    -- The palette controls chams only. Boxes and tracers stay visually distinct.
     for _, highlight in pairs(espObjects) do
         if highlight and highlight.Parent then
             highlight.FillColor = color
@@ -1714,6 +1717,7 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 for _, player in ipairs(Players:GetPlayers()) do bindESPPlayer(player) end
 
+-- Project the real 3D character bounds every frame. This makes boxes shrink with distance.
 local lastESPReconcile = 0
 RunService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
@@ -1828,7 +1832,6 @@ end, 34)
 paintESPColorButton()
 infoCard(pages["VISUAL"], "НАСТРОЙКА ESP", "Выбери цвет кнопкой выше. Боксы обводят персонажа, линии ведут от нижней части экрана, чамсы подсвечивают модель.")
 
--- ============ COORDINATE HUD ============
 local coordinateHud = make("TextLabel", {
     Name = "CoordinateHUD", Visible = false, AnchorPoint = Vector2.new(0, 0),
     Position = UDim2.fromOffset(18, 334), Size = UDim2.fromOffset(190, 24),
@@ -1857,9 +1860,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [КОНЕЦ ЧАСТИ 4]
-
--- ============ FLY ============
+-- FLY: one floating button. Hold to rise; release to fall. Drag it in edit mode.
 local flyTouch
 local flyEditMode = false
 local flyHeld = false
@@ -2057,7 +2058,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ NOCLIP ============
 local noclipEnabled = false
 local originalCollision = {}
 makeToggle(pages["MOVE"], "Проход сквозь объекты (Noclip)", false, function(value)
@@ -2091,6 +2091,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+-- Keep the single FLY button visible across every tab and while the menu is minimized, as long as FLY is enabled or edit mode is active.
 local function updateFlyButton()
     if not flyTouch then return end
     flyTouch.Visible = flyEditMode or flyEnabled
@@ -2101,7 +2102,7 @@ end
 minimize.Activated:Connect(updateFlyButton)
 openButton.Activated:Connect(updateFlyButton)
 
--- ============ TELEPORT POINTS ============
+-- Saved teleport points.
 local teleportPoints = {}
 local function canUseFiles()
     return type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function"
@@ -2240,6 +2241,7 @@ local function refreshPoints()
             if not root then
                 return
             end
+            -- Local character movement: use only in your own place / authorized tests.
             lastTeleportCFrame = root.CFrame
             root.CFrame = CFrame.new(point.x, point.y + 3, point.z)
         end)
@@ -2289,7 +2291,7 @@ makeActionButton(pages["TELEPORT"], "УДАЛИТЬ ВСЕ ТОЧКИ", function
     refreshPoints()
 end)
 
--- ============ EDIT TAB ============
+-- SETTINGS: customize both independently draggable flight controls.
 makeActionButton(pages["EDIT"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
     savedUI.flyPosition = {x = -24, y = -150}
     flyTouch.Position = UDim2.new(1, -24, 1, -150)
@@ -2411,9 +2413,9 @@ end)
 section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
 infoCard(pages["EDIT"], "Перемещение кнопки FLY", "Включи режим редактирования, затем перетащи кнопку FLY в удобное место. Отключи режим, чтобы снова использовать полёт.")
 section(pages["ABOUT"], "О ПРОЕКТЕ")
-infoCard(pages["ABOUT"], "RAHERHUB " .. VERSION .. " — MULTI-TOOL HUB", "Личная сборка. Стабильная сборка №3.")
+infoCard(pages["ABOUT"], "RAHERHUB 0.2 — MULTI-TOOL HUB", "Личная сборка. Стабильная сборка №3.")
 
--- ============ TELEGRAM CONTACT CARD ============
+-- Developer contact card: Telegram icon, link, copy action, and mobile fallback.
 local TELEGRAM_LINK = "https://t.me/generalvaneska2024"
 local TELEGRAM_ICON = "rbxassetid://138727397408628"
 local contactCard = make("Frame", {
@@ -2517,6 +2519,7 @@ end
 
 copyTelegramButton.Activated:Connect(function()
     local copied = false
+    -- Clipboard functions are executor-specific; try only if the environment exposes one.
     local clipboardFunctions = {}
     if type(setclipboard) == "function" then table.insert(clipboardFunctions, setclipboard) end
     if type(toclipboard) == "function" then table.insert(clipboardFunctions, toclipboard) end
@@ -2552,7 +2555,7 @@ end)
 infoCard(pages["ABOUT"], "Навигация", "HOME — быстрые действия; MOVE — движение; VISUAL — HUD/FOV/ESP; TELEPORT — точки; SETTINGS — профили.")
 infoCard(pages["ABOUT"], "Совместимость", "Некоторые функции зависят от доступных возможностей среды и прав в текущем Roblox-проекте.")
 
--- ============ FOV ============
+-- Camera FOV control; restores the original FOV when disabled/reset.
 local cameraFovOriginal = (workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView) or 70
 local cameraFovEnabled = false
 makeToggle(pages["VISUAL"], "Настройка угла обзора (FOV)", false, function(value)
@@ -2565,7 +2568,6 @@ local setFovSetting = createSettingSlider(pages["SETTINGS"], "Угол обзо�
     if cameraFovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = value end
 end)
 
--- ============ PANIC / RESET ============
 section(pages["SETTINGS"], "ПРОФИЛЬ И БЕЗОПАСНЫЙ СБРОС")
 local function setAllToggles(value)
     for _, entry in ipairs(toggleRegistry) do
@@ -2592,6 +2594,7 @@ makeActionButton(pages["HOME"], "PANIC BUTTON — ВЫКЛЮЧИТЬ ВСЁ", fu
 end)
 
 makeActionButton(pages["SETTINGS"], "ПОЛНЫЙ СБРОС ДО ЗАВОДСКИХ", function()
+    -- Disable every feature first and restore any modified character/camera state.
     setAllToggles(false)
     speedEnabled, noclipEnabled, flyEnabled, flyHeld = false, false, false, false
     espEnabled, coordsEnabled, cameraFovEnabled = false, false, false
@@ -2603,6 +2606,7 @@ makeActionButton(pages["SETTINGS"], "ПОЛНЫЙ СБРОС ДО ЗАВОДСК
     table.clear(originalCollision)
     updateESP()
 
+    -- Restore factory movement and visual values.
     walkSpeed = 16
     flySpeed = 4
     walkSpeedLabel.Text = "СКОРОСТЬ: 16"
@@ -2626,6 +2630,7 @@ makeActionButton(pages["SETTINGS"], "ПОЛНЫЙ СБРОС ДО ЗАВОДСК
     if setFlySizeSetting then setFlySizeSetting(66) end
     if setFlyOpacitySetting then setFlyOpacitySetting(12) end
     if setFovSetting then setFovSetting(80) end
+    -- Remove the saved settings profile too, so old values cannot be reloaded later.
     pcall(function()
         if type(isfile) == "function" and type(delfile) == "function" and isfile(CONFIG_FILE) then
             delfile(CONFIG_FILE)
@@ -2633,7 +2638,6 @@ makeActionButton(pages["SETTINGS"], "ПОЛНЫЙ СБРОС ДО ЗАВОДСК
     end)
 end)
 
--- ============ SEARCH ============
 section(pages["HOME"], "ПОИСК ФУНКЦИЙ")
 local functionBox = make("TextBox", {Size = UDim2.new(1, -2, 0, 32), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, Text = "", PlaceholderText = "Например: скорость, FOV, координаты…", PlaceholderColor3 = COLORS.muted, TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.Gotham, ClearTextOnFocus = false}, pages["HOME"])
 corner(functionBox, 10)
@@ -2673,7 +2677,8 @@ local function refreshSearch()
 end
 functionBox:GetPropertyChangedSignal("Text"):Connect(refreshSearch)
 
--- ============ PROFILES ============
+-- Named profiles are stored together in one JSON file. The profile name is a key,
+-- not a filename, so arbitrary path characters cannot escape the config file.
 local profileNameBox = make("TextBox", {
     Name = "ProfileName", Size = UDim2.new(1, -2, 0, 34),
     BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
@@ -2700,6 +2705,7 @@ local function readProfileStore()
     if not readOK or type(raw) ~= "string" then return nil, "Не удалось прочитать файл профилей." end
     local decodeOK, data = pcall(function() return HttpService:JSONDecode(raw) end)
     if not decodeOK or type(data) ~= "table" then return nil, "Файл профилей повреждён." end
+    -- Migrate the old single-profile format without discarding its settings.
     if type(data.profiles) ~= "table" then
         local legacy = data
         data = {version = VERSION, profiles = {}}
@@ -2729,6 +2735,14 @@ local function cleanProfileName()
     local name = profileNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
     if #name > 32 then name = name:sub(1, 32) end
     return name
+end
+local function listProfileNames()
+    local store, err = readProfileStore()
+    if not store then profileMessage(err, false); return end
+    local names = {}
+    for name in pairs(store.profiles) do table.insert(names, name) end
+    table.sort(names, function(a, b) return a:lower() < b:lower() end)
+    profileMessage(#names > 0 and ("Профили: " .. table.concat(names, " • ")) or "Сохранённых профилей пока нет.", #names > 0)
 end
 local function applySettingsData(data)
     if type(data.espColorIndex) == "number" then espColorIndex = math.clamp(math.floor(data.espColorIndex), 1, #espPalette); paintESPColorButton(); refreshESPColors() end
@@ -2771,19 +2785,18 @@ local function applySettingsData(data)
         if statsOverlay then statsOverlay.Position = UDim2.fromOffset(data.launcherPosition.x, data.launcherPosition.y) end
     end
 end
-
--- ============ PROFILE PICKER ============
+-- Profile picker: opens as a separate compact panel with selectable saved profiles.
 local selectedProfileName = nil
 local profilePicker = make("Frame", {
     Name = "ProfilePicker", AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.86, 0, 0.68, 0),
-    BackgroundColor3 = COLORS.background,
+    BackgroundColor3 = COLORS.background or Color3.fromRGB(14, 16, 25),
     BorderSizePixel = 0, Visible = false, ZIndex = 300
 }, gui)
 profilePicker.Size = UDim2.new(0.86, 0, 0, 350)
 corner(profilePicker, 14)
-stroke(profilePicker, COLORS.accent, 1.5, 0.1)
-make("TextLabel", {
+stroke(profilePicker, COLORS.accent or Color3.fromRGB(255, 70, 190), 1.5, 0.1)
+local pickerTitle = make("TextLabel", {
     Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -52, 0, 28),
     BackgroundTransparency = 1, Text = "ВЫБОР ПРОФИЛЯ", TextColor3 = COLORS.text,
     TextSize = 13, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
@@ -2808,7 +2821,7 @@ local profileList = make("ScrollingFrame", {
     ScrollingDirection = Enum.ScrollingDirection.Y, ZIndex = 301
 }, profilePicker)
 corner(profileList, 9)
-make("UIListLayout", {
+local profileListLayout = make("UIListLayout", {
     Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder
 }, profileList)
 make("UIPadding", {
@@ -2817,7 +2830,7 @@ make("UIPadding", {
 }, profileList)
 local pickerLoad = make("TextButton", {
     Position = UDim2.new(0, 10, 1, -50), Size = UDim2.new(0.5, -13, 0, 38),
-    BackgroundColor3 = COLORS.green, BorderSizePixel = 0,
+    BackgroundColor3 = COLORS.green or Color3.fromRGB(60, 190, 130), BorderSizePixel = 0,
     Text = "ЗАГРУЗИТЬ", TextColor3 = Color3.new(1, 1, 1), TextSize = 10,
     Font = Enum.Font.GothamBold, ZIndex = 301
 }, profilePicker)
@@ -2834,7 +2847,7 @@ local function refreshProfilePicker()
     end
     local store, err = readProfileStore()
     if not store then
-        make("TextLabel", {
+        local row = make("TextLabel", {
             Size = UDim2.new(1, -4, 0, 42), BackgroundTransparency = 1,
             Text = err or "Не удалось прочитать профили.", TextColor3 = COLORS.muted,
             TextSize = 10, Font = Enum.Font.Gotham, TextWrapped = true, ZIndex = 302
@@ -2864,7 +2877,7 @@ local function refreshProfilePicker()
         local isSelected = name == selectedProfileName
         local row = make("TextButton", {
             Name = "Profile_" .. tostring(index), Size = UDim2.new(1, -4, 0, 34),
-            BackgroundColor3 = isSelected and COLORS.accent or COLORS.button,
+            BackgroundColor3 = isSelected and (COLORS.accent or Color3.fromRGB(120, 65, 190)) or COLORS.button,
             BorderSizePixel = 0, Text = (isSelected and "✓  " or "    ") .. name,
             TextColor3 = COLORS.text, TextSize = 10, Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
@@ -2929,7 +2942,8 @@ makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗ
 end)
 makeActionButton(pages["SETTINGS"], "ОТКРЫТЬ СПИСОК ПРОФИЛЕЙ", openProfilePicker)
 
--- ============ COMPAT ============
+-- UNIVERSAL COMPATIBILITY DIAGNOSTICS
+-- Observes client-visible state only. It does not bypass server authority or anti-cheat.
 section(pages["COMPAT"], "ПРОВЕРКА СОВМЕСТИМОСТИ")
 infoCard(pages["COMPAT"], "Диагностика проекта", "Проверяет доступные объекты и состояние функций. Серверные ограничения нельзя достоверно определить только с клиента.")
 local compatSummary = make("TextLabel", {
@@ -2972,6 +2986,7 @@ compatRow("files", "Файловое API")
 compatRow("respawn", "Возрождение")
 infoCard(pages["COMPAT"], "Как читать статусы", "WORKING — объект доступен; LIMITED — функция включена, но результат не гарантирован; BLOCKED — нужный объект отсутствует; WAITING — пока нет данных.")
 local compatLastCharacter = nil
+local compatLastRoot = nil
 local compatRespawnSeen = false
 local function setCompat(key, value, color)
     local label = compatRows[key]
@@ -3033,6 +3048,7 @@ local function refreshCompatibility()
         compatSummary.Text = "Базовые объекты доступны. Для проверки движения включите нужную функцию в MOVE."
         compatSummary.TextColor3 = green
     end
+    compatLastRoot = root
 end
 makeActionButton(pages["COMPAT"], "ОБНОВИТЬ ПРОВЕРКУ", refreshCompatibility)
 makeActionButton(pages["COMPAT"], "СБРОСИТЬ СТАТУС ВОЗРОЖДЕНИЯ", function()
@@ -3051,11 +3067,11 @@ task.spawn(function()
     end
 end)
 
--- ============ INIT ============
 refreshPoints()
 refreshCompatibility()
 selectTab("HOME")
 
+-- Keep touch fly control visible independently of selected page and menu state.
 local function syncFlyButton()
     updateFlyButton()
 end
@@ -3064,6 +3080,3 @@ minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
 print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
-
--- [КОНЕЦ ЧАСТИ 5]
--- [[ КОНЕЦ ФАЙЛА ]]
