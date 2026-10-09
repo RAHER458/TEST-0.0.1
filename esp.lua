@@ -352,7 +352,7 @@ local authHeader = create("Frame", {
 corner(authHeader, 18)
 create("Frame", {
     Size = UDim2.new(1, 0, 0, 22),
-    Position = UDim2.new(0, 0, 1X, -22),
+    Position = UDim2.new(0, 0, 1, -22),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
 }, authHeader)
