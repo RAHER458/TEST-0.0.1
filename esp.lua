@@ -2161,3 +2161,4 @@ minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
 print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
+ 
