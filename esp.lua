@@ -226,9 +226,9 @@ local statsOverlay = make("TextButton", {
     Size = UDim2.fromOffset(156, 26),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "FPS --  |  PING --  |  -- ms",
+    Text = "FPS --  |  PING --",
     TextColor3 = COLORS.text,
-    TextSize = 10,
+    TextSize = 9,
     Font = Enum.Font.GothamBold,
     TextWrapped = false,
     AutoButtonColor = true,
@@ -261,7 +261,7 @@ RunService.RenderStepped:Connect(function(dt)
         currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
         local frameDelay = currentFPS > 0 and (1000 / currentFPS) or 0
         local ping = readPing()
-        statsOverlay.Text = string.format("%d FPS  |  %s PING  |  %.1f ms", currentFPS, ping and tostring(ping) or "--", frameDelay)
+        statsOverlay.Text = string.format("%d FPS  |  %s PING", currentFPS, ping and tostring(ping) or "--")
         fpsFrames, fpsElapsed = 0, 0
     end
 end)
@@ -389,10 +389,8 @@ compactButton.Activated:Connect(function()
     main.Visible = false
     main.BackgroundTransparency = 0
     statsOverlay.Position = UDim2.fromOffset(savedUI.rhPosition.x or 18, savedUI.rhPosition.y or 300)
-    statsOverlay.Size = UDim2.fromOffset(20, 20)
+    statsOverlay.Size = UDim2.fromOffset(112, 22)
     statsOverlay.Visible = true
-    local grow = TweenService:Create(statsOverlay, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(190, 58)})
-    grow:Play(); grow.Completed:Wait()
     menuAnimating = false
 end)
 
@@ -662,12 +660,12 @@ local function infoCard(parent, heading, body)
 end
 
 local statusLabel = make("TextLabel", {
-    Size = UDim2.new(1, -2, 0, 36),
+    Size = UDim2.new(1, -2, 0, 30),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "Система готова. Выбери нужный раздел слева.",
+    Text = "RAHERHUB 0.1  |  ЗАКРЫТЫЙ ALPHA-ТЕСТ  |  PRIVATE BUILD",
     TextColor3 = COLORS.green,
-    TextSize = 12,
+    TextSize = 10,
     Font = Enum.Font.GothamMedium,
     TextWrapped = true
 }, pages["HOME"])
@@ -735,24 +733,24 @@ makeToggle(pages["MOVE"], "Ускорение ходьбы", false, function(val
     if walkSpeedTrack then walkSpeedTrack.Visible = value end
 end)
 walkSpeedLabel = make("TextLabel", {
-    Size = UDim2.new(1, -2, 0, 24), BackgroundTransparency = 1,
+    Size = UDim2.new(1, -2, 0, 18), BackgroundTransparency = 1,
     Text = "СКОРОСТЬ: " .. walkSpeed, TextColor3 = COLORS.muted,
-    TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
+    TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
 }, pages["MOVE"])
 walkSpeedTrack = make("Frame", {
-    Size = UDim2.new(1, -2, 0, 29), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
+    Size = UDim2.new(1, -2, 0, 22), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
 }, pages["MOVE"])
 corner(walkSpeedTrack, 11)
 walkSpeedLabel.Visible = false
 walkSpeedTrack.Visible = false
 local walkSpeedBar = make("Frame", {
-    Position = UDim2.new(0, 10, 0.5, -4), Size = UDim2.new(0, 0, 0, 8),
+    Position = UDim2.new(0, 9, 0.5, -2), Size = UDim2.new(0, 0, 0, 4),
     BackgroundColor3 = COLORS.accent, BorderSizePixel = 0
 }, walkSpeedTrack)
 corner(walkSpeedBar, 5)
 local walkSpeedKnob = make("TextButton", {
     AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 10, 0.5, 0),
-    Size = UDim2.fromOffset(25, 25), BackgroundColor3 = Color3.new(1,1,1),
+    Size = UDim2.fromOffset(17, 17), BackgroundColor3 = Color3.new(1,1,1),
     BorderSizePixel = 0, Text = "", AutoButtonColor = false
 }, walkSpeedTrack)
 corner(walkSpeedKnob, 13)
@@ -763,7 +761,7 @@ local function setWalkSpeedFromX(x)
     local alpha = math.clamp((x - left) / width, 0, 1)
     walkSpeed = math.floor(16 + alpha * (1000 - 16) + 0.5)
     walkSpeedLabel.Text = "СКОРОСТЬ: " .. walkSpeed
-    walkSpeedBar.Size = UDim2.new(alpha, 0, 0, 8)
+    walkSpeedBar.Size = UDim2.new(alpha, 0, 0, 4)
     walkSpeedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
     if speedEnabled then applyWalkSpeed() end
 end
@@ -907,16 +905,16 @@ makeToggle(pages["MOVE"], "Полёт (удерживать для подъём�
 end)
 
 speedLabel = make("TextLabel", {
-    Size = UDim2.new(1, -2, 0, 24),
+    Size = UDim2.new(1, -2, 0, 18),
     BackgroundTransparency = 1,
     Text = "СИЛА ПОЛЁТА: 4",
     TextColor3 = COLORS.muted,
-    TextSize = 12,
+    TextSize = 10,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left
 }, pages["MOVE"])
 speedTrack = make("Frame", {
-    Size = UDim2.new(1, -2, 0, 28),
+    Size = UDim2.new(1, -2, 0, 22),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, pages["MOVE"])
@@ -925,7 +923,7 @@ speedLabel.Visible = false
 speedTrack.Visible = false
 local speedBar = make("Frame", {
     Position = UDim2.new(0, 10, 0.5, -4),
-    Size = UDim2.new((flySpeed - 1) / 19, 0, 0, 8),
+    Size = UDim2.new((flySpeed - 1) / 19, 0, 0, 4),
     BackgroundColor3 = COLORS.accent,
     BorderSizePixel = 0
 }, speedTrack)
@@ -933,7 +931,7 @@ corner(speedBar, 5)
 local speedKnob = make("TextButton", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new((flySpeed - 1) / 19, 10, 0.5, 0),
-    Size = UDim2.fromOffset(25, 25),
+    Size = UDim2.fromOffset(17, 17),
     BackgroundColor3 = Color3.new(1,1,1),
     BorderSizePixel = 0,
     Text = "",
@@ -947,7 +945,7 @@ local function setFlySpeedFromX(x)
     local alpha = math.clamp((x - left) / width, 0, 1)
     flySpeed = math.floor(1 + alpha * 19 + 0.5)
     speedLabel.Text = "СИЛА ПОЛЁТА: " .. flySpeed
-    speedBar.Size = UDim2.new(alpha, 0, 0, 8)
+    speedBar.Size = UDim2.new(alpha, 0, 0, 4)
     speedKnob.Position = UDim2.new(alpha, 10, 0.5, 0)
 end
 speedTrack.InputBegan:Connect(function(input)
