@@ -365,7 +365,7 @@ local authTitle = create("TextLabel", {
     TextColor3 = C.pink,
     TextSize = 30,
     Font = Enum.Font.GothamBlack,
-    TextXAlignment = Enum.TextAlignment.Center,
+    TextXAlignment = Enum.TextXAlignment.Center,
 }, authHeader)
 
 create("TextLabel", {
