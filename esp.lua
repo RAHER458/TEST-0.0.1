@@ -1,8 +1,10 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.0
+    Version: 1.1
     Platform: Roblox / Delta Executor / iOS
+
+    Отдельный проект. Работает через Cloudflare Worker.
 ]]
 
 -- ============ WAIT GAME ============
@@ -19,13 +21,14 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ============ CONFIG ============
 local CONFIG = {
-    VERSION     = "1.0",
+    VERSION     = "1.1",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
     DEVICE_FILE = "RH_HUB_DEVICE.dat",
     TG_LINK     = "https://t.me/generalvaneska2024",
-    TIMEOUT     = 10,
+    WINDOW_W    = 340,
+    WINDOW_H    = 440,
 }
 
 -- ============ COLORS ============
@@ -33,6 +36,7 @@ local C = {
     bg      = Color3.fromRGB(11, 12, 18),
     surface = Color3.fromRGB(20, 23, 32),
     surface2= Color3.fromRGB(28, 32, 45),
+    surface3= Color3.fromRGB(36, 41, 55),
     button  = Color3.fromRGB(36, 41, 55),
     input   = Color3.fromRGB(24, 27, 36),
     border  = Color3.fromRGB(58, 64, 88),
@@ -48,16 +52,16 @@ local C = {
 -- ============ CLEANUP ============
 pcall(function()
     local core = game:GetService("CoreGui")
-    local old = core:FindFirstChild("RH_HUB_GUI")
-    if old then old:Destroy() end
-    local oldAuth = core:FindFirstChild("RH_HUB_AUTH_GUI")
-    if oldAuth then oldAuth:Destroy() end
+    for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
+        local old = core:FindFirstChild(name)
+        if old then old:Destroy() end
+    end
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if playerGui then
-        local oldP = playerGui:FindFirstChild("RH_HUB_GUI")
-        if oldP then oldP:Destroy() end
-        local oldAP = playerGui:FindFirstChild("RH_HUB_AUTH_GUI")
-        if oldAP then oldAP:Destroy() end
+        for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
+            local old = playerGui:FindFirstChild(name)
+            if old then old:Destroy() end
+        end
     end
 end)
 
@@ -67,6 +71,7 @@ local STATE = {
     token    = nil,
     deviceId = nil,
     busy     = false,
+    mode     = "window",  -- "window" / "circle" / "overlay"
 }
 
 -- ============ HELPERS ============
@@ -228,8 +233,8 @@ end
 -- ============ TOAST FACTORY ============
 local function makeToast(guiObj, parentFrame)
     local container = create("Frame", {
-        Position = UDim2.new(0, 0, 1, -220),
-        Size = UDim2.new(1, 0, 0, 200),
+        Position = UDim2.new(0, 0, 1, -180),
+        Size = UDim2.new(1, 0, 0, 170),
         BackgroundTransparency = 1,
         ZIndex = 200,
     }, parentFrame)
@@ -242,9 +247,9 @@ local function makeToast(guiObj, parentFrame)
     }, container)
 
     create("UIPadding", {
-        PaddingBottom = UDim.new(0, 16),
-        PaddingLeft = UDim.new(0, 20),
-        PaddingRight = UDim.new(0, 20),
+        PaddingBottom = UDim.new(0, 12),
+        PaddingLeft = UDim.new(0, 16),
+        PaddingRight = UDim.new(0, 16),
     }, container)
 
     local n = 0
@@ -281,7 +286,7 @@ local function makeToast(guiObj, parentFrame)
         }, t)
 
         TweenService:Create(t, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(1, 0, 0, 40),
+            Size = UDim2.new(1, 0, 0, 38),
         }):Play()
 
         task.delay(3.2, function()
@@ -308,7 +313,6 @@ local authGui = create("ScreenGui", {
 safeParent(authGui)
 
 local authBg = create("Frame", {
-    Name = "Bg",
     Size = UDim2.fromScale(1, 1),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
@@ -340,8 +344,8 @@ if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(authFit)
 end
 
+-- Header
 local authHeader = create("Frame", {
-    Name = "Header",
     Size = UDim2.new(1, 0, 0, 68),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
@@ -387,6 +391,7 @@ task.spawn(function()
     end
 end)
 
+-- Замок
 create("TextLabel", {
     Position = UDim2.new(0.5, -12, 0, 78),
     Size = UDim2.fromOffset(24, 24),
@@ -398,6 +403,7 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Center,
 }, authMain)
 
+-- Описание
 create("TextLabel", {
     Position = UDim2.new(0, 22, 0, 106),
     Size = UDim2.new(1, -44, 0, 34),
@@ -411,6 +417,7 @@ create("TextLabel", {
     TextYAlignment = Enum.TextYAlignment.Top,
 }, authMain)
 
+-- Заголовок поля
 create("TextLabel", {
     Position = UDim2.new(0, 22, 0, 144),
     Size = UDim2.new(1, -44, 0, 14),
@@ -422,6 +429,7 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, authMain)
 
+-- Поле ввода
 local authInputWrap = create("Frame", {
     Position = UDim2.new(0, 22, 0, 162),
     Size = UDim2.new(1, -44, 0, 42),
@@ -469,6 +477,7 @@ authKeyBox.FocusLost:Connect(function()
     }):Play()
 end)
 
+-- АКТИВИРОВАТЬ
 local authActBtn = create("TextButton", {
     Position = UDim2.new(0, 22, 0, 214),
     Size = UDim2.new(1, -44, 0, 44),
@@ -482,6 +491,7 @@ local authActBtn = create("TextButton", {
 }, authMain)
 corner(authActBtn, 12)
 
+-- ПОЛУЧИТЬ КЛЮЧ
 local authTgBtn = create("TextButton", {
     Position = UDim2.new(0, 22, 0, 266),
     Size = UDim2.new(1, -44, 0, 40),
@@ -496,6 +506,7 @@ local authTgBtn = create("TextButton", {
 corner(authTgBtn, 11)
 stroke(authTgBtn, C.pink, 1, 0.3)
 
+-- Статус
 local authStatus = create("TextLabel", {
     Position = UDim2.new(0, 22, 1, -36),
     Size = UDim2.new(1, -44, 0, 28),
@@ -535,7 +546,7 @@ local function setBusy(busy)
     end
 end
 
--- ============ PASTE BUTTON ============
+-- PASTE
 authPasteBtn.MouseButton1Click:Connect(function()
     if STATE.busy then return end
 
@@ -560,7 +571,7 @@ authPasteBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ TELEGRAM BUTTON ============
+-- TELEGRAM
 local tgCooldown = false
 
 authTgBtn.MouseButton1Click:Connect(function()
@@ -576,7 +587,7 @@ authTgBtn.MouseButton1Click:Connect(function()
 
     if copied then
         authToast("Ссылка скопирована! Вставьте в браузер", "ok")
-        setStatus("Ссылка в буфере: " .. CONFIG.TG_LINK, "ok")
+        setStatus("Ссылка в буфере", "ok")
     else
         authToast("Скопируйте вручную", "warn")
         setStatus("Ссылка: " .. CONFIG.TG_LINK, "warn")
@@ -587,39 +598,9 @@ authTgBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- ============ SUCCESS ============
-local function onAuthSuccess(token)
-    STATE.authed = true
-    STATE.token = token
-
-    if token then saveToken(token) end
-
-    setStatus("Успешная авторизация!", "ok")
-    authToast("Добро пожаловать!", "ok")
-
-    task.spawn(function()
-        task.wait(0.8)
-
-        if authMain and authMain.Parent then
-            local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-                BackgroundTransparency = 1,
-                Size = UDim2.fromOffset(authMain.Size.X.Offset * 0.88, authMain.Size.Y.Offset * 0.88),
-            })
-            tw:Play()
-            tw.Completed:Wait()
-        end
-
-        if authGui and authGui.Parent then
-            pcall(function() authGui:Destroy() end)
-        end
-
-        if _G.RH_HUB_ON_AUTH_SUCCESS then
-            pcall(_G.RH_HUB_ON_AUTH_SUCCESS, token)
-        end
-    end)
-end
-
 -- ============ ACTIVATE ============
+local onAuthSuccess
+
 local function activateKey(rawKey)
     local key = tostring(rawKey or ""):gsub("%s+", "")
 
@@ -678,7 +659,7 @@ local function activateKey(rawKey)
     end)
 end
 
--- ============ VERIFY ============
+-- VERIFY
 local function verifySavedToken(token)
     if type(token) ~= "string" or token == "" then
         return false, "no_token"
@@ -713,7 +694,7 @@ authKeyBox.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- ============ AUTO CHECK ============
+-- AUTO CHECK
 task.spawn(function()
     task.wait(0.3)
 
@@ -745,80 +726,395 @@ task.spawn(function()
     end
 end)
 
-_G.RH_HUB_AUTH = {
-    authed = false,
-    token = nil,
-    device = STATE.deviceId,
-    userId = LocalPlayer.UserId,
-}
+-- ============ AUTH SUCCESS CALLBACK ============
+onAuthSuccess = function(token)
+    STATE.authed = true
+    STATE.token = token
 
--- ============ MAIN GUI (заглушка) ============
+    if token then saveToken(token) end
+
+    setStatus("Успешная авторизация!", "ok")
+    authToast("Добро пожаловать!", "ok")
+
+    task.spawn(function()
+        task.wait(0.7)
+
+        if authMain and authMain.Parent then
+            local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                BackgroundTransparency = 1,
+                Size = UDim2.fromOffset(authMain.Size.X.Offset * 0.88, authMain.Size.Y.Offset * 0.88),
+            })
+            tw:Play()
+            tw.Completed:Wait()
+        end
+
+        if authGui and authGui.Parent then
+            pcall(function() authGui:Destroy() end)
+        end
+
+        if _G.RH_HUB_ON_AUTH_SUCCESS then
+            pcall(_G.RH_HUB_ON_AUTH_SUCCESS, token)
+        end
+    end)
+end
+
+-- [КОНЕЦ ЧАСТИ 1]
+
+-- ============ MAIN GUI ============
 local mainGui = create("ScreenGui", {
     Name = "RH_HUB_GUI",
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     IgnoreGuiInset = true,
-    Enabled = false,
+    Enabled = false,  -- включается после авторизации
 })
 safeParent(mainGui)
 
-local mainStub = create("Frame", {
+local WIN_W = CONFIG.WINDOW_W  -- 340
+local WIN_H = CONFIG.WINDOW_H  -- 440
+
+local main = create("Frame", {
+    Name = "MainWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(320, 180),
+    Size = UDim2.fromOffset(WIN_W, WIN_H),
+    BackgroundColor3 = C.bg,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+}, mainGui)
+corner(main, 16)
+stroke(main, C.border, 1, 0.15)
+
+-- Адаптив под экран
+local function fitMain()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+    local w = math.min(WIN_W, vp.X - 20)
+    local h = math.min(WIN_H, vp.Y - 60)
+    main.Size = UDim2.fromOffset(w, h)
+end
+fitMain()
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain)
+end
+
+-- ============ HEADER ============
+local header = create("Frame", {
+    Name = "Header",
+    Size = UDim2.new(1, 0, 0, 46),
     BackgroundColor3 = C.surface,
     BorderSizePixel = 0,
-}, mainGui)
-corner(mainStub, 18)
-stroke(mainStub, C.accent, 1.5, 0.2)
+}, main)
+corner(header, 16)
+create("Frame", {
+    Size = UDim2.new(1, 0, 0, 18),
+    Position = UDim2.new(0, 0, 1, -18),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+}, header)
 
-create("TextLabel", {
-    Position = UDim2.new(0, 20, 0, 20),
-    Size = UDim2.new(1, -40, 0, 36),
+local titleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 6),
+    Size = UDim2.new(1, -100, 0, 24),
     BackgroundTransparency = 1,
     Text = "RH-HUB",
     TextColor3 = C.pink,
-    TextSize = 26,
+    TextSize = 18,
     Font = Enum.Font.GothamBlack,
-    TextXAlignment = Enum.TextXAlignment.Center,
-}, mainStub)
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
 
 create("TextLabel", {
-    Position = UDim2.new(0, 20, 0, 62),
-    Size = UDim2.new(1, -40, 0, 22),
+    Position = UDim2.new(0, 13, 0, 28),
+    Size = UDim2.new(1, -100, 0, 12),
     BackgroundTransparency = 1,
-    Text = "✓ Авторизация пройдена",
-    TextColor3 = C.green,
-    TextSize = 13,
-    Font = Enum.Font.GothamBold,
-    TextXAlignment = Enum.TextXAlignment.Center,
-}, mainStub)
-
-create("TextLabel", {
-    Position = UDim2.new(0, 20, 0, 90),
-    Size = UDim2.new(1, -40, 0, 40),
-    BackgroundTransparency = 1,
-    Text = "Здесь будет основное меню (следующий шаг).",
+    Text = "MULTI-TOOL  •  v" .. CONFIG.VERSION,
     TextColor3 = C.muted,
-    TextSize = 10,
-    Font = Enum.Font.Gotham,
-    TextWrapped = true,
-    TextXAlignment = Enum.TextXAlignment.Center,
-    TextYAlignment = Enum.TextYAlignment.Top,
-}, mainStub)
+    TextSize = 8,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
 
-local logoutBtn = create("TextButton", {
-    Position = UDim2.new(0, 20, 1, -58),
-    Size = UDim2.new(1, -40, 0, 40),
+-- Радужный логотип
+task.spawn(function()
+    local hue = 0
+    while mainGui.Parent do
+        hue = (hue + 0.008) % 1
+        if titleLabel.Parent then
+            titleLabel.TextColor3 = Color3.fromHSV(hue, 0.65, 1)
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- Кнопки в хедере
+local minimizeBtn = create("TextButton", {
+    Position = UDim2.new(1, -76, 0, 8),
+    Size = UDim2.fromOffset(30, 30),
     BackgroundColor3 = C.button,
     BorderSizePixel = 0,
-    Text = "🔓 ВЫЙТИ",
+    Text = "—",
+    TextColor3 = C.text,
+    TextSize = 18,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true,
+}, header)
+corner(minimizeBtn, 8)
+
+local circleBtn = create("TextButton", {
+    Position = UDim2.new(1, -42, 0, 8),
+    Size = UDim2.fromOffset(30, 30),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+    Text = "⌄",
+    TextColor3 = C.text,
+    TextSize = 18,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = true,
+}, header)
+corner(circleBtn, 8)
+
+-- ============ NAV TABS ============
+local navBar = create("Frame", {
+    Position = UDim2.new(0, 8, 0, 52),
+    Size = UDim2.new(1, -16, 0, 34),
+    BackgroundTransparency = 1,
+}, main)
+
+create("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 3),
+}, navBar)
+
+local content = create("Frame", {
+    Name = "Content",
+    Position = UDim2.new(0, 8, 0, 92),
+    Size = UDim2.new(1, -16, 1, -100),
+    BackgroundTransparency = 1,
+    ClipsDescendants = true,
+}, main)
+
+local pages = {}
+local navButtons = {}
+
+local TABS = {
+    {id = "HOME",     name = "HOME"},
+    {id = "MOVE",     name = "MOVE"},
+    {id = "VISUAL",   name = "VISUAL"},
+    {id = "TELEPORT", name = "TP"},
+    {id = "SETTINGS", name = "SET"},
+    {id = "ABOUT",    name = "INFO"},
+}
+
+local function createPage(name)
+    local page = create("ScrollingFrame", {
+        Name = name .. "Page",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = C.accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Visible = false,
+    }, content)
+
+    create("UIPadding", {
+        PaddingTop = UDim.new(0, 4),
+        PaddingBottom = UDim.new(0, 12),
+        PaddingLeft = UDim.new(0, 2),
+        PaddingRight = UDim.new(0, 4),
+    }, page)
+
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+    }, page)
+
+    pages[name] = page
+    return page
+end
+
+local activeTab = "HOME"
+
+local function selectTab(name)
+    if not pages[name] then return end
+    activeTab = name
+
+    for tabName, page in pairs(pages) do
+        page.Visible = tabName == name
+    end
+
+    for tabId, btn in pairs(navButtons) do
+        local sel = tabId == name
+        btn.BackgroundColor3 = sel and C.accent or C.button
+        btn.TextColor3 = sel and C.text or C.muted
+    end
+end
+
+local function makeNavButton(id, label, order)
+    local b = create("TextButton", {
+        Name = id,
+        Size = UDim2.new(1/6, -3, 1, 0),
+        BackgroundColor3 = C.button,
+        BorderSizePixel = 0,
+        Text = label,
+        TextColor3 = C.muted,
+        TextSize = 9,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = true,
+        LayoutOrder = order,
+    }, navBar)
+    corner(b, 8)
+
+    b.MouseButton1Click:Connect(function()
+        selectTab(id)
+    end)
+
+    navButtons[id] = b
+    return b
+end
+
+for i, tab in ipairs(TABS) do
+    makeNavButton(tab.id, tab.name, i)
+end
+
+local homePage     = createPage("HOME")
+local movePage     = createPage("MOVE")
+local visualPage   = createPage("VISUAL")
+local tpPage       = createPage("TELEPORT")
+local settingsPage = createPage("SETTINGS")
+local aboutPage    = createPage("ABOUT")
+
+-- ============ UI COMPONENTS ============
+local function section(parent, text)
+    local lbl = create("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 18),
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = C.accent,
+        Font = Enum.Font.GothamBold,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, parent)
+    return lbl
+end
+
+local function infoCard(parent, heading, body)
+    local frame = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 60),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, parent)
+    corner(frame, 10)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 10, 0, 8),
+        Size = UDim2.new(1, -20, 0, 16),
+        BackgroundTransparency = 1,
+        Text = heading,
+        TextColor3 = C.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, frame)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 10, 0, 26),
+        Size = UDim2.new(1, -20, 0, 28),
+        BackgroundTransparency = 1,
+        Text = body,
+        TextColor3 = C.muted,
+        Font = Enum.Font.Gotham,
+        TextSize = 9,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+    }, frame)
+
+    return frame
+end
+
+local function soonCard(parent)
+    local frame = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 120),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, parent)
+    corner(frame, 12)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 0, 0, 30),
+        Size = UDim2.new(1, 0, 0, 30),
+        BackgroundTransparency = 1,
+        Text = "🚧",
+        TextColor3 = C.text,
+        TextSize = 32,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    }, frame)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 10, 0, 68),
+        Size = UDim2.new(1, -20, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "Скоро появится",
+        TextColor3 = C.text,
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    }, frame)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 10, 0, 90),
+        Size = UDim2.new(1, -20, 0, 16),
+        BackgroundTransparency = 1,
+        Text = "Функционал в разработке",
+        TextColor3 = C.muted,
+        TextSize = 9,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    }, frame)
+
+    return frame
+end
+
+-- ============ HOME PAGE ============
+section(homePage, "ГЛАВНАЯ")
+infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
+infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
+infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "Нажми «—» в хедере для показа оверлея RH | FPS | PING. Нажми «⌄» — свёрнётся в кружок HUB.")
+
+-- ============ MOVE PAGE ============
+section(movePage, "ДВИЖЕНИЕ")
+soonCard(movePage)
+
+-- ============ VISUAL PAGE ============
+section(visualPage, "ВИЗУАЛИЗАЦИЯ")
+soonCard(visualPage)
+
+-- ============ TELEPORT PAGE ============
+section(tpPage, "ТЕЛЕПОРТ")
+soonCard(tpPage)
+
+-- ============ SETTINGS PAGE ============
+section(settingsPage, "НАСТРОЙКИ")
+infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена.")
+
+local logoutBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 0, 38),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+    Text = "🔓  ВЫЙТИ ИЗ АККАУНТА",
     TextColor3 = C.text,
     TextSize = 11,
     Font = Enum.Font.GothamBold,
     AutoButtonColor = true,
-}, mainStub)
-corner(logoutBtn, 11)
+}, settingsPage)
+corner(logoutBtn, 10)
 stroke(logoutBtn, C.red, 1, 0.4)
 
 logoutBtn.MouseButton1Click:Connect(function()
@@ -840,29 +1136,343 @@ logoutBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-_G.RH_HUB_ON_AUTH_SUCCESS = function(token)
-    if _G.RH_HUB_AUTH then
-        _G.RH_HUB_AUTH.authed = true
-        _G.RH_HUB_AUTH.token = token
+-- ============ ABOUT PAGE ============
+section(aboutPage, "О ПРОЕКТЕ")
+infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
+infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
+infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
+
+-- [КОНЕЦ ЧАСТИ 2]
+
+-- ============ DRAG MAIN WINDOW ============
+local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragMain.active = true
+        dragMain.input = input
+        dragMain.startPointer = input.Position
+        dragMain.startPos = main.Position
+        dragMain.moved = false
     end
-    if mainGui then
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragMain.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
+    local d = input.Position - dragMain.startPointer
+    main.Position = UDim2.new(
+        dragMain.startPos.X.Scale, dragMain.startPos.X.Offset + d.X,
+        dragMain.startPos.Y.Scale, dragMain.startPos.Y.Offset + d.Y
+    )
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragMain.active = false
+        dragMain.input = nil
+    end
+end)
+
+-- ============ OVERLAY (RH | FPS | PING) ============
+local overlayGui = create("ScreenGui", {
+    Name = "RH_HUB_OVERLAY",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    DisplayOrder = 99998,
+    Enabled = false,
+})
+safeParent(overlayGui)
+
+local overlayFrame = create("TextButton", {
+    Name = "Overlay",
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.fromOffset(20, 300),
+    Size = UDim2.fromOffset(150, 26),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Text = "RH  |  FPS --  |  PING --",
+    TextColor3 = C.text,
+    TextSize = 10,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+}, overlayGui)
+corner(overlayFrame, 8)
+stroke(overlayFrame, C.accent, 1, 0.2)
+
+-- FPS/PING обновление
+local statsService = game:GetService("Stats")
+local fpsFrames, fpsElapsed, currentFPS = 0, 0, 0
+
+local function readPing()
+    local ping = nil
+    pcall(function()
+        ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if typeof(ping) == "number" then
+        return math.max(0, math.floor(ping + 0.5))
+    end
+    return nil
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    fpsFrames += 1
+    fpsElapsed += dt
+    if fpsElapsed >= 0.5 then
+        currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
+        local ping = readPing()
+        overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s",
+            currentFPS,
+            ping and tostring(ping) or "--"
+        )
+        fpsFrames, fpsElapsed = 0, 0
+    end
+end)
+
+-- Драг оверлея
+local dragOverlay = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local OVERLAY_THRESHOLD = 6
+
+overlayFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragOverlay.active = true
+        dragOverlay.input = input
+        dragOverlay.startPointer = input.Position
+        dragOverlay.startPos = Vector2.new(overlayFrame.Position.X.Offset, overlayFrame.Position.Y.Offset)
+        dragOverlay.moved = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragOverlay.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
+    local d = input.Position - dragOverlay.startPointer
+    if math.abs(d.X) > OVERLAY_THRESHOLD or math.abs(d.Y) > OVERLAY_THRESHOLD then
+        dragOverlay.moved = true
+    end
+
+    if dragOverlay.moved then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(dragOverlay.startPos.X + d.X, 0, vp.X - overlayFrame.AbsoluteSize.X)
+        local y = math.clamp(dragOverlay.startPos.Y + d.Y, 0, vp.Y - overlayFrame.AbsoluteSize.Y)
+        overlayFrame.Position = UDim2.fromOffset(x, y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragOverlay.active = false
+    end
+end)
+
+-- ============ CIRCLE (Кружок HUB) ============
+local circleGui = create("ScreenGui", {
+    Name = "RH_HUB_CIRCLE",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    DisplayOrder = 99999,
+    Enabled = false,
+})
+safeParent(circleGui)
+
+local circleBtn = create("TextButton", {
+    Name = "CircleBtn",
+    AnchorPoint = Vector2.new(0, 0),
+    Position = UDim2.fromOffset(20, 360),
+    Size = UDim2.fromOffset(54, 54),
+    BackgroundColor3 = C.accent,
+    BorderSizePixel = 0,
+    Text = "HUB",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 13,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+}, circleGui)
+corner(circleBtn, 27)
+stroke(circleBtn, C.pink, 1.5, 0.2)
+
+-- Пульсация кружка
+local pulseRunning = false
+local function startCirclePulse()
+    if pulseRunning then return end
+    pulseRunning = true
+    task.spawn(function()
+        while circleGui.Enabled do
+            TweenService:Create(circleBtn, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                { Size = UDim2.fromOffset(58, 58) }):Play()
+            task.wait(0.9)
+            if not circleGui.Enabled then break end
+            TweenService:Create(circleBtn, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                { Size = UDim2.fromOffset(54, 54) }):Play()
+            task.wait(0.9)
+        end
+        pulseRunning = false
+    end)
+end
+
+-- Драг + тап кружка
+local dragCircle = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local CIRCLE_THRESHOLD = 6
+
+circleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragCircle.active = true
+        dragCircle.input = input
+        dragCircle.startPointer = input.Position
+        dragCircle.startPos = Vector2.new(circleBtn.Position.X.Offset, circleBtn.Position.Y.Offset)
+        dragCircle.moved = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragCircle.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
+    local d = input.Position - dragCircle.startPointer
+    if math.abs(d.X) > CIRCLE_THRESHOLD or math.abs(d.Y) > CIRCLE_THRESHOLD then
+        dragCircle.moved = true
+    end
+
+    if dragCircle.moved then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(dragCircle.startPos.X + d.X, 0, vp.X - circleBtn.AbsoluteSize.X)
+        local y = math.clamp(dragCircle.startPos.Y + d.Y, 0, vp.Y - circleBtn.AbsoluteSize.Y)
+        circleBtn.Position = UDim2.fromOffset(x, y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if not dragCircle.active then return end
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragCircle.active = false
+
+        -- Тап (не двигал) — вернуть окно
+        if not dragCircle.moved then
+            circleGui.Enabled = false
+            mainGui.Enabled = true
+            STATE.mode = "window"
+        end
+    end
+end)
+
+-- ============ MINIMIZE / CIRCLE LOGIC ============
+-- Кнопка «—» → оверлей
+minimizeBtn.MouseButton1Click:Connect(function()
+    if STATE.mode ~= "window" then return end
+
+    mainGui.Enabled = false
+    overlayGui.Enabled = true
+    STATE.mode = "overlay"
+end)
+
+-- Кнопка «⌄» → кружок
+circleBtn.MouseButton1Click:Connect(function() end)  -- не используется, обрабатываем через InputEnded
+
+circleBtn.MouseButton1Click:Connect(function()
+    -- Обрабатывается через InputBegan/InputEnded
+end)
+
+-- Отдельная привязка для кнопки «⌄» в хедере
+circleBtn.MouseButton1Click:Connect(function() end)  -- заглушка
+
+-- Обработчик кнопки «⌄» (в хедере)
+local function switchToCircle()
+    if STATE.mode ~= "window" then return end
+    mainGui.Enabled = false
+    circleGui.Enabled = true
+    STATE.mode = "circle"
+    startCirclePulse()
+end
+
+-- Привязка кнопки хедера «⌄»
+local headerCircleBtn = header:FindFirstChild("CircleBtn")
+-- (см. Часть 2 — circleBtn)
+
+-- Переопределяем обработчик для кнопки в хедере
+local function bindHeaderButtons()
+    -- Кнопка «—»
+    minimizeBtn.MouseButton1Click:Connect(function()
+        if STATE.mode == "window" then
+            mainGui.Enabled = false
+            overlayGui.Enabled = true
+            STATE.mode = "overlay"
+        elseif STATE.mode == "overlay" then
+            overlayGui.Enabled = false
+            mainGui.Enabled = true
+            STATE.mode = "window"
+        end
+    end)
+
+    -- Кнопка «⌄»
+    circleBtn.MouseButton1Click:Connect(function()
+        if STATE.mode == "window" then
+            mainGui.Enabled = false
+            circleGui.Enabled = true
+            STATE.mode = "circle"
+            startCirclePulse()
+        end
+    end)
+end
+
+-- ============ OVERLAY → ОБРАТНО В ОКНО ============
+-- Двойной тап по оверлею возвращает окно
+local lastOverlayTap = 0
+overlayFrame.MouseButton1Click:Connect(function()
+    local now = os.clock()
+    if now - lastOverlayTap < 0.5 then
+        -- Двойной тап
+        overlayGui.Enabled = false
         mainGui.Enabled = true
+        STATE.mode = "window"
     end
+    lastOverlayTap = now
+end)
+
+-- ============ AUTH CALLBACK ============
+_G.RH_HUB_ON_AUTH_SUCCESS = function(token)
+    mainGui.Enabled = true
+    STATE.mode = "window"
     print("[RH-HUB] Меню открыто.")
 end
 
+-- Если уже авторизован (при перезапуске скрипта с сохранённым токеном)
 if STATE.authed then
     mainGui.Enabled = true
-    if _G.RH_HUB_AUTH then
-        _G.RH_HUB_AUTH.authed = true
-        _G.RH_HUB_AUTH.token = STATE.token
-    end
+    STATE.mode = "window"
 end
 
 -- ============ INIT ============
+selectTab("HOME")
+bindHeaderButtons()
+
+_G.RH_HUB_AUTH = {
+    authed = STATE.authed,
+    token = STATE.token,
+    device = STATE.deviceId,
+    userId = LocalPlayer.UserId,
+}
+
 print("----------------------------------------")
 print("RH-HUB INITIALIZED")
 print("Version: " .. CONFIG.VERSION)
 print("UserId: " .. tostring(LocalPlayer.UserId))
 print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
+
+-- [КОНЕЦ ЧАСТИ 3]
+-- [[ КОНЕЦ ФАЙЛА ]]
