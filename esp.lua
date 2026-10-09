@@ -1,4 +1,4 @@
--- RAHERHUB 0.2 | NPC-ONLY TRIGGERBOT BUILD | Private testing UI
+-- RAHERHUB 0.2 | UNIVERSAL COMPATIBILITY BUILD | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -1319,59 +1319,6 @@ espColorButton = makeActionButton(pages["VISUAL"], "", function()
 end, 34)
 paintESPColorButton()
 infoCard(pages["VISUAL"], "НАСТРОЙКА ESP", "Выбери цвет кнопкой выше. Боксы обводят персонажа, линии ведут от нижней части экрана, чамсы подсвечивают модель.")
-
--- NPC-only triggerbot: fires the currently equipped Tool only when the
--- center-screen ray hits a living NPC model. Actual Player characters and
--- models marked as friendly are deliberately excluded.
-local triggerBotEnabled = false
-local triggerBotLastShot = 0
-local triggerBotCooldown = 0.14
-local triggerBotRange = 1000
-local triggerBotToggleSetter
-local _, triggerBotToggleSetterLocal = makeToggle(pages["VISUAL"], "TRIGGERBOT: ТОЛЬКО БОТЫ", false, function(value)
-    triggerBotEnabled = value
-    triggerBotLastShot = 0
-end)
-triggerBotToggleSetter = triggerBotToggleSetterLocal
-infoCard(pages["VISUAL"], "TRIGGERBOT", "Автоматически активирует экипированное оружие, когда прицел по центру экрана наведён на живого NPC. Игроков и распознанных союзников игнорирует.")
-
-RunService.Heartbeat:Connect(function()
-    if not triggerBotEnabled then return end
-    local now = os.clock()
-    if now - triggerBotLastShot < triggerBotCooldown then return end
-
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return end
-
-    local tool
-    for _, child in ipairs(character:GetChildren()) do
-        if child:IsA("Tool") then tool = child break end
-    end
-    if not tool then return end
-
-    local viewport = camera.ViewportSize
-    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {character}
-    params.IgnoreWater = true
-    local result = workspace:Raycast(ray.Origin, ray.Direction * triggerBotRange, params)
-    if not result or not result.Instance then return end
-
-    local model = result.Instance:FindFirstAncestorOfClass("Model")
-    if not model or not model.Parent or isPlayerCharacterModel(model) or isAllyNPC(model) then return end
-    local targetHumanoid = model:FindFirstChildOfClass("Humanoid")
-    if not targetHumanoid or targetHumanoid.Health <= 0 then return end
-
-    -- Tool:Activate() is the standard Roblox client-side tool activation path.
-    -- Games that fire through custom remotes may require their own weapon adapter.
-    local ok = pcall(function() tool:Activate() end)
-    if ok then triggerBotLastShot = now end
-end)
 
 local coordinateHud = make("TextLabel", {
     Name = "CoordinateHUD", Visible = false, AnchorPoint = Vector2.new(0, 0),
