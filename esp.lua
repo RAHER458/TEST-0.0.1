@@ -906,6 +906,33 @@ local function getModelRoot(model)
         or model:FindFirstChild("Torso")
         or model:FindFirstChildWhichIsA("BasePart")
 end
+-- Stable 2D box based on character head/root, rather than GetBoundingBox corners.
+-- GetBoundingBox may briefly return incomplete/rotated bounds while rigs stream or animate.
+local function projectModelRect(model, root, humanoid, camera, viewport)
+    if not model or not root or not humanoid or not camera then return nil end
+    local head = model:FindFirstChild("Head")
+    local topWorld
+    if head and head:IsA("BasePart") then
+        topWorld = head.Position + Vector3.new(0, head.Size.Y * 0.55, 0)
+    else
+        topWorld = root.Position + Vector3.new(0, math.max(2.5, humanoid.HipHeight + root.Size.Y * 1.8), 0)
+    end
+    local bottomWorld = root.Position - Vector3.new(0, math.max(1, humanoid.HipHeight + root.Size.Y * 0.5), 0)
+    local top = camera:WorldToViewportPoint(topWorld)
+    local bottom = camera:WorldToViewportPoint(bottomWorld)
+    if top.Z <= 0 or bottom.Z <= 0 then return nil end
+    local height = math.abs(bottom.Y - top.Y)
+    if height < 4 then return nil end
+    local width = math.max(3, height * 0.42)
+    local centerX = (top.X + bottom.X) * 0.5
+    local minX, maxX = centerX - width * 0.5, centerX + width * 0.5
+    local minY, maxY = math.min(top.Y, bottom.Y), math.max(top.Y, bottom.Y)
+    if maxX < 0 or minX > viewport.X or maxY < 0 or minY > viewport.Y then return nil end
+    minX, maxX = math.clamp(minX, 0, viewport.X), math.clamp(maxX, 0, viewport.X)
+    minY, maxY = math.clamp(minY, 0, viewport.Y), math.clamp(maxY, 0, viewport.Y)
+    if maxX <= minX or maxY <= minY then return nil end
+    return minX, minY, maxX, maxY
+end
 local function removeNPCESP(model)
     local visual = espNpcVisuals[model]
     if visual then
@@ -985,7 +1012,7 @@ local function createESP(player)
             highlight.Adornee = character
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             highlight.Enabled = true
-            highlight.Parent = character
+            highlight.Parent = espGui
             espObjects[player] = highlight
         else
             existing.Enabled = true
@@ -1065,35 +1092,13 @@ RunService.RenderStepped:Connect(function()
                 local valid = root and humanoid and humanoid.Health > 0 and character.Parent
                 local showBox, showLine = false, false
                 if valid and espBoxesEnabled then
-                    local ok, boundsCF, boundsSize = pcall(function() return character:GetBoundingBox() end)
-                    if ok and boundsCF and boundsSize then
-                        local half = boundsSize * 0.5
-                        local minX, minY = math.huge, math.huge
-                        local maxX, maxY = -math.huge, -math.huge
-                        local frontCorners = 0
-                        for _, x in ipairs({-half.X, half.X}) do
-                            for _, y in ipairs({-half.Y, half.Y}) do
-                                for _, z in ipairs({-half.Z, half.Z}) do
-                                    local worldCorner = boundsCF:PointToWorldSpace(Vector3.new(x, y, z))
-                                    local point = camera:WorldToViewportPoint(worldCorner)
-                                    if point.Z > 0 then
-                                        frontCorners += 1
-                                        minX = math.min(minX, point.X); minY = math.min(minY, point.Y)
-                                        maxX = math.max(maxX, point.X); maxY = math.max(maxY, point.Y)
-                                    end
-                                end
-                            end
-                        end
-                        if frontCorners > 0 and maxX > minX and maxY > minY
-                            and maxX >= 0 and minX <= viewport.X and maxY >= 0 and minY <= viewport.Y then
-                            minX = math.clamp(minX, 0, viewport.X); maxX = math.clamp(maxX, 0, viewport.X)
-                            minY = math.clamp(minY, 0, viewport.Y); maxY = math.clamp(maxY, 0, viewport.Y)
-                            visual.boxFrame.Position = UDim2.fromOffset(minX, minY)
-                            visual.boxFrame.Size = UDim2.fromOffset(math.max(1, maxX - minX), math.max(1, maxY - minY))
-                            visual.boxFrame.Visible = true
-                            visual.boxStroke.Color = BOX_COLOR
-                            showBox = true
-                        end
+                    local minX, minY, maxX, maxY = projectModelRect(character, root, humanoid, camera, viewport)
+                    if minX then
+                        visual.boxFrame.Position = UDim2.fromOffset(minX, minY)
+                        visual.boxFrame.Size = UDim2.fromOffset(math.max(1, maxX - minX), math.max(1, maxY - minY))
+                        visual.boxFrame.Visible = true
+                        visual.boxStroke.Color = BOX_COLOR
+                        showBox = true
                     end
                 end
                 if not showBox then visual.boxFrame.Visible = false end
@@ -1175,30 +1180,13 @@ RunService.RenderStepped:Connect(function()
         local valid = espEnabled and humanoid and humanoid.Health > 0 and root
         local showBox, showLine = false, false
         if valid and espBoxesEnabled then
-            local ok, boundsCF, boundsSize = pcall(function() return model:GetBoundingBox() end)
-            if ok and boundsCF and boundsSize then
-                local half = boundsSize * 0.5
-                local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                local frontCorners = 0
-                for _, x in ipairs({-half.X, half.X}) do
-                    for _, y in ipairs({-half.Y, half.Y}) do
-                        for _, z in ipairs({-half.Z, half.Z}) do
-                            local point = camera:WorldToViewportPoint(boundsCF:PointToWorldSpace(Vector3.new(x,y,z)))
-                            if point.Z > 0 then
-                                frontCorners += 1
-                                minX = math.min(minX, point.X); minY = math.min(minY, point.Y)
-                                maxX = math.max(maxX, point.X); maxY = math.max(maxY, point.Y)
-                            end
-                        end
-                    end
-                end
-                if frontCorners > 0 and maxX > minX and maxY > minY and maxX >= 0 and minX <= viewport.X and maxY >= 0 and minY <= viewport.Y then
-                    minX = math.clamp(minX, 0, viewport.X); maxX = math.clamp(maxX, 0, viewport.X)
-                    minY = math.clamp(minY, 0, viewport.Y); maxY = math.clamp(maxY, 0, viewport.Y)
-                    visual.boxFrame.Position = UDim2.fromOffset(minX, minY)
-                    visual.boxFrame.Size = UDim2.fromOffset(math.max(1,maxX-minX), math.max(1,maxY-minY))
-                    visual.boxFrame.Visible = true; visual.boxStroke.Color = BOX_COLOR; showBox = true
-                end
+            local minX, minY, maxX, maxY = projectModelRect(model, root, humanoid, camera, viewport)
+            if minX then
+                visual.boxFrame.Position = UDim2.fromOffset(minX, minY)
+                visual.boxFrame.Size = UDim2.fromOffset(math.max(1, maxX-minX), math.max(1, maxY-minY))
+                visual.boxFrame.Visible = true
+                visual.boxStroke.Color = BOX_COLOR
+                showBox = true
             end
         end
         if not showBox then visual.boxFrame.Visible = false end
