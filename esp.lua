@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
@@ -16,6 +17,8 @@ local savedUI = _G[SETTINGS_KEY]
 savedUI.flySize = savedUI.flySize or 66
 savedUI.flyOpacity = savedUI.flyOpacity or 0.12
 savedUI.flyPosition = savedUI.flyPosition or {x = -24, y = -150}
+savedUI.soundEnabled = savedUI.soundEnabled ~= false
+savedUI.soundVolume = savedUI.soundVolume or 0.35
 savedUI.rhPosition = savedUI.rhPosition or {x = 18, y = 300}
 local POINTS_FILE = "raherhub_teleport_points.json"
 
@@ -676,6 +679,31 @@ infoCard(pages["HOME"], "RAHERHUB 0.1", "Личная сборка с интер
 infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
 infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
+-- RAHERHUB UI sound system (short electronic interface cues).
+local uiSounds = {}
+local SOUND_IDS = {
+    click = "rbxassetid://9118823101",
+    confirm = "rbxassetid://9118828562",
+    error = "rbxassetid://9118826045"
+}
+for name, soundId in pairs(SOUND_IDS) do
+    local sound = Instance.new("Sound")
+    sound.Name = "RAHERHUB_SFX_" .. name
+    sound.SoundId = soundId
+    sound.Volume = savedUI.soundVolume
+    sound.Parent = SoundService
+    uiSounds[name] = sound
+end
+local function playUISound(kind)
+    if not savedUI.soundEnabled then return end
+    local sound = uiSounds[kind] or uiSounds.click
+    if not sound then return end
+    sound.Volume = math.clamp(tonumber(savedUI.soundVolume) or 0.35, 0, 1)
+    sound:Stop()
+    sound.TimePosition = 0
+    sound:Play()
+end
+
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
@@ -690,7 +718,10 @@ local function makeActionButton(parent, text, callback, height)
         AutoButtonColor = true
     }, parent)
     corner(button, 12)
-    button.Activated:Connect(callback)
+    button.Activated:Connect(function(...)
+        playUISound("click")
+        callback(...)
+    end)
     return button
 end
 
@@ -1214,6 +1245,7 @@ local function refreshPoints()
         }, row)
         corner(go, 8)
         go.Activated:Connect(function()
+            playUISound("confirm")
             local character = LocalPlayer.Character
             local root = character and character:FindFirstChild("HumanoidRootPart")
             if not root then
@@ -1235,6 +1267,7 @@ local function refreshPoints()
         }, row)
         corner(delete, 8)
         delete.Activated:Connect(function()
+            playUISound("error")
             table.remove(teleportPoints, index)
             savePoints()
             refreshPoints()
@@ -1257,6 +1290,7 @@ makeActionButton(pages["TELEPORT"], "+ СОХРАНИТЬ ТЕКУЩЕЕ МЕС�
     end
     local pos = root.Position
     table.insert(teleportPoints, {name = name, x = pos.X, y = pos.Y, z = pos.Z})
+    playUISound("confirm")
     local saved = savePoints()
     pointNameBox.Text = ""
     refreshPoints()
@@ -1366,6 +1400,17 @@ local function applyFlyAppearance()
     flyTouch.TextSize = math.floor(savedUI.flySize * 0.25)
     flyTouch.BackgroundTransparency = savedUI.flyOpacity
 end
+
+section(pages["SETTINGS"], "ЗВУКОВОЕ СОПРОВОЖДЕНИЕ")
+makeToggle(pages["SETTINGS"], "Интерфейсные звуки", savedUI.soundEnabled, function(value)
+    savedUI.soundEnabled = value
+    if value then playUISound("confirm") end
+end)
+createSettingSlider(pages["SETTINGS"], "Громкость звуков", 0, 100, math.floor(savedUI.soundVolume * 100 + 0.5), function(v) return tostring(v) .. "%" end, function(value)
+    savedUI.soundVolume = value / 100
+    for _, sound in pairs(uiSounds) do sound.Volume = savedUI.soundVolume end
+end)
+makeActionButton(pages["SETTINGS"], "ПРОВЕРИТЬ ЗВУК", function() playUISound("confirm") end)
 
 createSettingSlider(pages["SETTINGS"], "Размер кнопки FLY", 44, 110, savedUI.flySize, function(v) return tostring(v) .. " px" end, function(value)
     savedUI.flySize = value
