@@ -9,10 +9,6 @@ local HttpService = game:GetService("HttpService")
 
 -- Ждём загрузки LocalPlayer (защита для iOS Delta)
 local LocalPlayer = Players.LocalPlayer
-if not LocalPlayer then
-    repeat task.wait(0.1) until Players.LocalPlayer
-    LocalPlayer = Players.LocalPlayer
-end
 
 local VERSION = "0.2.1-AUTH"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
