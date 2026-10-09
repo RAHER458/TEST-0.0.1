@@ -10,7 +10,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2-COMBAT-MENU-FIX"
+local VERSION = "0.2-COMBAT-MENU-DIAGNOSTIC-FIX"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -21,24 +21,16 @@ savedUI.rhPosition = savedUI.rhPosition or {x = 18, y = 300}
 local POINTS_FILE = "raherhub_teleport_points.json"
 local CONFIG_FILE = "raherhub_02_config.json"
 
--- Remove an older copy if the script is re-run.
+-- Remove previous copies from both possible GUI containers before building a new one.
 pcall(function()
     local core = game:GetService("CoreGui")
-    local old = core:FindFirstChild("RAHERHUB_01")
-    if old then old:Destroy() end
-    local oldCombat = core:FindFirstChild("RAHERHUB_COMBAT_OVERLAY")
-    if oldCombat then oldCombat:Destroy() end
-    local oldESP = core:FindFirstChild("RAHERHUB_ESP_OVERLAY")
-    if oldESP then oldESP:Destroy() end
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if playerGui then
-        local oldPlayerESP = playerGui:FindFirstChild("RAHERHUB_ESP_OVERLAY")
-        if oldPlayerESP then oldPlayerESP:Destroy() end
-    end
-    -- BillboardGui boxes live beside ScreenGui in CoreGui/PlayerGui, so clean
-    -- those siblings too when the script is rerun.
     for _, container in ipairs({core, playerGui}) do
         if container then
+            for _, name in ipairs({"RAHERHUB_01", "RAHERHUB_COMBAT_OVERLAY", "RAHERHUB_ESP_OVERLAY"}) do
+                local old = container:FindFirstChild(name)
+                if old then old:Destroy() end
+            end
             for _, child in ipairs(container:GetChildren()) do
                 if child.Name:match("^RaherESPBox_") then pcall(function() child:Destroy() end) end
             end
@@ -73,9 +65,16 @@ local function stroke(parent, color, thickness, transparency)
 end
 
 local function safeParentGui(gui)
-    local ok = pcall(function() gui.Parent = game:GetService("CoreGui") end)
-    if not ok or not gui.Parent then
-        gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    -- Prefer the standard player container: some mobile executors accept CoreGui
+    -- parenting without actually rendering the ScreenGui.
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
+    local ok = pcall(function() gui.Parent = playerGui end)
+    if not ok or gui.Parent ~= playerGui then
+        local core = game:GetService("CoreGui")
+        local coreOK = pcall(function() gui.Parent = core end)
+        if not coreOK or gui.Parent ~= core then
+            error("RAHERHUB: unable to parent ScreenGui to PlayerGui or CoreGui")
+        end
     end
 end
 
@@ -2577,16 +2576,25 @@ refreshPoints()
 refreshCompatibility()
 selectTab("HOME")
 -- Visibility safety: always show the main window immediately after injection.
-pcall(function()
-    gui.Enabled = true
-    gui.DisplayOrder = 9999
-    main.Visible = true
-    main.BackgroundTransparency = 0
-    openButton.Visible = false
-    statsOverlay.Visible = false
-    fitPanel()
-    main.Position = UDim2.fromScale(0.5, 0.5)
-end)
+local function forceMenuVisible()
+    pcall(function()
+        local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if playerGui and gui.Parent ~= playerGui then gui.Parent = playerGui end
+        gui.Enabled = true
+        gui.DisplayOrder = 100000
+        main.Visible = true
+        main.Active = true
+        main.BackgroundTransparency = 0
+        openButton.Visible = false
+        statsOverlay.Visible = false
+        fitPanel()
+        main.Position = UDim2.fromScale(0.5, 0.5)
+    end)
+end
+forceMenuVisible()
+-- Re-assert once more after the first rendered frame, to catch mobile executor timing issues.
+task.delay(1, forceMenuVisible)
+task.delay(3, forceMenuVisible)
 
 -- Keep touch fly control visible independently of selected page and menu state.
 local function syncFlyButton()
