@@ -265,9 +265,83 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
-statsOverlay.Activated:Connect(function()
-    statsOverlay.Visible = false
-    main.Visible = true
+-- The minimized performance overlay can be moved around the screen.
+-- A short tap opens the full menu; dragging only moves the overlay.
+local overlayDrag = {
+    active = false,
+    input = nil,
+    startPointer = nil,
+    startPosition = nil,
+    moved = false,
+}
+local OVERLAY_DRAG_THRESHOLD = 8
+
+local function clampOverlayPosition(x, y)
+    local camera = workspace.CurrentCamera
+    local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+    local size = statsOverlay.AbsoluteSize
+    x = math.clamp(x, 0, math.max(0, viewport.X - size.X))
+    y = math.clamp(y, 0, math.max(0, viewport.Y - size.Y))
+    return x, y
+end
+
+local function finishOverlayGesture()
+    if not overlayDrag.active then return end
+    local wasMoved = overlayDrag.moved
+    overlayDrag.active = false
+    overlayDrag.input = nil
+    overlayDrag.startPointer = nil
+    overlayDrag.startPosition = nil
+    overlayDrag.moved = false
+
+    savedUI.rhPosition = {
+        x = statsOverlay.Position.X.Offset,
+        y = statsOverlay.Position.Y.Offset,
+    }
+
+    if not wasMoved then
+        statsOverlay.Visible = false
+        main.Visible = true
+    end
+end
+
+statsOverlay.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        overlayDrag.active = true
+        overlayDrag.input = input
+        overlayDrag.startPointer = input.Position
+        overlayDrag.startPosition = Vector2.new(statsOverlay.Position.X.Offset, statsOverlay.Position.Y.Offset)
+        overlayDrag.moved = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not overlayDrag.active then return end
+    local isMouseMove = overlayDrag.input and overlayDrag.input.UserInputType == Enum.UserInputType.MouseButton1
+        and input.UserInputType == Enum.UserInputType.MouseMovement
+    local isTouchMove = overlayDrag.input and overlayDrag.input.UserInputType == Enum.UserInputType.Touch
+        and input == overlayDrag.input
+    if not (isMouseMove or isTouchMove) then return end
+
+    local delta = input.Position - overlayDrag.startPointer
+    if delta.Magnitude >= OVERLAY_DRAG_THRESHOLD then
+        overlayDrag.moved = true
+    end
+    if overlayDrag.moved then
+        local x, y = clampOverlayPosition(overlayDrag.startPosition.X + delta.X, overlayDrag.startPosition.Y + delta.Y)
+        statsOverlay.Position = UDim2.fromOffset(x, y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if not overlayDrag.active then return end
+    local touchEnded = overlayDrag.input and overlayDrag.input.UserInputType == Enum.UserInputType.Touch
+        and input == overlayDrag.input
+    local mouseEnded = overlayDrag.input and overlayDrag.input.UserInputType == Enum.UserInputType.MouseButton1
+        and input.UserInputType == Enum.UserInputType.MouseButton1
+    if touchEnded or mouseEnded then
+        finishOverlayGesture()
+    end
 end)
 
 local tabsBar, content, tabLayout, pages, tabButtons
