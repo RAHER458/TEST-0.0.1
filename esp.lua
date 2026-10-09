@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
@@ -275,6 +276,7 @@ local overlayDrag = {
     moved = false,
 }
 local OVERLAY_DRAG_THRESHOLD = 8
+local openMainFromLauncher
 
 local function clampOverlayPosition(x, y)
     local camera = workspace.CurrentCamera
@@ -301,7 +303,7 @@ local function finishOverlayGesture()
 
     if not wasMoved then
         statsOverlay.Visible = false
-        main.Visible = true
+        if openMainFromLauncher then task.spawn(openMainFromLauncher) else main.Visible = true end
     end
 end
 
@@ -347,60 +349,48 @@ end)
 local tabsBar, content, tabLayout, pages, tabButtons
 local function applyMenuLayout()
     fitPanel()
-    if compactMode then
-        header.Size = UDim2.new(1, 0, 0, 48)
-        title.Position = UDim2.new(0, 9, 0, 3)
-        title.Size = UDim2.new(1, -105, 0, 25)
-        title.TextSize = 18
-        subtitle.Visible = false
-        compactButton.Position = UDim2.new(1, -45, 0, 7)
-        minimize.Position = UDim2.new(1, -7, 0, 7)
-        compactButton.Size = UDim2.fromOffset(31, 31)
-        minimize.Size = UDim2.fromOffset(31, 31)
-        tabsBar.Position = UDim2.new(0, 7, 0, 53)
-        tabsBar.Size = UDim2.new(1, -14, 0, 32)
-        tabLayout.Padding = UDim.new(0, 3)
-        content.Position = UDim2.new(0, 8, 0, 91)
-        content.Size = UDim2.new(1, -16, 1, -99)
-        for _, button in pairs(tabButtons or {}) do
-            button.TextSize = 7
-        end
-        for _, page in pairs(pages or {}) do
-            for _, child in ipairs(page:GetChildren()) do
-                if child:IsA("UIListLayout") then child.Padding = UDim.new(0, 5) end
-                if child:IsA("GuiObject") and child:IsA("TextButton") then
-                    child.Size = UDim2.new(1, -2, 0, 34)
-                    child.TextSize = 11
-                elseif child:IsA("TextLabel") then
-                    child.TextSize = math.min(child.TextSize, 10)
-                end
-            end
-        end
-        compactButton.Text = "↗"
-    else
-        header.Size = UDim2.new(1, 0, 0, 58)
-        title.Position = UDim2.new(0, 11, 0, 5)
-        title.Size = UDim2.new(1, -112, 0, 29)
-        title.TextSize = 21
-        subtitle.Visible = true
-        compactButton.Position = UDim2.new(1, -48, 0, 9)
-        minimize.Position = UDim2.new(1, -8, 0, 9)
-        compactButton.Size = UDim2.fromOffset(34, 34)
-        minimize.Size = UDim2.fromOffset(34, 34)
-        tabsBar.Position = UDim2.new(0, 9, 0, 65)
-        tabsBar.Size = UDim2.new(1, -18, 0, 36)
-        tabLayout.Padding = UDim.new(0, 4)
-        content.Position = UDim2.new(0, 10, 0, 108)
-        content.Size = UDim2.new(1, -20, 1, -118)
-        for _, button in pairs(tabButtons or {}) do button.TextSize = 8 end
-        compactButton.Text = "▣"
+    header.Size = UDim2.new(1, 0, 0, compactMode and 50 or 58)
+    title.Position = UDim2.new(0, 11, 0, 5)
+    title.Size = UDim2.new(1, -112, 0, 29)
+    title.TextSize = compactMode and 18 or 21
+    subtitle.Visible = not compactMode
+    compactButton.Position = UDim2.new(1, compactMode and -45 or -48, 0, compactMode and 7 or 9)
+    minimize.Position = UDim2.new(1, compactMode and -7 or -8, 0, compactMode and 7 or 9)
+    compactButton.Size = UDim2.fromOffset(compactMode and 31 or 34, compactMode and 31 or 34)
+    minimize.Size = UDim2.fromOffset(compactMode and 31 or 34, compactMode and 31 or 34)
+    compactButton.Text = compactMode and "↗" or "▣"
+    -- Persistent left navigation rail: category names stay in one place on every page.
+    tabsBar.Position = UDim2.new(0, 8, 0, compactMode and 58 or 66)
+    tabsBar.Size = UDim2.new(0, 78, 1, compactMode and -66 or -76)
+    content.Position = UDim2.new(0, 94, 0, compactMode and 58 or 66)
+    content.Size = UDim2.new(1, -102, 1, compactMode and -66 or -76)
+    tabLayout.Padding = UDim.new(0, 5)
+    for _, button in pairs(tabButtons or {}) do
+        button.Size = UDim2.new(1, 0, 0, compactMode and 31 or 35)
+        button.TextSize = compactMode and 8 or 9
+    end
+    for _, page in pairs(pages or {}) do
+        local layout = page:FindFirstChildOfClass("UIListLayout")
+        if layout then layout.Padding = UDim.new(0, compactMode and 5 or 7) end
     end
 end
+local menuAnimating = false
 compactButton.Activated:Connect(function()
-    -- Collapse into a tiny FPS / ping / frame-delay overlay.
+    if menuAnimating then return end
+    menuAnimating = true
+    -- Animate the panel down into the draggable performance overlay.
+    local shrink = TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1
+    })
+    shrink:Play(); shrink.Completed:Wait()
     main.Visible = false
-    statsOverlay.Visible = true
+    main.BackgroundTransparency = 0
     statsOverlay.Position = UDim2.fromOffset(savedUI.rhPosition.x or 18, savedUI.rhPosition.y or 300)
+    statsOverlay.Size = UDim2.fromOffset(20, 20)
+    statsOverlay.Visible = true
+    local grow = TweenService:Create(statsOverlay, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(190, 58)})
+    grow:Play(); grow.Completed:Wait()
+    menuAnimating = false
 end)
 
 -- Rainbow title animation.
@@ -448,9 +438,37 @@ local openButton = make("TextButton", {
 }, gui)
 corner(openButton, 29)
 
-minimize.Activated:Connect(function()
+local function closeMainToLauncher()
+    if menuAnimating or not main.Visible then return end
+    menuAnimating = true
+    local tween = TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1
+    })
+    tween:Play(); tween.Completed:Wait()
     main.Visible = false
+    main.BackgroundTransparency = 0
     openButton.Visible = true
+    menuAnimating = false
+end
+openMainFromLauncher = function()
+    if menuAnimating then return end
+    menuAnimating = true
+    openButton.Visible = false
+    fitPanel()
+    main.Size = UDim2.fromOffset(40, 40)
+    main.BackgroundTransparency = 1
+    main.Visible = true
+    local targetSize = compactMode and UDim2.fromOffset(252, 326) or UDim2.fromOffset(310, 440)
+    local camera = workspace.CurrentCamera
+    if camera then targetSize = UDim2.fromOffset(math.min(targetSize.X.Offset, camera.ViewportSize.X - 20), math.min(targetSize.Y.Offset, camera.ViewportSize.Y - 60)) end
+    local tween = TweenService:Create(main, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = targetSize, BackgroundTransparency = 0
+    })
+    tween:Play(); tween.Completed:Wait()
+    menuAnimating = false
+end
+minimize.Activated:Connect(function()
+    task.spawn(closeMainToLauncher)
 end)
 do
     local rhDragging, rhStart, rhStartPos, rhInput, rhMoved = false, nil, nil, nil, false
@@ -474,7 +492,7 @@ do
     end)
     openButton.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not rhMoved then main.Visible = true; openButton.Visible = false end
+            if not rhMoved then task.spawn(openMainFromLauncher) end
             rhDragging = false
         end
     end)
@@ -486,34 +504,37 @@ tabsBar = make("Frame", {
     BackgroundTransparency = 1
 }, main)
 tabLayout = make("UIListLayout", {
-    FillDirection = Enum.FillDirection.Horizontal,
+    FillDirection = Enum.FillDirection.Vertical,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
-    VerticalAlignment = Enum.VerticalAlignment.Center,
-    Padding = UDim.new(0, 7),
+    VerticalAlignment = Enum.VerticalAlignment.Top,
+    Padding = UDim.new(0, 5),
     SortOrder = Enum.SortOrder.LayoutOrder
 }, tabsBar)
 
 pages = {}
 tabButtons = {}
-local activeTab = "MAIN"
+local activeTab = "HOME"
 content = make("Frame", {
     Position = UDim2.new(0, 12, 0, 138),
     Size = UDim2.new(1, -24, 1, -150),
     BackgroundTransparency = 1
 }, main)
 
-for _, tabName in ipairs({"MAIN", "FUNCTIONS", "TELEPORT", "SETTINGS", "COMING SOON"}) do
+local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "EDIT", "SETTINGS", "ABOUT"}
+local tabCaptions = {HOME = "⌂  HOME", MOVE = "↟  MOVE", VISUAL = "◎  VISUAL", TELEPORT = "⌖  TP", EDIT = "✎  EDIT", SETTINGS = "⚙  SET", ABOUT = "i  INFO"}
+for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
-        Size = UDim2.new(1/5, -6, 1, 0),
+        Size = UDim2.new(1, 0, 0, 35),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
-        Text = tabName,
+        Text = tabCaptions[tabName] or tabName,
         TextColor3 = COLORS.muted,
         TextSize = 9,
+        TextXAlignment = Enum.TextXAlignment.Left,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true,
-        LayoutOrder = #tabButtons + 1
+        LayoutOrder = tabIndex
     }, tabsBar)
     corner(tab, 10)
     tabButtons[tabName] = tab
@@ -541,18 +562,48 @@ for _, tabName in ipairs({"MAIN", "FUNCTIONS", "TELEPORT", "SETTINGS", "COMING S
     pages[tabName] = page
 end
 
+local pageTween
 local function selectTab(name)
+    if not pages[name] then return end
     activeTab = name
+    if pageTween then pageTween:Cancel() end
     for tabName, page in pairs(pages) do
-        page.Visible = tabName == name
-        tabButtons[tabName].BackgroundColor3 = tabName == name and COLORS.accent or COLORS.button
-        tabButtons[tabName].TextColor3 = tabName == name and Color3.new(1,1,1) or COLORS.muted
+        local selected = tabName == name
+        page.Visible = selected
+        tabButtons[tabName].BackgroundColor3 = selected and COLORS.accent or COLORS.button
+        tabButtons[tabName].TextColor3 = selected and Color3.new(1,1,1) or COLORS.muted
+        if selected then
+            page.Position = UDim2.fromOffset(7, 0)
+            pageTween = TweenService:Create(page, TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.fromOffset(0, 0)})
+            pageTween:Play()
+        else
+            page.Position = UDim2.fromOffset(0, 0)
+        end
     end
 end
 for name, button in pairs(tabButtons) do
     button.Activated:Connect(function() selectTab(name) end)
 end
 applyMenuLayout()
+
+-- Soft hover/press feedback for navigation and controls.
+local function animateButton(button)
+    if not button:IsA("TextButton") then return end
+    local original = button.BackgroundColor3
+    button.MouseEnter:Connect(function()
+        if button.Parent == tabsBar and activeTab == button.Name:gsub("Tab$", "") then return end
+        TweenService:Create(button, TweenInfo.new(0.12), {BackgroundColor3 = COLORS.panel2}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        if button.Parent == tabsBar then
+            local key = button.Name:gsub("Tab$", "")
+            TweenService:Create(button, TweenInfo.new(0.12), {BackgroundColor3 = key == activeTab and COLORS.accent or COLORS.button}):Play()
+        else
+            TweenService:Create(button, TweenInfo.new(0.12), {BackgroundColor3 = original}):Play()
+        end
+    end)
+end
+for _, button in pairs(tabButtons) do animateButton(button) end
 
 local function section(parent, text)
     return make("TextLabel", {
@@ -602,18 +653,18 @@ local statusLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 36),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "Готово. Регистрация не требуется.",
+    Text = "Система готова. Выбери нужный раздел слева.",
     TextColor3 = COLORS.green,
     TextSize = 12,
     Font = Enum.Font.GothamMedium,
     TextWrapped = true
-}, pages["MAIN"])
+}, pages["HOME"])
 corner(statusLabel, 11)
 
-section(pages["MAIN"], "OVERVIEW")
-infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
-infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест.")
-infoCard(pages["MAIN"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
+section(pages["HOME"], "ПАНЕЛЬ УПРАВЛЕНИЯ")
+infoCard(pages["HOME"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
+infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
+infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
@@ -652,8 +703,8 @@ local function makeToggle(parent, label, initial, callback)
     end
 end
 
-section(pages["FUNCTIONS"], "УПРАВЛЕНИЕ ПЕРСОНАЖЕМ")
-infoCard(pages["FUNCTIONS"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
+section(pages["MOVE"], "ДВИЖЕНИЕ И ПЕРЕМЕЩЕНИЕ")
+infoCard(pages["MOVE"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
 
 -- Скорость ходьбы: диапазон 16–1000
 local speedEnabled = false
@@ -664,7 +715,7 @@ local function applyWalkSpeed()
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if humanoid then humanoid.WalkSpeed = speedEnabled and walkSpeed or 16 end
 end
-makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
+makeToggle(pages["MOVE"], "Ускорение ходьбы", false, function(value)
     speedEnabled = value
     applyWalkSpeed()
     if walkSpeedLabel then walkSpeedLabel.Visible = value end
@@ -674,10 +725,10 @@ walkSpeedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24), BackgroundTransparency = 1,
     Text = "СКОРОСТЬ: " .. walkSpeed, TextColor3 = COLORS.muted,
     TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
-}, pages["FUNCTIONS"])
+}, pages["MOVE"])
 walkSpeedTrack = make("Frame", {
     Size = UDim2.new(1, -2, 0, 36), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
-}, pages["FUNCTIONS"])
+}, pages["MOVE"])
 corner(walkSpeedTrack, 11)
 walkSpeedLabel.Visible = false
 walkSpeedTrack.Visible = false
@@ -758,7 +809,7 @@ Players.PlayerAdded:Connect(function(player)
     end)
 end)
 Players.PlayerRemoving:Connect(removeESP)
-makeToggle(pages["FUNCTIONS"], "Подсветка игроков (ESP)", false, function(value)
+makeToggle(pages["VISUAL"], "Подсветка игроков (ESP)", false, function(value)
     espEnabled = value
     updateESP()
 end)
@@ -772,13 +823,13 @@ local flySpeed = 4
 local speedLabel, speedTrack
 local flyDragState = {dragging = false, start = nil, startPos = nil, input = nil}
 
-makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
+makeToggle(pages["MOVE"], "Полёт (удерживать для подъёма)", false, function(value)
     flyEnabled = value
     if not value then flyHeld = false end
     if speedLabel then speedLabel.Visible = value end
     if speedTrack then speedTrack.Visible = value end
     if flyTouch then
-        flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+        flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "MOVE" and flyEnabled)
     end
 end)
 
@@ -790,12 +841,12 @@ speedLabel = make("TextLabel", {
     TextSize = 12,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left
-}, pages["FUNCTIONS"])
+}, pages["MOVE"])
 speedTrack = make("Frame", {
     Size = UDim2.new(1, -2, 0, 34),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
-}, pages["FUNCTIONS"])
+}, pages["MOVE"])
 corner(speedTrack, 11)
 speedLabel.Visible = false
 speedTrack.Visible = false
@@ -867,12 +918,12 @@ flyTouch = make("TextButton", {
 corner(flyTouch, 100)
 stroke(flyTouch, Color3.fromRGB(255,255,255), 1, 0.35)
 
-local _, setFlyEditToggle = makeToggle(pages["FUNCTIONS"], "Редактировать кнопку FLY", false, function(value)
+local _, setFlyEditToggle = makeToggle(pages["EDIT"], "Редактировать кнопку FLY", false, function(value)
     flyEditMode = value
     flyHeld = false
     if flyTouch then
         flyTouch.Text = value and "ПЕРЕМЕСТИ" or "FLY"
-        flyTouch.Visible = value or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+        flyTouch.Visible = value or (main.Visible and activeTab == "MOVE" and flyEnabled)
     end
     statusLabel.Text = value and "Перетащи кнопку FLY пальцем. Нажатие в этом режиме не запускает полёт." or "Режим редактирования FLY выключен."
     statusLabel.TextColor3 = value and COLORS.accent or COLORS.green
@@ -937,7 +988,7 @@ end)
 
 local noclipEnabled = false
 local originalCollision = {}
-makeToggle(pages["FUNCTIONS"], "Проход сквозь объекты (Noclip)", false, function(value)
+makeToggle(pages["MOVE"], "Проход сквозь объекты (Noclip)", false, function(value)
     noclipEnabled = value
     if not value then
         for part, oldValue in pairs(originalCollision) do
@@ -971,7 +1022,7 @@ end)
 -- Show the single FLY button while the feature is enabled or being edited.
 local function updateFlyButton()
     if not flyTouch then return end
-    flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
+    flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "MOVE" and flyEnabled)
 end
 for _, button in pairs(tabButtons) do
     button.Activated:Connect(function() task.defer(updateFlyButton) end)
@@ -1163,8 +1214,24 @@ makeActionButton(pages["TELEPORT"], "УДАЛИТЬ ВСЕ ТОЧКИ", function
 end)
 
 -- SETTINGS: customize both independently draggable flight controls.
-section(pages["SETTINGS"], "INTERFACE SETTINGS")
-infoCard(pages["SETTINGS"], "Настройка кнопок FLY", "Изменяйте размер и прозрачность обеих кнопок. Позиции кнопок сохраняются отдельно.")
+makeActionButton(pages["EDIT"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
+    savedUI.flyPosition = {x = -24, y = -150}
+    flyTouch.Position = UDim2.new(1, -24, 1, -150)
+    statusLabel.Text = "Позиция кнопки FLY сброшена."
+    statusLabel.TextColor3 = COLORS.green
+end)
+
+makeActionButton(pages["EDIT"], "ГОТОВО — ВЫЙТИ ИЗ РЕДАКТОРА", function()
+    flyEditMode = false
+    flyTouch.Text = "FLY"
+    if setFlyEditToggle then setFlyEditToggle(false) end
+    statusLabel.Text = "Режим редактирования выключен."
+    statusLabel.TextColor3 = COLORS.green
+    updateFlyButton()
+end)
+
+section(pages["SETTINGS"], "ВНЕШНИЙ ВИД")
+infoCard(pages["SETTINGS"], "Настройка кнопок FLY", "Изменяйте размер и прозрачность кнопки FLY. Позиция настраивается во вкладке EDIT.")
 
 local function createSettingSlider(parent, titleText, minValue, maxValue, initialValue, formatter, onChange)
     local wrap = make("Frame", {
@@ -1259,13 +1326,6 @@ createSettingSlider(pages["SETTINGS"], "Прозрачность кнопки FL
     applyFlyAppearance()
 end)
 
-makeActionButton(pages["SETTINGS"], "СБРОСИТЬ ПОЗИЦИЮ FLY", function()
-    savedUI.flyPosition = {x = -24, y = -150}
-    flyTouch.Position = UDim2.new(1, -24, 1, -150)
-    statusLabel.Text = "Позиция кнопки FLY сброшена."
-    statusLabel.TextColor3 = COLORS.green
-end)
-
 makeActionButton(pages["SETTINGS"], "СБРОСИТЬ РАЗМЕР И ПРОЗРАЧНОСТЬ", function()
     savedUI.flySize = 66
     savedUI.flyOpacity = 0.12
@@ -1274,20 +1334,15 @@ makeActionButton(pages["SETTINGS"], "СБРОСИТЬ РАЗМЕР И ПРОЗР
     statusLabel.TextColor3 = COLORS.green
 end)
 
-makeActionButton(pages["SETTINGS"], "ГОТОВО / ВЫЙТИ ИЗ РЕДАКТИРОВАНИЯ", function()
-    flyEditMode = false
-    flyTouch.Text = "FLY"
-    statusLabel.Text = "Настройки применены."
-    statusLabel.TextColor3 = COLORS.green
-    updateFlyButton()
-end)
-
-section(pages["COMING SOON"], "COMING SOON")
-infoCard(pages["COMING SOON"], "В разработке", "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования.")
-infoCard(pages["COMING SOON"], "Следующие улучшения", "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования.")
+section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
+infoCard(pages["EDIT"], "Перемещение кнопки FLY", "Включи режим редактирования, затем перетащи кнопку FLY в удобное место. Отключи режим, чтобы снова использовать полёт.")
+section(pages["ABOUT"], "О ПРОЕКТЕ")
+infoCard(pages["ABOUT"], "RAHERHUB 0.1", "Личная сборка. Версия 0.1 остаётся до начала альфа-тестирования.")
+infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
+infoCard(pages["ABOUT"], "Совместимость", "Некоторые функции зависят от доступных возможностей среды и прав в текущем Roblox-проекте.")
 
 refreshPoints()
-selectTab("MAIN")
+selectTab("HOME")
 
 -- Keep touch fly control visibility in sync with the selected page and minimized state.
 local function syncFlyButton()
