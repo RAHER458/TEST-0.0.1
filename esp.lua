@@ -25,7 +25,6 @@ local CONFIG = {
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
     DEVICE_FILE = "RH_HUB_DEVICE.dat",
     TG_LINK     = "https://t.me/generalvaneska2024",
-    TG_ICON     = "rbxassetid://104099125092946",
     TIMEOUT     = 10,
 }
 
@@ -316,12 +315,11 @@ local authBg = create("Frame", {
     BackgroundTransparency = 0.15,
 }, authGui)
 
--- Главное окно авторизации (высота уменьшена до 420)
 local authMain = create("Frame", {
     Name = "AuthWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(340, 420),
+    Size = UDim2.fromOffset(320, 400),
     BackgroundColor3 = C.surface,
     BorderSizePixel = 0,
     ClipsDescendants = true,
@@ -333,8 +331,8 @@ local function authFit()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local vp = cam.ViewportSize
-    local w = math.min(340, vp.X - 24)
-    local h = math.min(420, vp.Y - 60)
+    local w = math.min(320, vp.X - 24)
+    local h = math.min(400, vp.Y - 60)
     authMain.Size = UDim2.fromOffset(w, h)
 end
 authFit()
@@ -342,44 +340,42 @@ if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(authFit)
 end
 
--- Header (высота 76)
 local authHeader = create("Frame", {
     Name = "Header",
-    Size = UDim2.new(1, 0, 0, 76),
+    Size = UDim2.new(1, 0, 0, 68),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
 }, authMain)
 corner(authHeader, 18)
 create("Frame", {
-    Size = UDim2.new(1, 0, 0, 22),
-    Position = UDim2.new(0, 0, 1, -22),
+    Size = UDim2.new(1, 0, 0, 20),
+    Position = UDim2.new(0, 0, 1, -20),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
 }, authHeader)
 
 local authTitle = create("TextLabel", {
-    Position = UDim2.new(0, 20, 0, 12),
-    Size = UDim2.new(1, -40, 0, 38),
+    Position = UDim2.new(0, 20, 0, 10),
+    Size = UDim2.new(1, -40, 0, 36),
     BackgroundTransparency = 1,
     Text = "RH-HUB",
     TextColor3 = C.pink,
-    TextSize = 30,
+    TextSize = 28,
     Font = Enum.Font.GothamBlack,
     TextXAlignment = Enum.TextXAlignment.Center,
 }, authHeader)
 
 create("TextLabel", {
-    Position = UDim2.new(0, 20, 0, 52),
-    Size = UDim2.new(1, -40, 0, 16),
+    Position = UDim2.new(0, 20, 0, 46),
+    Size = UDim2.new(1, -40, 0, 14),
     BackgroundTransparency = 1,
-    Text = "АВТОРИЗАЦИЯ • ВВЕДИТЕ КЛЮЧ",
+    Text = "ВВЕДИТЕ КЛЮЧ ДОСТУПА",
     TextColor3 = C.muted,
     TextSize = 9,
     Font = Enum.Font.GothamMedium,
     TextXAlignment = Enum.TextXAlignment.Center,
 }, authHeader)
 
--- Радужная анимация
 task.spawn(function()
     local hue = 0
     while authGui.Parent do
@@ -391,24 +387,22 @@ task.spawn(function()
     end
 end)
 
--- Замок (высота 24, сдвинут к 84)
 create("TextLabel", {
-    Position = UDim2.new(0.5, -14, 0, 84),
-    Size = UDim2.fromOffset(28, 28),
+    Position = UDim2.new(0.5, -12, 0, 78),
+    Size = UDim2.fromOffset(24, 24),
     BackgroundTransparency = 1,
     Text = "🔒",
     TextColor3 = C.text,
-    TextSize = 22,
+    TextSize = 20,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Center,
 }, authMain)
 
--- Описание (компактное)
 create("TextLabel", {
-    Position = UDim2.new(0, 22, 0, 116),
-    Size = UDim2.new(1, -44, 0, 36),
+    Position = UDim2.new(0, 22, 0, 106),
+    Size = UDim2.new(1, -44, 0, 34),
     BackgroundTransparency = 1,
-    Text = "Получите ключ у администратора и введите его ниже.\nОдин ключ работает на одном устройстве.",
+    Text = "Получите ключ у администратора.\nОдин ключ = одно устройство.",
     TextColor3 = C.muted,
     TextSize = 10,
     Font = Enum.Font.Gotham,
@@ -417,9 +411,8 @@ create("TextLabel", {
     TextYAlignment = Enum.TextYAlignment.Top,
 }, authMain)
 
--- Заголовок поля
 create("TextLabel", {
-    Position = UDim2.new(0, 22, 0, 158),
+    Position = UDim2.new(0, 22, 0, 144),
     Size = UDim2.new(1, -44, 0, 14),
     BackgroundTransparency = 1,
     Text = "КЛЮЧ ДОСТУПА",
@@ -429,10 +422,9 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, authMain)
 
--- Поле ввода (компактное, 44px)
 local authInputWrap = create("Frame", {
-    Position = UDim2.new(0, 22, 0, 176),
-    Size = UDim2.new(1, -44, 0, 44),
+    Position = UDim2.new(0, 22, 0, 162),
+    Size = UDim2.new(1, -44, 0, 42),
     BackgroundColor3 = C.input,
     BorderSizePixel = 0,
 }, authMain)
@@ -441,7 +433,7 @@ local authInputStroke = stroke(authInputWrap, C.border, 1.5, 0.1)
 
 local authKeyBox = create("TextBox", {
     Position = UDim2.new(0, 12, 0, 0),
-    Size = UDim2.new(1, -56, 1, 0),
+    Size = UDim2.new(1, -52, 1, 0),
     BackgroundTransparency = 1,
     Text = "",
     PlaceholderText = "RAH-XXXXXXXXXXXXXXXX",
@@ -454,7 +446,7 @@ local authKeyBox = create("TextBox", {
 }, authInputWrap)
 
 local authPasteBtn = create("TextButton", {
-    Position = UDim2.new(1, -42, 0, 6),
+    Position = UDim2.new(1, -40, 0, 5),
     Size = UDim2.fromOffset(32, 32),
     BackgroundColor3 = C.button,
     BorderSizePixel = 0,
@@ -477,9 +469,8 @@ authKeyBox.FocusLost:Connect(function()
     }):Play()
 end)
 
--- Кнопка АКТИВИРОВАТЬ (высота 44)
 local authActBtn = create("TextButton", {
-    Position = UDim2.new(0, 22, 0, 232),
+    Position = UDim2.new(0, 22, 0, 214),
     Size = UDim2.new(1, -44, 0, 44),
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
@@ -491,13 +482,12 @@ local authActBtn = create("TextButton", {
 }, authMain)
 corner(authActBtn, 12)
 
--- Кнопка ПОЛУЧИТЬ КЛЮЧ (высота 40)
 local authTgBtn = create("TextButton", {
-    Position = UDim2.new(0, 22, 0, 284),
+    Position = UDim2.new(0, 22, 0, 266),
     Size = UDim2.new(1, -44, 0, 40),
     BackgroundColor3 = C.button,
     BorderSizePixel = 0,
-    Text = "",
+    Text = "📱  ПОЛУЧИТЬ КЛЮЧ",
     TextColor3 = C.text,
     TextSize = 12,
     Font = Enum.Font.GothamBold,
@@ -506,29 +496,9 @@ local authTgBtn = create("TextButton", {
 corner(authTgBtn, 11)
 stroke(authTgBtn, C.pink, 1, 0.3)
 
-create("ImageLabel", {
-    Position = UDim2.new(0, 10, 0.5, -12),
-    Size = UDim2.fromOffset(24, 24),
-    BackgroundTransparency = 1,
-    Image = CONFIG.TG_ICON,
-    ScaleType = Enum.ScaleType.Fit,
-}, authTgBtn)
-
-local authTgLabel = create("TextLabel", {
-    Position = UDim2.new(0, 42, 0, 0),
-    Size = UDim2.new(1, -50, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "ПОЛУЧИТЬ КЛЮЧ",
-    TextColor3 = C.text,
-    TextSize = 12,
-    Font = Enum.Font.GothamBold,
-    TextXAlignment = Enum.TextXAlignment.Left,
-}, authTgBtn)
-
--- Статус-строка (высота 30, привязана к низу)
 local authStatus = create("TextLabel", {
-    Position = UDim2.new(0, 22, 1, -40),
-    Size = UDim2.new(1, -44, 0, 30),
+    Position = UDim2.new(0, 22, 1, -36),
+    Size = UDim2.new(1, -44, 0, 28),
     BackgroundTransparency = 1,
     Text = "Ожидание ввода...",
     TextColor3 = C.muted,
@@ -582,7 +552,7 @@ authPasteBtn.MouseButton1Click:Connect(function()
     if value and value ~= "" then
         value = value:gsub("%s+", "")
         authKeyBox.Text = value
-        setStatus("Ключ вставлен. Нажмите АКТИВИРОВАТЬ.", "ok")
+        setStatus("Ключ вставлен", "ok")
         authToast("Ключ вставлен", "ok")
     else
         authToast("Буфер обмена пуст", "warn")
@@ -604,22 +574,15 @@ authTgBtn.MouseButton1Click:Connect(function()
         copied = pcall(toclipboard, CONFIG.TG_LINK)
     end
 
-    authTgLabel.Text = copied and "ССЫЛКА СКОПИРОВАНА!" or "КОПИРУЙТЕ ВРУЧНУЮ"
-    authTgLabel.TextColor3 = copied and C.green or C.yellow
-
     if copied then
-        authToast("Вставьте ссылку в браузер", "ok")
-        setStatus("Telegram: " .. CONFIG.TG_LINK, "ok")
+        authToast("Ссылка скопирована! Вставьте в браузер", "ok")
+        setStatus("Ссылка в буфере: " .. CONFIG.TG_LINK, "ok")
     else
-        authToast("Скопируйте ссылку вручную", "warn")
+        authToast("Скопируйте вручную", "warn")
         setStatus("Ссылка: " .. CONFIG.TG_LINK, "warn")
     end
 
     task.delay(2.5, function()
-        if authTgLabel.Parent then
-            authTgLabel.Text = "ПОЛУЧИТЬ КЛЮЧ"
-            authTgLabel.TextColor3 = C.text
-        end
         tgCooldown = false
     end)
 end)
@@ -632,7 +595,7 @@ local function onAuthSuccess(token)
     if token then saveToken(token) end
 
     setStatus("Успешная авторизация!", "ok")
-    authToast("Добро пожаловать в RH-HUB!", "ok")
+    authToast("Добро пожаловать!", "ok")
 
     task.spawn(function()
         task.wait(0.8)
@@ -869,7 +832,7 @@ logoutBtn.MouseButton1Click:Connect(function()
 
     local ok, err = pcall(function()
         loadstring(game:HttpGet(
-            "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/rh-hub.lua?t=" .. os.time()
+            "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
         ))()
     end)
     if not ok then
@@ -877,7 +840,6 @@ logoutBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ============ CALLBACK ============
 _G.RH_HUB_ON_AUTH_SUCCESS = function(token)
     if _G.RH_HUB_AUTH then
         _G.RH_HUB_AUTH.authed = true
