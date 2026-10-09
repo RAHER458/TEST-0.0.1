@@ -1,14 +1,15 @@
 --[[
     RH-AUTH
     Standalone Authentication & License Admin Panel
-    Version: 1.2.2 "Cards Fix v2"
+    Version: 1.2.3 "Cards Fix v3"
     Platform: Roblox / Delta Executor / iOS
     Language: Russian
 
-    CHANGELOG 1.2.2:
-      - Фикс авторизации: /admin/stats должен вернуть result.stats
-      - Фикс модалки: тап по кнопкам не закрывает окно
-      - Фикс высоты statsFrame: 280 -> 320
+    CHANGELOG 1.2.3:
+      - Toggle "Бессрочная" — через OnChange, без двойного обработчика
+      - Бейджи статусов — читаемый контрастный текст
+      - Ширина окна: 340 -> 380 (шире, не выше)
+      - Scale-формула: /370 -> /410
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -22,7 +23,7 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local VERSION = "1.2.2 Cards Fix v2"
+local VERSION = "1.2.3 Cards Fix v3"
 local API_BASE = "https://raherauth.raher458.workers.dev"
 local DEVICE_FILE = "RH_AUTH_DEVICE.dat"
 
@@ -201,6 +202,16 @@ local function getLicenseStatus(item)
     return "active", "АКТИВЕН", COLORS.Green
 end
 
+-- Контрастный цвет текста по яркости фона
+local function getContrastText(bgColor)
+    local lum = (bgColor.R * 0.299) + (bgColor.G * 0.587) + (bgColor.B * 0.114)
+    if lum > 0.5 then
+        return Color3.fromRGB(20, 20, 30)
+    else
+        return Color3.fromRGB(255, 255, 255)
+    end
+end
+
 local function create(className, properties, parent)
     local object = Instance.new(className)
     for property, value in pairs(properties or {}) do
@@ -253,12 +264,13 @@ local screenGui = create("ScreenGui", {
 
 local FULL_HEIGHT = 460
 local MINI_HEIGHT = 48
+local WINDOW_WIDTH = 380
 
 local main = create("Frame", {
     Name = "MainWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0.5, 0, 0.5, 0),
-    Size = UDim2.new(0, 340, 0, FULL_HEIGHT),
+    Size = UDim2.new(0, WINDOW_WIDTH, 0, FULL_HEIGHT),
     BackgroundColor3 = COLORS.Window,
     BorderSizePixel = 0,
     ClipsDescendants = true,
@@ -273,7 +285,7 @@ local function updateScale()
     local camera = workspace.CurrentCamera
     if not camera then return end
     local viewport = camera.ViewportSize
-    local scaleX = viewport.X / 370
+    local scaleX = viewport.X / 410
     local scaleY = viewport.Y / 500
     scale.Scale = math.clamp(math.min(scaleX, scaleY), 0.72, 1)
 end
@@ -628,8 +640,10 @@ local function createButton(parent, text, callback, color, height)
     return button
 end
 
+-- FIX 1: Toggle с OnChange callback — без гонки обработчиков
 local function createToggle(parent, labelText, defaultOn)
     local state = defaultOn and true or false
+    local changeCallbacks = {}
 
     local wrap = create("Frame", {
         Size = UDim2.new(1, 0, 0, 40),
@@ -681,6 +695,10 @@ local function createToggle(parent, labelText, defaultOn)
         TweenService:Create(knob, TweenInfo.new(0.2), {
             Position = state and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
         }):Play()
+
+        for _, cb in ipairs(changeCallbacks) do
+            pcall(cb, state)
+        end
     end)
 
     local api = {
@@ -689,6 +707,12 @@ local function createToggle(parent, labelText, defaultOn)
             state = v and true or false
             track.BackgroundColor3 = state and COLORS.Accent or COLORS.Panel2
             knob.Position = state and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2)
+            for _, cb in ipairs(changeCallbacks) do
+                pcall(cb, state)
+            end
+        end,
+        OnChange = function(cb)
+            table.insert(changeCallbacks, cb)
         end,
     }
 
@@ -720,7 +744,7 @@ local modalBox = create("Frame", {
 addCorner(modalBox, 12)
 addStroke(modalBox, COLORS.Border, 1)
 
-create("TextLabel", {
+local modalTitle = create("TextLabel", {
     Position = UDim2.new(0, 16, 0, 14),
     Size = UDim2.new(1, -32, 0, 22),
     BackgroundTransparency = 1,
@@ -730,10 +754,7 @@ create("TextLabel", {
     TextSize = 14,
     TextXAlignment = Enum.TextXAlignment.Left,
     ZIndex = 502,
-    Name = "ModalTitle",
 }, modalBox)
-
-local modalTitle = modalBox:FindFirstChild("ModalTitle")
 
 local modalText = create("TextLabel", {
     Position = UDim2.new(0, 16, 0, 42),
@@ -807,11 +828,10 @@ bindButton(modalConfirm, function()
     end
 end)
 
--- FIX 2: Закрываем модалку только при тапе по ФОНУ (не по кнопкам)
+-- Клик по фону (не по кнопкам) — отмена
 modalOverlay.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch
     or input.UserInputType == Enum.UserInputType.MouseButton1 then
-
         local target = input.Target
         if target == modalOverlay then
             closeModal()
@@ -822,7 +842,6 @@ end)
 -- ==== HOME ====
 section(homePage, "СТАТИСТИКА")
 
--- FIX 3: высота 320 вместо 280
 local statsFrame = create("Frame", {
     Size = UDim2.new(1, 0, 0, 320),
     BackgroundTransparency = 1,
@@ -989,6 +1008,7 @@ local lifetimeToggle, lifetimeWrap, lifetimeBtn = createToggle(
     createPg, "БЕССРОЧНАЯ ЛИЦЕНЗИЯ", false
 )
 
+-- FIX 1: используем OnChange, а НЕ второй MouseButton1Click
 local function applyLifetimeBlock()
     local life = lifetimeToggle.Get()
     for _, box in ipairs({daysBox, hoursBox, minutesBox}) do
@@ -997,11 +1017,12 @@ local function applyLifetimeBlock()
     end
 end
 
-if lifetimeBtn then
-    lifetimeBtn.MouseButton1Click:Connect(function()
-        applyLifetimeBlock()
-    end)
-end
+lifetimeToggle.OnChange(function()
+    applyLifetimeBlock()
+end)
+
+-- применить сразу при создании
+applyLifetimeBlock()
 
 section(createPg, "ПАРАМЕТРЫ")
 
@@ -1236,20 +1257,20 @@ local function buildKeyCard(item)
         ZIndex = 2,
     }, card)
 
+    -- FIX 2: бейдж статуса с контрастным текстом
     local pill = create("TextLabel", {
-        Position = UDim2.new(1, -84, 0, 7),
-        Size = UDim2.new(0, 72, 0, 20),
+        Position = UDim2.new(1, -92, 0, 7),
+        Size = UDim2.new(0, 80, 0, 20),
         BackgroundColor3 = statusColor,
-        BackgroundTransparency = 0.75,
+        BackgroundTransparency = 0.15,
         Text = statusText,
-        TextColor3 = statusColor,
+        TextColor3 = getContrastText(statusColor),
         Font = Enum.Font.GothamBold,
         TextSize = 8,
         BorderSizePixel = 0,
         ZIndex = 2,
     }, card)
     addCorner(pill, 10)
-    addStroke(pill, statusColor, 1)
 
     local metaLabel = create("TextLabel", {
         Position = UDim2.new(0, 14, 0, 30),
@@ -1515,7 +1536,6 @@ createButton(adminPage, "ВОЙТИ", function()
 
     setStatus("Проверяем секрет...", nil)
 
-    -- FIX 1: проверяем наличие result.stats
     local result, err = apiRequest("/admin/stats", {}, secret)
 
     if not result or not result.stats then
@@ -1729,9 +1749,9 @@ UserInputService.InputEnded:Connect(function(input)
             bubble.Visible = false
             STATE.isBubbleVisible = false
             main.Visible = true
-            main.Size = UDim2.new(0, 340, 0, MINI_HEIGHT)
+            main.Size = UDim2.new(0, WINDOW_WIDTH, 0, MINI_HEIGHT)
             TweenService:Create(main, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-                { Size = UDim2.new(0, 340, 0, FULL_HEIGHT) }):Play()
+                { Size = UDim2.new(0, WINDOW_WIDTH, 0, FULL_HEIGHT) }):Play()
             updateScale()
         end
     end
@@ -1746,24 +1766,24 @@ bindButton(minimizeButton, function()
         statusBar.Visible = false
         nav.Visible = false
         TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Size = UDim2.new(0, 340, 0, MINI_HEIGHT) }):Play()
+            { Size = UDim2.new(0, WINDOW_WIDTH, 0, MINI_HEIGHT) }):Play()
         minimizeButton.Text = "+"
     else
         content.Visible = true
         statusBar.Visible = true
         nav.Visible = true
         TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-            { Size = UDim2.new(0, 340, 0, FULL_HEIGHT) }):Play()
+            { Size = UDim2.new(0, WINDOW_WIDTH, 0, FULL_HEIGHT) }):Play()
         minimizeButton.Text = "—"
     end
 end)
 
 bindButton(closeButton, function()
     TweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        { Size = UDim2.new(0, 300, 0, 400) }):Play()
+        { Size = UDim2.new(0, WINDOW_WIDTH - 40, 0, 400) }):Play()
     task.wait(0.2)
     main.Visible = false
-    main.Size = UDim2.new(0, 340, 0, FULL_HEIGHT)
+    main.Size = UDim2.new(0, WINDOW_WIDTH, 0, FULL_HEIGHT)
     bubble.Visible = true
     STATE.isBubbleVisible = true
     STATE.isMinimized = false
