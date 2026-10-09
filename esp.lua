@@ -6,10 +6,11 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2-COMPAT"
+local VERSION = "0.2-COMPAT-COMBAT-BOTS"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -25,6 +26,8 @@ pcall(function()
     local core = game:GetService("CoreGui")
     local old = core:FindFirstChild("RAHERHUB_01")
     if old then old:Destroy() end
+    local oldCombat = core:FindFirstChild("RAHERHUB_COMBAT_OVERLAY")
+    if oldCombat then oldCombat:Destroy() end
     local oldESP = core:FindFirstChild("RAHERHUB_ESP_OVERLAY")
     if oldESP then oldESP:Destroy() end
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -557,8 +560,8 @@ content = make("Frame", {
     BackgroundTransparency = 1
 }, main)
 
-local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "COMPAT", "EDIT", "SETTINGS", "ABOUT"}
-local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", COMPAT = "✓", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
+local tabNames = {"HOME", "MOVE", "COMBAT", "VISUAL", "TELEPORT", "COMPAT", "EDIT", "SETTINGS", "ABOUT"}
+local tabCaptions = {HOME = "⌂", MOVE = "↕", COMBAT = "◎", VISUAL = "◉", TELEPORT = "➤", COMPAT = "✓", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
 for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
@@ -692,7 +695,7 @@ local statusLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 30),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0,
-    Text = "RAHERHUB 0.2  |  MULTI-TOOL HUB  |  PRIVATE ALPHA",
+    Text = "RAHERHUB 0.2  |  MULTI-TOOL + COMBAT  |  PRIVATE ALPHA",
     TextColor3 = COLORS.green,
     TextSize = 10,
     Font = Enum.Font.GothamMedium,
@@ -2211,6 +2214,237 @@ makeActionButton(pages["SETTINGS"], "СОХРАНИТЬ ПРОФИЛЬ С НАЗ
     else profileMessage("Не удалось сохранить профиль в файл.", false) end
 end)
 makeActionButton(pages["SETTINGS"], "ОТКРЫТЬ СПИСОК ПРОФИЛЕЙ", openProfilePicker)
+
+-- COMBAT: player-like rigs and connected player characters for private testing.
+-- Targets include other Players and marked Workspace rigs; the local character is always excluded.
+section(pages["COMBAT"], "COMBAT · BOT TARGETING")
+infoCard(pages["COMBAT"], "Боты и игроки для тестирования", "Поиск включает персонажей других подключённых Players и помеченные модели в Workspace. Можно тестировать с другом; твой собственный персонаж не выбирается целью.")
+local combatAimEnabled, combatTriggerEnabled, combatFovEnabled, combatLockEnabled = false, false, true, false
+local combatFov, combatSmooth, combatRange = 140, 8, 300
+local combatStatus = make("TextLabel", {
+    Size = UDim2.new(1, -2, 0, 42), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
+    Text = "COMBAT: ОЖИДАНИЕ ЦЕЛИ", TextColor3 = COLORS.muted, TextSize = 10,
+    Font = Enum.Font.GothamBold, TextWrapped = true
+}, pages["COMBAT"])
+corner(combatStatus, 10)
+
+local combatOverlay = nil
+local combatCircle = nil
+pcall(function()
+    local core = game:GetService("CoreGui")
+    local old = core:FindFirstChild("RAHERHUB_COMBAT_OVERLAY")
+    if old then old:Destroy() end
+    combatOverlay = Instance.new("ScreenGui")
+    combatOverlay.Name = "RAHERHUB_COMBAT_OVERLAY"
+    combatOverlay.ResetOnSpawn = false
+    combatOverlay.IgnoreGuiInset = true
+    combatOverlay.DisplayOrder = 40
+    combatOverlay.Parent = core
+    combatCircle = Instance.new("Frame")
+    combatCircle.Name = "TrainingFOV"
+    combatCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+    combatCircle.Position = UDim2.fromScale(0.5, 0.5)
+    combatCircle.Size = UDim2.fromOffset(combatFov * 2, combatFov * 2)
+    combatCircle.BackgroundTransparency = 1
+    combatCircle.BorderSizePixel = 0
+    combatCircle.Visible = false
+    combatCircle.Parent = combatOverlay
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = COLORS.accent
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.12
+    stroke.Parent = combatCircle
+    local round = Instance.new("UICorner")
+    round.CornerRadius = UDim.new(1, 0)
+    round.Parent = combatCircle
+end)
+
+local function makeCombatSlider(labelText, minValue, maxValue, initialValue, callback)
+    local value = initialValue
+    local label = make("TextLabel", {
+        Size = UDim2.new(1, -2, 0, 18), BackgroundTransparency = 1,
+        Text = labelText .. ": " .. tostring(value), TextColor3 = COLORS.muted,
+        TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
+    }, pages["COMBAT"])
+    local track = make("TextButton", {
+        Size = UDim2.new(1, -2, 0, 26), BackgroundColor3 = COLORS.panel,
+        BorderSizePixel = 0, Text = "", AutoButtonColor = false
+    }, pages["COMBAT"])
+    corner(track, 10)
+    local bar = make("Frame", {
+        Position = UDim2.new(0, 8, 0.5, -2), Size = UDim2.new((value-minValue)/(maxValue-minValue), -16, 0, 4),
+        BackgroundColor3 = COLORS.accent, BorderSizePixel = 0
+    }, track)
+    corner(bar, 4)
+    local knob = make("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new((value-minValue)/(maxValue-minValue), 0, 0.5, 0),
+        Size = UDim2.fromOffset(14, 14), BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0
+    }, track)
+    corner(knob, 7)
+    local dragging = false
+    local function setFromX(x)
+        local width = math.max(1, track.AbsoluteSize.X)
+        local alpha = math.clamp((x - track.AbsolutePosition.X) / width, 0, 1)
+        value = math.floor(minValue + alpha * (maxValue-minValue) + 0.5)
+        label.Text = labelText .. ": " .. tostring(value)
+        local scale = (value-minValue)/(maxValue-minValue)
+        bar.Size = UDim2.new(scale, -16, 0, 4)
+        knob.Position = UDim2.new(scale, 0, 0.5, 0)
+        callback(value)
+    end
+    track.Activated:Connect(function(input)
+        setFromX(UserInputService:GetMouseLocation().X)
+    end)
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            setFromX(input.Position.X)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            setFromX(input.Position.X)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    end)
+    return function() return value end
+end
+
+local _, setCombatAim = makeToggle(pages["COMBAT"], "AIM ASSIST — игроки и боты", false, function(value)
+    combatAimEnabled = value
+end)
+local _, setCombatLock = makeToggle(pages["COMBAT"], "TARGET LOCK — удерживать выбранную цель", false, function(value)
+    combatLockEnabled = value
+end)
+local _, setCombatTrigger = makeToggle(pages["COMBAT"], "TRIGGER BOT — огонь по цели", false, function(value)
+    combatTriggerEnabled = value
+end)
+local _, setCombatFov = makeToggle(pages["COMBAT"], "ПОКАЗЫВАТЬ AIM FOV", true, function(value)
+    combatFovEnabled = value
+    if combatCircle then combatCircle.Visible = value end
+end)
+makeCombatSlider("FOV / радиус", 40, 350, combatFov, function(v)
+    combatFov = v
+    if combatCircle then combatCircle.Size = UDim2.fromOffset(v*2, v*2) end
+end)
+makeCombatSlider("Плавность наведения", 1, 20, combatSmooth, function(v) combatSmooth = v end)
+makeCombatSlider("Дальность цели", 50, 1000, combatRange, function(v) combatRange = v end)
+infoCard(pages["COMBAT"], "Поиск целей", "В цели попадают другие подключённые игроки и модели в Workspace с атрибутом RAHERHUB_Bot=true или тегом RAHERHUB_Bot. Собственный персонаж исключён.")
+makeActionButton(pages["COMBAT"], "СБРОСИТЬ COMBAT", function()
+    setCombatAim(false)
+    setCombatTrigger(false)
+    setCombatLock(false)
+    setCombatFov(true)
+    combatStatus.Text = "COMBAT: НАСТРОЙКИ СБРОШЕНЫ"
+    combatStatus.TextColor3 = COLORS.muted
+end)
+
+local combatLastTarget = nil
+local combatLastShot = 0
+local combatCandidates = {}
+local combatCandidateRefresh = 0
+local function isCombatBotModel(model)
+    if not model or not model:IsA("Model") then return false end
+    return model:GetAttribute("RAHERHUB_Bot") == true
+        or CollectionService:HasTag(model, "RAHERHUB_Bot")
+end
+local function refreshCombatCandidates()
+    local list, seen = {}, {}
+    -- Include every other connected player's character (for consensual private testing),
+    -- plus marked Workspace rigs that are not attached to a Player.
+    for _, player in ipairs(Players:GetPlayers()) do
+        local character = player.Character
+        if player ~= LocalPlayer and character and not seen[character] then
+            local part = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
+            if part and part:IsA("BasePart") then
+                table.insert(list, character)
+                seen[character] = true
+            end
+        end
+    end
+    for _, object in ipairs(workspace:GetDescendants()) do
+        if object:IsA("Model") and not seen[object] and isCombatBotModel(object) then
+            local part = object:FindFirstChild("Head") or object:FindFirstChild("HumanoidRootPart") or object.PrimaryPart
+            if part and part:IsA("BasePart") then
+                table.insert(list, object)
+                seen[object] = true
+            end
+        end
+    end
+    combatCandidates = list
+end
+local function getCombatTarget()
+    local camera = workspace.CurrentCamera
+    local character = LocalPlayer.Character
+    local localRoot = character and character:FindFirstChild("HumanoidRootPart")
+    if not camera or not localRoot then return nil, "Нет камеры или персонажа" end
+    local center = camera.ViewportSize / 2
+    local best, bestScore = nil, math.huge
+    for _, model in ipairs(combatCandidates) do
+        if model and model ~= character then
+            local targetPlayer = Players:GetPlayerFromCharacter(model)
+            local allowedTarget = (targetPlayer ~= nil and targetPlayer ~= LocalPlayer) or isCombatBotModel(model)
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            local part = model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+            if allowedTarget and (not hum or hum.Health > 0) and part and part:IsA("BasePart") then
+                local distance = (part.Position - localRoot.Position).Magnitude
+                local screen, onScreen = camera:WorldToViewportPoint(part.Position)
+                local offset = (Vector2.new(screen.X, screen.Y) - center).Magnitude
+                if onScreen and screen.Z > 0 and distance <= combatRange and offset <= combatFov and offset < bestScore then
+                    best, bestScore = {model = model, humanoid = hum, part = part, distance = distance, offset = offset}, offset
+                end
+            end
+        end
+    end
+    return best, best and nil or "Нет цели в FOV / заданной дальности"
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    if combatCircle then
+        local camera = workspace.CurrentCamera
+        if camera then combatCircle.Position = UDim2.fromOffset(camera.ViewportSize.X/2, camera.ViewportSize.Y/2) end
+        combatCircle.Visible = combatFovEnabled
+        combatCircle.Size = UDim2.fromOffset(combatFov*2, combatFov*2)
+    end
+    if os.clock() - combatCandidateRefresh >= 0.5 then
+        combatCandidateRefresh = os.clock()
+        pcall(refreshCombatCandidates)
+    end
+    if not combatAimEnabled and not combatTriggerEnabled then
+        if combatStatus and combatStatus.Parent then
+            combatStatus.Text = "COMBAT: " .. (combatFovEnabled and "FOV ГОТОВ · ожидание цели" or "ВЫКЛЮЧЕН")
+            combatStatus.TextColor3 = COLORS.muted
+        end
+        combatLastTarget = nil
+        return
+    end
+    local target, reason = getCombatTarget()
+    if not target then
+        combatLastTarget = nil
+        combatStatus.Text = "COMBAT: " .. (reason or "цель не найдена")
+        combatStatus.TextColor3 = Color3.fromRGB(255, 190, 70)
+        return
+    end
+    combatLastTarget = target.model
+    combatStatus.Text = string.format("ЦЕЛЬ: %s · %.0f studs · FOV %.0f", target.model.Name, target.distance, target.offset)
+    combatStatus.TextColor3 = COLORS.green
+    local camera = workspace.CurrentCamera
+    if combatAimEnabled and camera then
+        local desired = CFrame.lookAt(camera.CFrame.Position, target.part.Position)
+        local alpha = combatLockEnabled and 1 or math.clamp((22 / combatSmooth) * math.max(dt, 1/240), 0, 1)
+        camera.CFrame = camera.CFrame:Lerp(desired, alpha)
+    end
+    if combatTriggerEnabled and target.offset <= math.max(8, combatFov * 0.08) and os.clock() - combatLastShot >= 0.22 then
+        local character = LocalPlayer.Character
+        local tool = character and character:FindFirstChildOfClass("Tool")
+        if tool then
+            combatLastShot = os.clock()
+            pcall(function() tool:Activate() end)
+        end
+    end
+end)
 
 -- UNIVERSAL COMPATIBILITY DIAGNOSTICS
 -- Observes client-visible state only. It does not bypass server authority or anti-cheat.
