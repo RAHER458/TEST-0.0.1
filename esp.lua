@@ -1327,31 +1327,16 @@ local triggerBotEnabled = false
 local triggerBotLastShot = 0
 local triggerBotCooldown = 0.14
 local triggerBotRange = 1000
--- Aim-assist controls: radius is measured in screen pixels from the crosshair;
--- speed controls how quickly the camera rotates toward a target inside that radius.
-local triggerAimEnabled = false
-local triggerAimRadius = 120
-local triggerAimSpeed = 12
 local triggerBotToggleSetter
 local _, triggerBotToggleSetterLocal = makeToggle(pages["VISUAL"], "TRIGGERBOT: ИГРОКИ + БОТЫ", false, function(value)
     triggerBotEnabled = value
     triggerBotLastShot = 0
 end)
 triggerBotToggleSetter = triggerBotToggleSetterLocal
-infoCard(pages["VISUAL"], "TRIGGERBOT", "Автоматически активирует экипированное оружие при наведении на живого игрока или NPC. Игроки, включая союзников, тоже являются целями для тестирования.")
-local _, triggerAimToggleSetter = makeToggle(pages["VISUAL"], "НАВЕДЕНИЕ: ИГРОКИ + NPC", false, function(value)
-    triggerAimEnabled = value
-end)
-createSettingSlider(pages["VISUAL"], "Скорость наведения", 1, 30, triggerAimSpeed, function(v) return tostring(v) end, function(value)
-    triggerAimSpeed = value
-end)
-createSettingSlider(pages["VISUAL"], "Радиус прицела", 20, 400, triggerAimRadius, function(v) return tostring(v) .. " px" end, function(value)
-    triggerAimRadius = value
-end)
-infoCard(pages["VISUAL"], "НАВЕДЕНИЕ", "Радиус задаёт область вокруг центра прицела. Скорость 1 — плавно, 30 — быстро. Наведение и автосрабатывание можно включать независимо.")
+infoCard(pages["VISUAL"], "TRIGGERBOT", "Автоматически активирует экипированное оружие при наведении по центру экрана на живого игрока или NPC. Игроки, включая союзников, тоже являются целями для тестирования.")
 
-RunService.Heartbeat:Connect(function(dt)
-    if not triggerBotEnabled and not triggerAimEnabled then return end
+RunService.Heartbeat:Connect(function()
+    if not triggerBotEnabled then return end
     local now = os.clock()
     if now - triggerBotLastShot < triggerBotCooldown then return end
 
@@ -1369,43 +1354,7 @@ RunService.Heartbeat:Connect(function(dt)
     if not tool then return end
 
     local viewport = camera.ViewportSize
-    local center = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
-
-    -- Choose the closest valid living player/NPC inside the adjustable screen radius.
-    if triggerAimEnabled then
-        local bestPart, bestDistance
-        local function considerModel(model, isPlayerTarget)
-            if not model or model == character or not model.Parent then return end
-            if not isPlayerTarget and isAllyNPC(model) then return end
-            local targetHumanoid = model:FindFirstChildOfClass("Humanoid")
-            if not targetHumanoid or targetHumanoid.Health <= 0 then return end
-            local part = model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
-            if not part or not part:IsA("BasePart") then return end
-            local point, onScreen = camera:WorldToViewportPoint(part.Position)
-            if not onScreen or point.Z <= 0 then return end
-            local distance = (Vector2.new(point.X, point.Y) - center).Magnitude
-            if distance <= triggerAimRadius and (not bestDistance or distance < bestDistance) then
-                bestPart, bestDistance = part, distance
-            end
-        end
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character then considerModel(player.Character, true) end
-        end
-        for _, instance in ipairs(workspace:GetDescendants()) do
-            if instance:IsA("Humanoid") then
-                local model = instance.Parent
-                if model and model:IsA("Model") and not isPlayerCharacterModel(model) then considerModel(model, false) end
-            end
-        end
-        if bestPart then
-            local desired = CFrame.lookAt(camera.CFrame.Position, bestPart.Position)
-            local alpha = 1 - math.exp(-triggerAimSpeed * math.max(dt or 1/60, 1/240))
-            camera.CFrame = camera.CFrame:Lerp(desired, math.clamp(alpha, 0, 1))
-        end
-    end
-
-    if not triggerBotEnabled then return end
-    local ray = camera:ViewportPointToRay(center.X, center.Y)
+    local ray = camera:ViewportPointToRay(viewport.X * 0.5, viewport.Y * 0.5)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = {character}
