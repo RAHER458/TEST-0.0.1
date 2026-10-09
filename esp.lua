@@ -132,7 +132,7 @@ local main = make("Frame", {
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
-main.Size = UDim2.fromOffset(390, 500)
+main.Size = UDim2.fromOffset(310, 440)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
 stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
@@ -145,9 +145,9 @@ local function fitPanel()
     if not camera then return end
     local viewport = camera.ViewportSize
     if compactMode then
-        main.Size = UDim2.fromOffset(math.max(280, math.min(520, viewport.X - 24)), math.max(340, math.min(560, viewport.Y - 48)))
+        main.Size = UDim2.fromOffset(math.min(252, viewport.X - 20), math.min(326, viewport.Y - 60))
     else
-        main.Size = UDim2.fromOffset(math.max(280, math.min(520, viewport.X - 24)), math.max(340, math.min(560, viewport.Y - 48)))
+        main.Size = UDim2.fromOffset(math.min(310, viewport.X - 20), math.min(440, viewport.Y - 60))
     end
 end
 fitPanel()
@@ -352,7 +352,7 @@ local function applyMenuLayout()
     header.Size = UDim2.new(1, 0, 0, compactMode and 50 or 58)
     title.Position = UDim2.new(0, 11, 0, 5)
     title.Size = UDim2.new(1, -112, 0, 29)
-    title.TextSize = compactMode and 17 or 20
+    title.TextSize = compactMode and 18 or 21
     subtitle.Visible = not compactMode
     compactButton.Position = UDim2.new(1, compactMode and -45 or -48, 0, compactMode and 7 or 9)
     minimize.Position = UDim2.new(1, compactMode and -7 or -8, 0, compactMode and 7 or 9)
@@ -360,14 +360,16 @@ local function applyMenuLayout()
     minimize.Size = UDim2.fromOffset(compactMode and 31 or 34, compactMode and 31 or 34)
     compactButton.Text = compactMode and "↗" or "▣"
     -- Persistent left navigation rail: category names stay in one place on every page.
-    tabsBar.Position = UDim2.new(0, 7, 0, compactMode and 56 or 64)
-    tabsBar.Size = UDim2.new(0, 46, 1, compactMode and -64 or -72)
-    content.Position = UDim2.new(0, 60, 0, compactMode and 56 or 64)
-    content.Size = UDim2.new(1, -68, 1, compactMode and -64 or -72)
-    tabLayout.Padding = UDim.new(0, 7)
+    tabsBar.Position = UDim2.new(0, 8, 0, compactMode and 58 or 66)
+    tabsBar.Size = UDim2.new(0, 78, 1, compactMode and -66 or -76)
+    content.Position = UDim2.new(0, 94, 0, compactMode and 58 or 66)
+    content.Size = UDim2.new(1, -102, 1, compactMode and -66 or -76)
+    tabLayout.Padding = UDim.new(0, 5)
+    tabsBar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    tabsBar.CanvasSize = UDim2.new(0, 0, 0, 0)
     for _, button in pairs(tabButtons or {}) do
-        button.Size = UDim2.new(1, 0, 0, compactMode and 34 or 42)
-        button.TextSize = compactMode and 17 or 20
+        button.Size = UDim2.new(1, -5, 0, compactMode and 35 or 39)
+        button.TextSize = compactMode and 20 or 22
         button.TextXAlignment = Enum.TextXAlignment.Center
     end
     for _, page in pairs(pages or {}) do
@@ -459,9 +461,9 @@ openMainFromLauncher = function()
     main.Size = UDim2.fromOffset(40, 40)
     main.BackgroundTransparency = 1
     main.Visible = true
-    local targetSize = compactMode and UDim2.fromOffset(390, 500) or UDim2.fromOffset(390, 500)
+    local targetSize = compactMode and UDim2.fromOffset(252, 326) or UDim2.fromOffset(310, 440)
     local camera = workspace.CurrentCamera
-    if camera then targetSize = UDim2.fromOffset(math.min(520, camera.ViewportSize.X - 24), math.min(560, camera.ViewportSize.Y - 48)) end
+    if camera then targetSize = UDim2.fromOffset(math.min(targetSize.X.Offset, camera.ViewportSize.X - 20), math.min(targetSize.Y.Offset, camera.ViewportSize.Y - 60)) end
     local tween = TweenService:Create(main, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Size = targetSize, BackgroundTransparency = 0
     })
@@ -499,10 +501,17 @@ do
     end)
 end
 
-tabsBar = make("Frame", {
-    Position = UDim2.new(0, 12, 0, 86),
-    Size = UDim2.new(1, -24, 0, 44),
-    BackgroundTransparency = 1
+tabsBar = make("ScrollingFrame", {
+    Position = UDim2.new(0, 8, 0, 66),
+    Size = UDim2.new(0, 78, 1, -76),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    ScrollingDirection = Enum.ScrollingDirection.Y,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = COLORS.accent,
+    ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
 }, main)
 tabLayout = make("UIListLayout", {
     FillDirection = Enum.FillDirection.Vertical,
@@ -522,16 +531,16 @@ content = make("Frame", {
 }, main)
 
 local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "EDIT", "SETTINGS", "ABOUT"}
-local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "⌖", EDIT = "✎", SETTINGS = "⚙", ABOUT = "ⓘ"}
+local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
 for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
-        Size = UDim2.new(1, 0, 0, 35),
+        Size = UDim2.new(1, -5, 0, 39),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = tabCaptions[tabName] or tabName,
         TextColor3 = COLORS.muted,
-        TextSize = 20,
+        TextSize = 22,
         TextXAlignment = Enum.TextXAlignment.Center,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true,
@@ -620,30 +629,29 @@ end
 
 local function infoCard(parent, heading, body)
     local card = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 84),
+        Size = UDim2.new(1, -2, 0, 70),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
     corner(card, 13)
     make("TextLabel", {
         Position = UDim2.new(0, 13, 0, 10),
-        Size = UDim2.new(1, -26, 0, 24),
+        Size = UDim2.new(1, -26, 0, 22),
         BackgroundTransparency = 1,
         Text = heading,
         TextColor3 = COLORS.text,
-        TextSize = 12,
-        TextWrapped = true,
+        TextSize = 13,
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left
     }, card)
     make("TextLabel", {
-        Position = UDim2.new(0, 10, 0, 35),
-        Size = UDim2.new(1, -20, 0, 42),
+        Position = UDim2.new(0, 10, 0, 31),
+        Size = UDim2.new(1, -20, 0, 34),
         BackgroundTransparency = 1,
         Text = body,
         TextWrapped = true,
         TextColor3 = COLORS.muted,
-        TextSize = 11,
+        TextSize = 10,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top
@@ -665,19 +673,18 @@ corner(statusLabel, 11)
 
 section(pages["HOME"], "ПАНЕЛЬ УПРАВЛЕНИЯ")
 infoCard(pages["HOME"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
-infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Слева выбери значок: ↕ движение, ◉ подсветка, ⌖ точки, ✎ редактор, ⚙ настройки.")
+infoCard(pages["HOME"], "БЫСТРЫЙ СТАРТ", "Используйте левое меню: MOVE — движение, VISUAL — подсветка, TP — точки, EDIT — размещение кнопки FLY.")
 infoCard(pages["HOME"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохраняются на устройстве, если среда поддерживает работу с файлами.")
 
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
-        Size = UDim2.new(1, -2, 0, height or 44),
+        Size = UDim2.new(1, -2, 0, height or 38),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = text,
         TextColor3 = COLORS.text,
-        TextSize = 11,
-        TextWrapped = true,
+        TextSize = 12,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true
     }, parent)
@@ -690,7 +697,7 @@ local function makeToggle(parent, label, initial, callback)
     local enabled = initial or false
     local button
     local function paint()
-        button.Text = label .. "  •  " .. (enabled and "ВКЛ" or "ВЫКЛ")
+        button.Text = label .. "     [" .. (enabled and "ВКЛ" or "ВЫКЛ") .. "]"
         button.BackgroundColor3 = enabled and COLORS.green or COLORS.button
     end
     button = makeActionButton(parent, "", function()
@@ -1341,7 +1348,7 @@ section(pages["EDIT"], "РЕДАКТОР ЭЛЕМЕНТОВ")
 infoCard(pages["EDIT"], "Перемещение кнопки FLY", "Включи режим редактирования, затем перетащи кнопку FLY в удобное место. Отключи режим, чтобы снова использовать полёт.")
 section(pages["ABOUT"], "О ПРОЕКТЕ")
 infoCard(pages["ABOUT"], "RAHERHUB 0.1", "Личная сборка. Версия 0.1 остаётся до начала альфа-тестирования.")
-infoCard(pages["ABOUT"], "Навигация", "⌂ обзор; ↕ скорость, полёт и noclip; ◉ ESP; ⌖ точки; ✎ редактор; ⚙ оформление; ⓘ информация.")
+infoCard(pages["ABOUT"], "Навигация", "HOME — обзор; MOVE — скорость, полёт и noclip; VISUAL — ESP; TP — точки; EDIT — размещение кнопки; SET — оформление.")
 infoCard(pages["ABOUT"], "Совместимость", "Некоторые функции зависят от доступных возможностей среды и прав в текущем Roblox-проекте.")
 
 refreshPoints()
