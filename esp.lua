@@ -1,4 +1,4 @@
--- RAHERHUB 0.2 | MULTI-TOOL HUB | Private testing UI
+-- RAHERHUB 0.2 | MULTI-TOOL HUB + ROBLOX RESOLVER LAB | Private testing UI
 -- Intended for use in your own Roblox place / authorized test environment.
 -- No registration, license checks, accounts, or external HTTP requests.
 
@@ -557,8 +557,8 @@ content = make("Frame", {
     BackgroundTransparency = 1
 }, main)
 
-local tabNames = {"HOME", "MOVE", "VISUAL", "TELEPORT", "EDIT", "SETTINGS", "ABOUT"}
-local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", TELEPORT = "➤", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
+local tabNames = {"HOME", "MOVE", "VISUAL", "RESOLVER", "TELEPORT", "EDIT", "SETTINGS", "ABOUT"}
+local tabCaptions = {HOME = "⌂", MOVE = "↕", VISUAL = "◉", RESOLVER = "R", TELEPORT = "➤", EDIT = "✚", SETTINGS = "⚙", ABOUT = "i"}
 for tabIndex, tabName in ipairs(tabNames) do
     local tab = make("TextButton", {
         Name = tabName .. "Tab",
@@ -747,6 +747,136 @@ local function makeToggle(parent, label, initial, callback)
     table.insert(toggleRegistry, {label = label, get = function() return enabled end, set = setValue})
     return button, setValue
 end
+
+-- Roblox Resolver Lab: observational movement/yaw diagnostics only.
+-- It does not alter aim, hit registration, remote calls, or another player's state.
+section(pages["RESOLVER"], "ROBLOX MOVEMENT / ROTATION ANALYSIS")
+infoCard(pages["RESOLVER"], "RESOLVER LAB", "Анализирует только доступные клиенту CFrame, скорость и Humanoid-состояния. Это прогноз движения, не восстановление скрытого серверного угла.")
+local resolverEnabled = false
+local resolverPredictionMs = 150
+local resolverRows = {}
+local resolverHistory = {}
+local resolverLastUpdate = 0
+local resolverList = make("Frame", {
+    Name = "ResolverResults", Size = UDim2.new(1, -2, 0, 8), AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundTransparency = 1, BorderSizePixel = 0
+}, pages["RESOLVER"])
+make("UIListLayout", {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder}, resolverList)
+local resolverSummary = make("TextLabel", {
+    LayoutOrder = 1, Size = UDim2.new(1, -2, 0, 32), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0,
+    Text = "ОЖИДАНИЕ ЗАПУСКА АНАЛИЗА", TextColor3 = COLORS.muted, TextSize = 10,
+    Font = Enum.Font.GothamBold, TextWrapped = true
+}, pages["RESOLVER"])
+corner(resolverSummary, 10)
+resolverList.LayoutOrder = 2
+local function resolverClearRows()
+    for _, row in pairs(resolverRows) do if row and row.Parent then row:Destroy() end end
+    table.clear(resolverRows)
+end
+local function resolverWrapAngle(degrees)
+    return (degrees + 180) % 360 - 180
+end
+local function resolverYaw(root)
+    local look = root.CFrame.LookVector
+    return math.deg(math.atan2(-look.X, -look.Z))
+end
+local function resolverState(humanoid, velocity)
+    if humanoid.FloorMaterial == Enum.Material.Air then
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.Freefall or velocity.Y < -2 then return "FALLING" end
+        if state == Enum.HumanoidStateType.Jumping or velocity.Y > 2 then return "JUMPING" end
+        return "AIRBORNE"
+    end
+    if Vector3.new(velocity.X, 0, velocity.Z).Magnitude > 0.75 then return "MOVING" end
+    return "STANDING"
+end
+local function resolverRender()
+    if not resolverEnabled then return end
+    local now = os.clock()
+    if now - resolverLastUpdate < 0.12 then return end
+    resolverLastUpdate = now
+    local present = {}
+    local count = 0
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if root and humanoid and humanoid.Health > 0 then
+                present[player] = true
+                count += 1
+                local pos = root.Position
+                local yaw = resolverYaw(root)
+                local velocity = root.AssemblyLinearVelocity
+                local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+                local state = resolverState(humanoid, velocity)
+                local previous = resolverHistory[player]
+                local dt = previous and math.max(now - previous.time, 0.001) or 0
+                local measuredVelocity = previous and (pos - previous.pos) / dt or velocity
+                local yawRate = previous and resolverWrapAngle(yaw - previous.yaw) / dt or 0
+                local predictionVelocity = velocity
+                if predictionVelocity.Magnitude < 0.05 and previous and dt > 0 then predictionVelocity = measuredVelocity end
+                local horizon = resolverPredictionMs / 1000
+                local predicted = pos + predictionVelocity * horizon
+                -- Confidence measures consistency of available samples, not server truth.
+                local confidence = previous and math.clamp(100 - math.abs(speed - Vector3.new(measuredVelocity.X, 0, measuredVelocity.Z).Magnitude) * 5 - math.abs(yawRate) * 0.03, 0, 99) or 25
+                resolverHistory[player] = {pos = pos, yaw = yaw, time = now}
+                local row = resolverRows[player]
+                if not row or not row.Parent then
+                    row = make("TextLabel", {
+                        Name = "Resolver_" .. tostring(player.UserId), Size = UDim2.new(1, -2, 0, 69),
+                        BackgroundColor3 = COLORS.panel, BorderSizePixel = 0, Text = "", TextColor3 = COLORS.text,
+                        TextSize = 9, Font = Enum.Font.Code, TextWrapped = true,
+                        TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
+                        LayoutOrder = count
+                    }, resolverList)
+                    corner(row, 9)
+                    resolverRows[player] = row
+                end
+                row.LayoutOrder = count
+                row.Text = string.format("%s  |  %s\nDIST %.1f  |  SPEED %.1f studs/s\nYAW %+.1f°  |  TURN %+.1f°/s\nPRED %+.1f, %+.1f, %+.1f  |  CONF %.0f%%",
+                    string.sub(player.DisplayName or player.Name, 1, 18), state,
+                    (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - pos).Magnitude or 0),
+                    speed, yaw, yawRate, predicted.X, predicted.Y, predicted.Z, confidence)
+            end
+        end
+    end
+    for player, row in pairs(resolverRows) do
+        if not present[player] then if row and row.Parent then row:Destroy() end; resolverRows[player] = nil; resolverHistory[player] = nil end
+    end
+    resolverSummary.Text = string.format("АНАЛИЗ АКТИВЕН  |  ЦЕЛЕЙ: %d  |  ИНТЕРВАЛ: 120 мс  |  ПРОГНОЗ: %d мс", count, resolverPredictionMs)
+    if count == 0 then resolverSummary.Text = "АНАЛИЗ АКТИВЕН — ДРУГИЕ ПЕРСОНАЖИ НЕ НАЙДЕНЫ" end
+end
+makeToggle(pages["RESOLVER"], "Анализ движения и поворотов", false, function(value)
+    resolverEnabled = value
+    if not value then
+        resolverSummary.Text = "АНАЛИЗ ОСТАНОВЛЕН"
+        resolverClearRows()
+        table.clear(resolverHistory)
+    else
+        resolverSummary.Text = "СБОР НАЧАЛЬНЫХ НАБЛЮДЕНИЙ…"
+        resolverLastUpdate = 0
+    end
+end)
+makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 50 мс", function() resolverPredictionMs = 50 end)
+makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 100 мс", function() resolverPredictionMs = 100 end)
+makeActionButton(pages["RESOLVER"], "ПРОГНОЗ: 150 мс", function() resolverPredictionMs = 150 end)
+makeActionButton(pages["RESOLVER"], "ОЧИСТИТЬ ИСТОРИЮ", function()
+    table.clear(resolverHistory)
+    resolverSummary.Text = "ИСТОРИЯ ОЧИЩЕНА — СОБИРАЮ НОВЫЕ НАБЛЮДЕНИЯ"
+end)
+RunService.Heartbeat:Connect(function()
+    if resolverEnabled then
+        local ok, err = pcall(resolverRender)
+        if not ok then resolverSummary.Text = "ОШИБКА АНАЛИЗА: " .. tostring(err):sub(1, 100) end
+    end
+end)
+Players.PlayerRemoving:Connect(function(player)
+    resolverHistory[player] = nil
+    local row = resolverRows[player]
+    if row and row.Parent then row:Destroy() end
+    resolverRows[player] = nil
+end)
 
 section(pages["MOVE"], "ДВИЖЕНИЕ И ПЕРЕМЕЩЕНИЕ")
 infoCard(pages["MOVE"], "Инструменты тестирования", "Используйте инструменты только в своей игре или там, где у вас есть разрешение.")
