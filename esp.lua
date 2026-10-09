@@ -22,8 +22,30 @@ local CONFIG_FILE = "raherhub_02_config.json"
 
 -- Remove an older copy if the script is re-run.
 pcall(function()
-    local old = game:GetService("CoreGui"):FindFirstChild("RAHERHUB_01")
+    local core = game:GetService("CoreGui")
+    local old = core:FindFirstChild("RAHERHUB_01")
     if old then old:Destroy() end
+    local oldESP = core:FindFirstChild("RAHERHUB_ESP_OVERLAY")
+    if oldESP then oldESP:Destroy() end
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if playerGui then
+        local oldPlayerESP = playerGui:FindFirstChild("RAHERHUB_ESP_OVERLAY")
+        if oldPlayerESP then oldPlayerESP:Destroy() end
+    end
+    -- BillboardGui boxes live beside ScreenGui in CoreGui/PlayerGui, so clean
+    -- those siblings too when the script is rerun.
+    for _, container in ipairs({core, playerGui}) do
+        if container then
+            for _, child in ipairs(container:GetChildren()) do
+                if child.Name:match("^RaherESPBox_") then pcall(function() child:Destroy() end) end
+            end
+        end
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        local character = player.Character
+        local oldChams = character and character:FindFirstChild("RaherESPChams")
+        if oldChams then pcall(function() oldChams:Destroy() end) end
+    end
 end)
 
 local function make(className, props, parent)
@@ -800,8 +822,8 @@ LocalPlayer.CharacterAdded:Connect(function()
     if speedEnabled then applyWalkSpeed() end
 end)
 
--- ESP suite: chams/highlight, projected boxes and screen tracers.
--- Visual overlays are client-side and intended for authorized testing.
+-- ESP suite: independent defaults, BillboardGui boxes, and screen-space tracers.
+-- Every ESP sub-feature starts OFF and is controlled independently.
 local espEnabled = false
 local espObjects = {}
 local espCharacterConnections = {}
@@ -821,6 +843,15 @@ local espPalette = {
 local function currentESPColor()
     return espPalette[espColorIndex].color
 end
+
+-- Keep ESP drawings above the hub UI. BillboardGui boxes are parented here too.
+local espGui = make("ScreenGui", {
+    Name = "RAHERHUB_ESP_OVERLAY", ResetOnSpawn = false,
+    IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Global,
+    DisplayOrder = 100000
+})
+safeParentGui(espGui)
+
 local function removeESP(player)
     local object = espObjects[player]
     if object then pcall(function() object:Destroy() end) end
@@ -829,27 +860,39 @@ end
 local function removeESPVisual(player)
     local visual = espVisuals[player]
     if visual then
-        if visual.box then visual.box:Destroy() end
-        if visual.line then visual.line:Destroy() end
+        if visual.boxGui then pcall(function() visual.boxGui:Destroy() end) end
+        if visual.line then pcall(function() visual.line:Destroy() end) end
     end
     espVisuals[player] = nil
 end
 local function ensureESPVisual(player)
     if player == LocalPlayer then return nil end
     local visual = espVisuals[player]
-    if visual and visual.box and visual.box.Parent and visual.line and visual.line.Parent then return visual end
+    if visual and visual.boxGui and visual.boxGui.Parent and visual.line and visual.line.Parent then return visual end
     removeESPVisual(player)
+
+    -- A BillboardGui follows the character in world space, avoiding fragile
+    -- screen-projected 3D corner calculations for the box itself.
+    local boxGui = make("BillboardGui", {
+        Name = "RaherESPBox_" .. tostring(player.UserId),
+        Size = UDim2.fromOffset(76, 118),
+        StudsOffsetWorldSpace = Vector3.new(0, 0.35, 0),
+        AlwaysOnTop = true, LightInfluence = 0, Enabled = false,
+        MaxDistance = 100000
+    }, espGui.Parent or LocalPlayer:WaitForChild("PlayerGui"))
     local box = make("Frame", {
-        Name = "RaherESPBox_" .. player.UserId, BackgroundTransparency = 1,
-        BorderSizePixel = 0, Visible = false, Active = false, ZIndex = 5000
-    }, gui)
+        Name = "Outline", Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1, BorderSizePixel = 0,
+        Active = false, ZIndex = 10
+    }, boxGui)
     local boxStroke = stroke(box, currentESPColor(), 1.5, 0)
     local line = make("Frame", {
-        Name = "RaherESPLine_" .. player.UserId, AnchorPoint = Vector2.new(0.5, 0.5),
-        BackgroundColor3 = currentESPColor(), BorderSizePixel = 0, Visible = false,
-        Active = false, ZIndex = 5000
-    }, gui)
-    visual = {box = box, boxStroke = boxStroke, line = line}
+        Name = "RaherESPLine_" .. tostring(player.UserId),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = currentESPColor(), BorderSizePixel = 0,
+        Visible = false, Active = false, ZIndex = 100000
+    }, espGui)
+    visual = {boxGui = boxGui, box = box, boxStroke = boxStroke, line = line}
     espVisuals[player] = visual
     return visual
 end
@@ -863,18 +906,32 @@ local function refreshESPColors()
         if highlight and highlight.Parent then
             highlight.FillColor = color
             highlight.OutlineColor = color
-            highlight.Enabled = espChamsEnabled
+            highlight.Enabled = espEnabled and espChamsEnabled
         end
     end
 end
 local function createESP(player)
     if not espEnabled or player == LocalPlayer then return end
     local character = player.Character
-    if not character or not character.Parent then
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not character or not character.Parent or not root or not humanoid or humanoid.Health <= 0 then
         removeESP(player)
-        removeESPVisual(player)
+        local oldVisual = espVisuals[player]
+        if oldVisual then
+            if oldVisual.boxGui then oldVisual.boxGui.Enabled = false end
+            if oldVisual.line then oldVisual.line.Visible = false end
+        end
         return
     end
+
+    local visual = ensureESPVisual(player)
+    if visual then
+        visual.boxGui.Adornee = root
+        visual.boxGui.Enabled = espEnabled and espBoxesEnabled
+        visual.boxStroke.Color = currentESPColor()
+    end
+
     if espChamsEnabled then
         local existing = espObjects[player]
         if not (existing and existing.Parent and existing.Adornee == character) then
@@ -887,6 +944,7 @@ local function createESP(player)
             highlight.OutlineTransparency = 0
             highlight.Adornee = character
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Enabled = true
             highlight.Parent = character
             espObjects[player] = highlight
         else
@@ -897,17 +955,18 @@ local function createESP(player)
     else
         removeESP(player)
     end
-    ensureESPVisual(player)
 end
 local function bindESPPlayer(player)
     if player == LocalPlayer or espCharacterConnections[player] then return end
     espCharacterConnections[player] = player.CharacterAdded:Connect(function(character)
         task.spawn(function()
-            for _ = 1, 20 do
+            for _ = 1, 40 do
                 if not espEnabled or player.Parent ~= Players then return end
-                if player.Character == character and character.Parent then
+                if player.Character == character and character.Parent
+                    and character:FindFirstChild("HumanoidRootPart")
+                    and character:FindFirstChildOfClass("Humanoid") then
                     createESP(player)
-                    if (not espChamsEnabled) or (espObjects[player] and espObjects[player].Adornee == character) then return end
+                    return
                 end
                 task.wait(0.25)
             end
@@ -918,12 +977,17 @@ end
 local function updateESP()
     if espEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
-            bindESPPlayer(player)
-            createESP(player)
+            if player ~= LocalPlayer then
+                bindESPPlayer(player)
+                createESP(player)
+            end
         end
     else
         for player in pairs(espObjects) do removeESP(player) end
-        for player in pairs(espVisuals) do removeESPVisual(player) end
+        for player, visual in pairs(espVisuals) do
+            if visual.boxGui then visual.boxGui.Enabled = false end
+            if visual.line then visual.line.Visible = false end
+        end
     end
 end
 Players.PlayerAdded:Connect(function(player)
@@ -939,12 +1003,17 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 for _, player in ipairs(Players:GetPlayers()) do bindESPPlayer(player) end
 
--- Draw box outlines and tracers from the character's projected 3D bounds.
+-- Lines are drawn in screen space from the bottom-center to each player's root.
 local lastESPReconcile = 0
 RunService.RenderStepped:Connect(function()
-    if not espEnabled then return end
     local camera = workspace.CurrentCamera
-    if not camera then return end
+    if not espEnabled or not camera then
+        for _, visual in pairs(espVisuals) do
+            if visual.boxGui then visual.boxGui.Enabled = false end
+            if visual.line then visual.line.Visible = false end
+        end
+        return
+    end
     local viewport = camera.ViewportSize
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
@@ -954,50 +1023,28 @@ RunService.RenderStepped:Connect(function()
             local visual = ensureESPVisual(player)
             if visual then
                 local valid = root and humanoid and humanoid.Health > 0 and character.Parent
-                local visible = false
-                local minX, minY, maxX, maxY
-                if valid then
-                    local ok, cf, size = pcall(function() return character:GetBoundingBox() end)
-                    if ok and cf and size then
-                        minX, minY = math.huge, math.huge
-                        maxX, maxY = -math.huge, -math.huge
-                        local allInFront = false
-                        for _, x in ipairs({-1, 1}) do
-                            for _, y in ipairs({-1, 1}) do
-                                for _, z in ipairs({-1, 1}) do
-                                    local worldPoint = cf:PointToWorldSpace(Vector3.new(size.X*x/2, size.Y*y/2, size.Z*z/2))
-                                    local point, onScreen = camera:WorldToViewportPoint(worldPoint)
-                                    if point.Z > 0 then
-                                        allInFront = true
-                                        minX, minY = math.min(minX, point.X), math.min(minY, point.Y)
-                                        maxX, maxY = math.max(maxX, point.X), math.max(maxY, point.Y)
-                                    end
-                                end
-                            end
-                        end
-                        visible = allInFront and maxX > 0 and minX < viewport.X and maxY > 0 and minY < viewport.Y
+                visual.boxGui.Adornee = valid and root or nil
+                visual.boxGui.Enabled = valid and espBoxesEnabled or false
+                visual.boxStroke.Color = currentESPColor()
+                local showLine = false
+                if valid and espLinesEnabled then
+                    local point = camera:WorldToViewportPoint(root.Position)
+                    showLine = point.Z > 0 and point.X >= 0 and point.X <= viewport.X and point.Y >= 0 and point.Y <= viewport.Y
+                    if showLine then
+                        local fromX, fromY = viewport.X / 2, viewport.Y - 2
+                        local toX, toY = point.X, point.Y
+                        local dx, dy = toX - fromX, toY - fromY
+                        visual.line.Position = UDim2.fromOffset((fromX + toX) / 2, (fromY + toY) / 2)
+                        visual.line.Size = UDim2.fromOffset(math.max(1, math.sqrt(dx*dx + dy*dy)), 2)
+                        visual.line.Rotation = math.deg(math.atan2(dy, dx))
+                        visual.line.BackgroundColor3 = currentESPColor()
                     end
                 end
-                local show = visible
-                visual.box.Visible = show and espBoxesEnabled
-                visual.line.Visible = show and espLinesEnabled
-                if show then
-                    local width, height = math.max(2, maxX-minX), math.max(2, maxY-minY)
-                    visual.box.Position = UDim2.fromOffset(minX, minY)
-                    visual.box.Size = UDim2.fromOffset(width, height)
-                    visual.line.BackgroundColor3 = currentESPColor()
-                    local fromX, fromY = viewport.X/2, viewport.Y-2
-                    local toX, toY = (minX+maxX)/2, maxY
-                    local dx, dy = toX-fromX, toY-fromY
-                    visual.line.Position = UDim2.fromOffset((fromX + toX) / 2, (fromY + toY) / 2)
-                    visual.line.Size = UDim2.fromOffset(math.sqrt(dx*dx+dy*dy), 2)
-                    visual.line.Rotation = math.deg(math.atan2(dy, dx))
-                    if visual.boxStroke then visual.boxStroke.Color = currentESPColor() end
-                end
+                visual.line.Visible = showLine
             end
         end
     end
-    if os.clock() - lastESPReconcile > 0.75 then
+    if os.clock() - lastESPReconcile > 1 then
         lastESPReconcile = os.clock()
         updateESP()
     end
@@ -1007,19 +1054,17 @@ makeToggle(pages["VISUAL"], "ESP — ВКЛЮЧИТЬ ВСЁ", false, function(v
     espEnabled = value
     updateESP()
 end)
-makeToggle(pages["VISUAL"], "ESP: БОКСЫ", false, function(value)
+local espBoxesToggleButton, espLinesToggleButton, espChamsToggleButton
+local espBoxesToggleSetter, espLinesToggleSetter, espChamsToggleSetter
+espBoxesToggleButton, espBoxesToggleSetter = makeToggle(pages["VISUAL"], "ESP: БОКСЫ", false, function(value)
     espBoxesEnabled = value
-    if not value then
-        for _, visual in pairs(espVisuals) do if visual.box then visual.box.Visible = false end end
-    end
+    for _, visual in pairs(espVisuals) do if visual.boxGui then visual.boxGui.Enabled = espEnabled and value end end
 end)
-makeToggle(pages["VISUAL"], "ESP: ЛИНИИ К ИГРОКАМ", false, function(value)
+espLinesToggleButton, espLinesToggleSetter = makeToggle(pages["VISUAL"], "ESP: ЛИНИИ К ИГРОКАМ", false, function(value)
     espLinesEnabled = value
-    if not value then
-        for _, visual in pairs(espVisuals) do if visual.line then visual.line.Visible = false end end
-    end
+    if not value then for _, visual in pairs(espVisuals) do if visual.line then visual.line.Visible = false end end end
 end)
-makeToggle(pages["VISUAL"], "ESP: ЧАМСЫ / ПОДСВЕТКА", false, function(value)
+espChamsToggleButton, espChamsToggleSetter = makeToggle(pages["VISUAL"], "ESP: ЧАМСЫ / ПОДСВЕТКА", false, function(value)
     espChamsEnabled = value
     if not value then
         for player in pairs(espObjects) do removeESP(player) end
@@ -1957,9 +2002,9 @@ local function listProfileNames()
 end
 local function applySettingsData(data)
     if type(data.espColorIndex) == "number" then espColorIndex = math.clamp(math.floor(data.espColorIndex), 1, #espPalette); paintESPColorButton(); refreshESPColors() end
-    if type(data.espBoxesEnabled) == "boolean" then espBoxesEnabled = data.espBoxesEnabled end
-    if type(data.espLinesEnabled) == "boolean" then espLinesEnabled = data.espLinesEnabled end
-    if type(data.espChamsEnabled) == "boolean" then espChamsEnabled = data.espChamsEnabled end
+    if type(data.espBoxesEnabled) == "boolean" and espBoxesToggleSetter then espBoxesToggleSetter(data.espBoxesEnabled) end
+    if type(data.espLinesEnabled) == "boolean" and espLinesToggleSetter then espLinesToggleSetter(data.espLinesEnabled) end
+    if type(data.espChamsEnabled) == "boolean" and espChamsToggleSetter then espChamsToggleSetter(data.espChamsEnabled) end
     if espEnabled then updateESP() end
     if type(data.toggles) == "table" then
         for _, entry in ipairs(toggleRegistry) do
