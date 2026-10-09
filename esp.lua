@@ -10,7 +10,7 @@ local CollectionService = game:GetService("CollectionService")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
-local VERSION = "0.2-COMPAT-COMBAT-BOTS"
+local VERSION = "0.2-COMBAT-MENU-FIX"
 local SETTINGS_KEY = "RAHERHUB_02_SETTINGS"
 _G[SETTINGS_KEY] = _G[SETTINGS_KEY] or _G["RAHERHUB_01_SETTINGS"] or {}
 local savedUI = _G[SETTINGS_KEY]
@@ -83,7 +83,9 @@ local gui = make("ScreenGui", {
     Name = "RAHERHUB_01",
     ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    IgnoreGuiInset = true
+    IgnoreGuiInset = true,
+    DisplayOrder = 9999,
+    Enabled = true
 })
 safeParentGui(gui)
 
@@ -2574,6 +2576,17 @@ end)
 refreshPoints()
 refreshCompatibility()
 selectTab("HOME")
+-- Visibility safety: always show the main window immediately after injection.
+pcall(function()
+    gui.Enabled = true
+    gui.DisplayOrder = 9999
+    main.Visible = true
+    main.BackgroundTransparency = 0
+    openButton.Visible = false
+    statsOverlay.Visible = false
+    fitPanel()
+    main.Position = UDim2.fromScale(0.5, 0.5)
+end)
 
 -- Keep touch fly control visible independently of selected page and menu state.
 local function syncFlyButton()
