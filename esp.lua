@@ -1,3 +1,57 @@
+-- RAHERHUB 0.2.1 AUTH DIAGNOSTIC BUILD
+-- Displays runtime errors on-screen because the executor console may be unavailable.
+local function __rhShowError(message)
+    pcall(function()
+        local Players = game:GetService("Players")
+        local CoreGui = game:GetService("CoreGui")
+        local old = CoreGui:FindFirstChild("RAHERHUB_DIAGNOSTIC_ERROR")
+        if old then old:Destroy() end
+        local screen = Instance.new("ScreenGui")
+        screen.Name = "RAHERHUB_DIAGNOSTIC_ERROR"
+        screen.ResetOnSpawn = false
+        screen.DisplayOrder = 1000000
+        local parent = CoreGui
+        local ok = pcall(function() screen.Parent = CoreGui end)
+        if not ok or not screen.Parent then
+            local player = Players.LocalPlayer
+            if player then screen.Parent = player:WaitForChild("PlayerGui", 5) end
+        end
+        if not screen.Parent then return end
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0.92, 0, 0.58, 0)
+        frame.Position = UDim2.new(0.04, 0, 0.2, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(20, 15, 24)
+        frame.BorderSizePixel = 0
+        frame.Parent = screen
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = frame
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -20, 0, 42)
+        title.Position = UDim2.new(0, 10, 0, 4)
+        title.BackgroundTransparency = 1
+        title.Text = "RAHERHUB — ОШИБКА ЗАПУСКА"
+        title.TextColor3 = Color3.fromRGB(255, 95, 120)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 17
+        title.TextWrapped = true
+        title.Parent = frame
+        local body = Instance.new("TextLabel")
+        body.Size = UDim2.new(1, -20, 1, -58)
+        body.Position = UDim2.new(0, 10, 0, 48)
+        body.BackgroundTransparency = 1
+        body.Text = tostring(message)
+        body.TextColor3 = Color3.fromRGB(245, 245, 250)
+        body.Font = Enum.Font.Code
+        body.TextSize = 12
+        body.TextWrapped = true
+        body.TextXAlignment = Enum.TextXAlignment.Left
+        body.TextYAlignment = Enum.TextYAlignment.Top
+        body.Parent = frame
+    end)
+end
+
+local __rhOk, __rhErr = xpcall(function()
 -- RAHERHUB 0.2.1 | AUTH FIX | based on UNIVERSAL COMPATIBILITY BUILD
 -- Intended for use in your own Roblox place / authorized test environment.
 
@@ -3080,3 +3134,15 @@ minimize.Activated:Connect(syncFlyButton)
 openButton.Activated:Connect(function() task.defer(syncFlyButton) end)
 
 print("RAHERHUB " .. VERSION .. " MULTI-TOOL HUB запущен.")
+
+
+end, function(err)
+    local trace = tostring(err)
+    pcall(function()
+        if debug and debug.traceback then trace = trace .. "\n\n" .. debug.traceback() end
+    end)
+    return trace
+end)
+if not __rhOk then
+    __rhShowError(__rhErr)
+end
