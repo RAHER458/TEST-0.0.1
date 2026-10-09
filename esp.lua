@@ -5,7 +5,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Stats = game:GetService("Stats")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
@@ -123,8 +122,6 @@ local COLORS = {
     red = Color3.fromRGB(220, 75, 88)
 }
 
-local compactMode = false
-
 local main = make("Frame", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -134,20 +131,22 @@ local main = make("Frame", {
     BorderSizePixel = 0,
     ClipsDescendants = true
 }, gui)
-main.Size = UDim2.new(0, 390, 0, 540)
+main.Size = UDim2.fromOffset(310, 440)
 main.Position = UDim2.new(0.5, 0, 0.5, 0)
 corner(main, 18)
 stroke(main, Color3.fromRGB(74, 80, 115), 1, 0.15)
 
--- Fit the panel to small screens while keeping a comfortable touch layout.
+-- Compact-first mobile layout. The compact switch makes the whole window smaller,
+-- not merely narrower, and the layout remains scrollable on small screens.
+local compactMode = false
 local function fitPanel()
     local camera = workspace.CurrentCamera
     if not camera then return end
     local viewport = camera.ViewportSize
-    local width = math.clamp(viewport.X - 24, 300, 430)
-    local height = math.clamp(viewport.Y - 80, 390, 620)
-    if not compactMode then
-        main.Size = UDim2.fromOffset(width, height)
+    if compactMode then
+        main.Size = UDim2.fromOffset(math.min(252, viewport.X - 20), math.min(326, viewport.Y - 60))
+    else
+        main.Size = UDim2.fromOffset(math.min(310, viewport.X - 20), math.min(440, viewport.Y - 60))
     end
 end
 fitPanel()
@@ -157,7 +156,7 @@ end
 
 local header = make("Frame", {
     Name = "Header",
-    Size = UDim2.new(1, 0, 0, 76),
+    Size = UDim2.new(1, 0, 0, 58),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, main)
@@ -165,19 +164,19 @@ corner(header, 18)
 
 local title = make("TextLabel", {
     Name = "Title",
-    Position = UDim2.new(0, 16, 0, 9),
-    Size = UDim2.new(1, -100, 0, 34),
+    Position = UDim2.new(0, 11, 0, 5),
+    Size = UDim2.new(1, -112, 0, 29),
     BackgroundTransparency = 1,
     Text = "RAHERHUB",
     TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 25,
+    TextSize = 21,
     Font = Enum.Font.GothamBlack,
     TextXAlignment = Enum.TextXAlignment.Left
 }, header)
 
 local subtitle = make("TextLabel", {
-    Position = UDim2.new(0, 17, 0, 43),
-    Size = UDim2.new(1, -95, 0, 20),
+    Position = UDim2.new(0, 12, 0, 33),
+    Size = UDim2.new(1, -105, 0, 16),
     BackgroundTransparency = 1,
     Text = "ЛИЧНАЯ СБОРКА  •  версия " .. VERSION,
     TextColor3 = COLORS.muted,
@@ -189,8 +188,8 @@ local subtitle = make("TextLabel", {
 local minimize = make("TextButton", {
     Name = "Minimize",
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -12, 0, 13),
-    Size = UDim2.fromOffset(42, 42),
+    Position = UDim2.new(1, -8, 0, 9),
+    Size = UDim2.fromOffset(34, 34),
     BackgroundColor3 = COLORS.button,
     BorderSizePixel = 0,
     Text = "—",
@@ -199,24 +198,79 @@ local minimize = make("TextButton", {
     Font = Enum.Font.GothamBold,
     AutoButtonColor = true
 }, header)
-corner(minimize, 12)
+corner(minimize, 10)
 
--- Compact-layout control sits immediately to the left of the existing minimize button.
 local compactButton = make("TextButton", {
-    Name = "CompactModeButton",
+    Name = "CompactMode",
     AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -62, 0, 13),
-    Size = UDim2.fromOffset(42, 42),
+    Position = UDim2.new(1, -48, 0, 9),
+    Size = UDim2.fromOffset(34, 34),
     BackgroundColor3 = COLORS.button,
     BorderSizePixel = 0,
     Text = "▣",
     TextColor3 = COLORS.text,
-    TextSize = 19,
+    TextSize = 17,
     Font = Enum.Font.GothamBold,
     AutoButtonColor = true
 }, header)
-corner(compactButton, 12)
-local compactButtonStroke = stroke(compactButton, COLORS.accent, 1.2, 0.15)
+corner(compactButton, 10)
+
+local tabsBar, content, tabLayout, pages, tabButtons
+local function applyMenuLayout()
+    fitPanel()
+    if compactMode then
+        header.Size = UDim2.new(1, 0, 0, 48)
+        title.Position = UDim2.new(0, 9, 0, 3)
+        title.Size = UDim2.new(1, -105, 0, 25)
+        title.TextSize = 18
+        subtitle.Visible = false
+        compactButton.Position = UDim2.new(1, -45, 0, 7)
+        minimize.Position = UDim2.new(1, -7, 0, 7)
+        compactButton.Size = UDim2.fromOffset(31, 31)
+        minimize.Size = UDim2.fromOffset(31, 31)
+        tabsBar.Position = UDim2.new(0, 7, 0, 53)
+        tabsBar.Size = UDim2.new(1, -14, 0, 32)
+        tabLayout.Padding = UDim.new(0, 3)
+        content.Position = UDim2.new(0, 8, 0, 91)
+        content.Size = UDim2.new(1, -16, 1, -99)
+        for _, button in pairs(tabButtons or {}) do
+            button.TextSize = 7
+        end
+        for _, page in pairs(pages or {}) do
+            for _, child in ipairs(page:GetChildren()) do
+                if child:IsA("UIListLayout") then child.Padding = UDim.new(0, 5) end
+                if child:IsA("GuiObject") and child:IsA("TextButton") then
+                    child.Size = UDim2.new(1, -2, 0, 34)
+                    child.TextSize = 11
+                elseif child:IsA("TextLabel") then
+                    child.TextSize = math.min(child.TextSize, 10)
+                end
+            end
+        end
+        compactButton.Text = "↗"
+    else
+        header.Size = UDim2.new(1, 0, 0, 58)
+        title.Position = UDim2.new(0, 11, 0, 5)
+        title.Size = UDim2.new(1, -112, 0, 29)
+        title.TextSize = 21
+        subtitle.Visible = true
+        compactButton.Position = UDim2.new(1, -48, 0, 9)
+        minimize.Position = UDim2.new(1, -8, 0, 9)
+        compactButton.Size = UDim2.fromOffset(34, 34)
+        minimize.Size = UDim2.fromOffset(34, 34)
+        tabsBar.Position = UDim2.new(0, 9, 0, 65)
+        tabsBar.Size = UDim2.new(1, -18, 0, 36)
+        tabLayout.Padding = UDim.new(0, 4)
+        content.Position = UDim2.new(0, 10, 0, 108)
+        content.Size = UDim2.new(1, -20, 1, -118)
+        for _, button in pairs(tabButtons or {}) do button.TextSize = 8 end
+        compactButton.Text = "▣"
+    end
+end
+compactButton.Activated:Connect(function()
+    compactMode = not compactMode
+    applyMenuLayout()
+end)
 
 -- Rainbow title animation.
 local hue = 0
@@ -263,85 +317,6 @@ local openButton = make("TextButton", {
 }, gui)
 corner(openButton, 29)
 
--- Small FPS/PING indicator: fixed colors (not RGB) and draggable on touch/mouse.
-local statsHud = make("TextButton", {
-    Name = "MicroFpsPing",
-    Visible = false,
-    Position = UDim2.fromOffset(savedUI.hudPosition and savedUI.hudPosition.x or 12, savedUI.hudPosition and savedUI.hudPosition.y or 90),
-    Size = UDim2.fromOffset(142, 30),
-    BackgroundColor3 = Color3.fromRGB(24, 29, 40),
-    BackgroundTransparency = 0.06,
-    BorderSizePixel = 0,
-    Text = "FPS --  •  PING --",
-    TextColor3 = Color3.fromRGB(235, 240, 250),
-    TextSize = 11,
-    Font = Enum.Font.GothamSemibold,
-    AutoButtonColor = false,
-    ZIndex = 50
-}, gui)
-corner(statsHud, 8)
-local hudStroke = stroke(statsHud, Color3.fromRGB(105, 115, 135), 1, 0.05)
-local hudEnabled = false
-local hudDragging, hudMoved = false, false
-local fpsFrames, fpsElapsed, displayedFPS, pingElapsed = 0, 0, 0, 0
-RunService.RenderStepped:Connect(function(dt)
-    fpsFrames = fpsFrames + 1
-    fpsElapsed = fpsElapsed + dt
-    pingElapsed = pingElapsed + dt
-    if fpsElapsed >= 0.5 then
-        displayedFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
-        fpsFrames, fpsElapsed = 0, 0
-    end
-    if pingElapsed >= 0.5 then
-        pingElapsed = 0
-        local ping = "--"
-        pcall(function()
-            local item = Stats.Network.ServerStatsItem["Data Ping"]
-            if item then ping = item:GetValueString():gsub(" ms", "") end
-        end)
-        statsHud.Text = "FPS " .. tostring(displayedFPS) .. "  •  PING " .. ping
-    end
-end)
-statsHud.Activated:Connect(function()
-    if not hudDragging and not hudMoved then
-        main.Visible = true
-        openButton.Visible = false
-    end
-end)
-do
-    local hudStart, hudStartPos, hudInput = nil, nil, nil
-    statsHud.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            hudDragging, hudMoved = true, false
-            hudStart, hudStartPos, hudInput = input.Position, statsHud.Position, input
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then hudDragging = false end
-            end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if hudDragging and hudStart and (input == hudInput or input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            local delta = input.Position - hudStart
-            if math.abs(delta.X) > 3 or math.abs(delta.Y) > 3 then hudMoved = true end
-            local camera = workspace.CurrentCamera
-            local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
-            local x = math.clamp(hudStartPos.X.Offset + delta.X, 0, viewport.X - statsHud.AbsoluteSize.X)
-            local y = math.clamp(hudStartPos.Y.Offset + delta.Y, 0, viewport.Y - statsHud.AbsoluteSize.Y)
-            statsHud.Position = UDim2.fromOffset(x, y)
-            savedUI.hudPosition = {x = x, y = y}
-        end
-    end)
-    statsHud.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not hudMoved then
-                main.Visible = true
-                openButton.Visible = false
-            end
-            hudDragging = false
-        end
-    end)
-end
-
 minimize.Activated:Connect(function()
     main.Visible = false
     openButton.Visible = true
@@ -374,12 +349,12 @@ do
     end)
 end
 
-local tabsBar = make("Frame", {
+tabsBar = make("Frame", {
     Position = UDim2.new(0, 12, 0, 86),
     Size = UDim2.new(1, -24, 0, 44),
     BackgroundTransparency = 1
 }, main)
-local tabLayout = make("UIListLayout", {
+tabLayout = make("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
     VerticalAlignment = Enum.VerticalAlignment.Center,
@@ -387,10 +362,10 @@ local tabLayout = make("UIListLayout", {
     SortOrder = Enum.SortOrder.LayoutOrder
 }, tabsBar)
 
-local pages = {}
-local tabButtons = {}
+pages = {}
+tabButtons = {}
 local activeTab = "MAIN"
-local content = make("Frame", {
+content = make("Frame", {
     Position = UDim2.new(0, 12, 0, 138),
     Size = UDim2.new(1, -24, 1, -150),
     BackgroundTransparency = 1
@@ -423,7 +398,7 @@ for _, tabName in ipairs({"MAIN", "FUNCTIONS", "TELEPORT", "SETTINGS", "COMING S
         Visible = false
     }, content)
     make("UIListLayout", {
-        Padding = UDim.new(0, 9),
+        Padding = UDim.new(0, 6),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, page)
     make("UIPadding", {
@@ -446,6 +421,7 @@ end
 for name, button in pairs(tabButtons) do
     button.Activated:Connect(function() selectTab(name) end)
 end
+applyMenuLayout()
 
 local function section(parent, text)
     return make("TextLabel", {
@@ -461,7 +437,7 @@ end
 
 local function infoCard(parent, heading, body)
     local card = make("Frame", {
-        Size = UDim2.new(1, -2, 0, 86),
+        Size = UDim2.new(1, -2, 0, 70),
         BackgroundColor3 = COLORS.panel,
         BorderSizePixel = 0
     }, parent)
@@ -472,18 +448,18 @@ local function infoCard(parent, heading, body)
         BackgroundTransparency = 1,
         Text = heading,
         TextColor3 = COLORS.text,
-        TextSize = 15,
+        TextSize = 13,
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left
     }, card)
     make("TextLabel", {
-        Position = UDim2.new(0, 13, 0, 35),
-        Size = UDim2.new(1, -26, 0, 40),
+        Position = UDim2.new(0, 10, 0, 31),
+        Size = UDim2.new(1, -20, 0, 34),
         BackgroundTransparency = 1,
         Text = body,
         TextWrapped = true,
         TextColor3 = COLORS.muted,
-        TextSize = 12,
+        TextSize = 10,
         Font = Enum.Font.Gotham,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top
@@ -503,82 +479,6 @@ local statusLabel = make("TextLabel", {
 }, pages["MAIN"])
 corner(statusLabel, 11)
 
--- Compact mode compresses the whole layout rather than making a tall, narrow window.
-local originalGuiSizes = {}
-local originalTextSizes = {}
-local originalLayoutPaddings = {}
-local function cacheCompactDefaults()
-    for _, page in pairs(pages) do
-        for _, object in ipairs(page:GetDescendants()) do
-            if object:IsA("GuiObject") then
-                if object:IsA("TextButton") or object:IsA("TextLabel") then
-                    originalTextSizes[object] = object.TextSize
-                end
-                if object:IsA("TextButton") then
-                    originalGuiSizes[object] = object.Size
-                end
-            elseif object:IsA("UIListLayout") then
-                originalLayoutPaddings[object] = object.Padding
-            end
-        end
-    end
-end
-local function applyCompactMode(enabled)
-    compactMode = enabled
-    compactButton.BackgroundColor3 = enabled and COLORS.accent or COLORS.button
-    compactButton.Text = enabled and "▣" or "▣"
-    if enabled then
-        main.Size = UDim2.fromOffset(370, 470)
-        header.Size = UDim2.new(1, 0, 0, 66)
-        title.Position = UDim2.new(0, 12, 0, 7)
-        title.Size = UDim2.new(1, -145, 0, 29)
-        title.TextSize = 21
-        subtitle.Visible = false
-        minimize.Position = UDim2.new(1, -10, 0, 12)
-        minimize.Size = UDim2.fromOffset(38, 38)
-        compactButton.Position = UDim2.new(1, -54, 0, 12)
-        compactButton.Size = UDim2.fromOffset(38, 38)
-        tabsBar.Position = UDim2.new(0, 8, 0, 72)
-        tabsBar.Size = UDim2.new(1, -16, 0, 37)
-        tabLayout.Padding = UDim.new(0, 3)
-        content.Position = UDim2.new(0, 9, 0, 116)
-        content.Size = UDim2.new(1, -18, 1, -125)
-        for _, tab in pairs(tabButtons) do tab.TextSize = 8 end
-        for object, size in pairs(originalGuiSizes) do
-            if object.Parent then
-                object.Size = UDim2.new(size.X.Scale, size.X.Offset, size.Y.Scale, math.max(30, math.floor(size.Y.Offset * 0.84)))
-            end
-        end
-        for object, size in pairs(originalTextSizes) do
-            if object.Parent then object.TextSize = math.max(8, math.floor(size * 0.9)) end
-        end
-        for layout, padding in pairs(originalLayoutPaddings) do
-            if layout.Parent then layout.Padding = UDim.new(padding.Scale, math.max(3, math.floor(padding.Offset * 0.65))) end
-        end
-    else
-        fitPanel()
-        main.Size = UDim2.fromOffset(math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 414) - 24, 300, 430), math.clamp((workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 844) - 80, 390, 620))
-        header.Size = UDim2.new(1, 0, 0, 76)
-        title.Position = UDim2.new(0, 16, 0, 9)
-        title.Size = UDim2.new(1, -150, 0, 34)
-        title.TextSize = 25
-        subtitle.Visible = true
-        minimize.Position = UDim2.new(1, -12, 0, 13)
-        minimize.Size = UDim2.fromOffset(42, 42)
-        compactButton.Position = UDim2.new(1, -62, 0, 13)
-        compactButton.Size = UDim2.fromOffset(42, 42)
-        tabsBar.Position = UDim2.new(0, 12, 0, 86)
-        tabsBar.Size = UDim2.new(1, -24, 0, 44)
-        tabLayout.Padding = UDim.new(0, 7)
-        content.Position = UDim2.new(0, 12, 0, 138)
-        content.Size = UDim2.new(1, -24, 1, -150)
-        for tabName, tab in pairs(tabButtons) do tab.TextSize = 9 end
-        for object, size in pairs(originalGuiSizes) do if object.Parent then object.Size = size end end
-        for object, size in pairs(originalTextSizes) do if object.Parent then object.TextSize = size end end
-        for layout, padding in pairs(originalLayoutPaddings) do if layout.Parent then layout.Padding = padding end end
-    end
-end
-
 section(pages["MAIN"], "OVERVIEW")
 infoCard(pages["MAIN"], "RAHERHUB 0.1", "Личная сборка с интерфейсом для телефона и сохранением точек телепорта.")
 infoCard(pages["MAIN"], "БЫСТРЫЙ СТАРТ", "Откройте «Функции» для управления персонажем или «Телепорт» для сохранения мест.")
@@ -587,12 +487,12 @@ infoCard(pages["MAIN"], "ХРАНЕНИЕ ТОЧЕК", "Точки сохран�
 -- Toggle/button factories.
 local function makeActionButton(parent, text, callback, height)
     local button = make("TextButton", {
-        Size = UDim2.new(1, -2, 0, height or 46),
+        Size = UDim2.new(1, -2, 0, height or 38),
         BackgroundColor3 = COLORS.button,
         BorderSizePixel = 0,
         Text = text,
         TextColor3 = COLORS.text,
-        TextSize = 14,
+        TextSize = 12,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true
     }, parent)
@@ -627,6 +527,7 @@ infoCard(pages["FUNCTIONS"], "Инструменты тестирования", 
 -- Скорость ходьбы: диапазон 16–1000
 local speedEnabled = false
 local walkSpeed = 16
+local walkSpeedLabel, walkSpeedTrack
 local function applyWalkSpeed()
     local character = LocalPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -635,16 +536,20 @@ end
 makeToggle(pages["FUNCTIONS"], "Ускорение ходьбы", false, function(value)
     speedEnabled = value
     applyWalkSpeed()
+    if walkSpeedLabel then walkSpeedLabel.Visible = value end
+    if walkSpeedTrack then walkSpeedTrack.Visible = value end
 end)
-local walkSpeedLabel = make("TextLabel", {
+walkSpeedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24), BackgroundTransparency = 1,
     Text = "СКОРОСТЬ: " .. walkSpeed, TextColor3 = COLORS.muted,
     TextSize = 12, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left
 }, pages["FUNCTIONS"])
-local walkSpeedTrack = make("Frame", {
+walkSpeedTrack = make("Frame", {
     Size = UDim2.new(1, -2, 0, 36), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0
 }, pages["FUNCTIONS"])
 corner(walkSpeedTrack, 11)
+walkSpeedLabel.Visible = false
+walkSpeedTrack.Visible = false
 local walkSpeedBar = make("Frame", {
     Position = UDim2.new(0, 10, 0.5, -4), Size = UDim2.new(0, 0, 0, 8),
     BackgroundColor3 = COLORS.accent, BorderSizePixel = 0
@@ -733,17 +638,20 @@ local flyEditMode = false
 local flyHeld = false
 local flyEnabled = false
 local flySpeed = 4
+local speedLabel, speedTrack
 local flyDragState = {dragging = false, start = nil, startPos = nil, input = nil}
 
 makeToggle(pages["FUNCTIONS"], "Полёт (удерживать для подъёма)", false, function(value)
     flyEnabled = value
     if not value then flyHeld = false end
+    if speedLabel then speedLabel.Visible = value end
+    if speedTrack then speedTrack.Visible = value end
     if flyTouch then
         flyTouch.Visible = flyEditMode or (main.Visible and activeTab == "FUNCTIONS" and flyEnabled)
     end
 end)
 
-local speedLabel = make("TextLabel", {
+speedLabel = make("TextLabel", {
     Size = UDim2.new(1, -2, 0, 24),
     BackgroundTransparency = 1,
     Text = "СИЛА ПОЛЁТА: 4",
@@ -752,12 +660,14 @@ local speedLabel = make("TextLabel", {
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left
 }, pages["FUNCTIONS"])
-local speedTrack = make("Frame", {
+speedTrack = make("Frame", {
     Size = UDim2.new(1, -2, 0, 34),
     BackgroundColor3 = COLORS.panel,
     BorderSizePixel = 0
 }, pages["FUNCTIONS"])
 corner(speedTrack, 11)
+speedLabel.Visible = false
+speedTrack.Visible = false
 local speedBar = make("Frame", {
     Position = UDim2.new(0, 10, 0.5, -4),
     Size = UDim2.new((flySpeed - 1) / 19, 0, 0, 8),
@@ -1244,18 +1154,6 @@ end)
 section(pages["COMING SOON"], "COMING SOON")
 infoCard(pages["COMING SOON"], "В разработке", "Здесь появятся новые функции RAHERHUB. Версия остаётся 0.1 до начала альфа-тестирования.")
 infoCard(pages["COMING SOON"], "Следующие улучшения", "Дополнительные настройки интерфейса, удобства управления и новые инструменты для тестирования.")
-
-makeActionButton(pages["MAIN"], "МИКРО FPS / PING: ВКЛ / ВЫКЛ", function()
-    hudEnabled = not hudEnabled
-    statsHud.Visible = hudEnabled
-    statusLabel.Text = hudEnabled and "FPS/PING включён: перетащи индикатор в удобное место." or "FPS/PING выключен."
-    statusLabel.TextColor3 = COLORS.green
-end, 38)
-
-cacheCompactDefaults()
-compactButton.Activated:Connect(function()
-    applyCompactMode(not compactMode)
-end)
 
 refreshPoints()
 selectTab("MAIN")
