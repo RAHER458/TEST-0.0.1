@@ -1,15 +1,15 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.3
+    Version: 1.4 "Safe Mode"
     Platform: Roblox / Delta Executor / iOS
 
-    CHANGELOG 1.3:
-      - Таймаут запроса (15 сек) — не зависает вечно
+    CHANGELOG 1.4:
+      - Retry /activate — 3 попытки при таймауте
+      - Понятные ошибки для юзера
+      - Защита от потери ключа при плохой сети
       - Таймер оставшегося времени в хедере
       - Heartbeat: проверка каждые 5 секунд
-      - Авто-выкид на авторизацию при истечении ключа
-      - Исправлена логика кнопок «—» и «⌄»
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -23,7 +23,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "1.3",
+    VERSION     = "1.4",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -31,6 +31,8 @@ local CONFIG = {
     TG_LINK     = "https://t.me/generalvaneska2024",
     WINDOW_W    = 340,
     WINDOW_H    = 440,
+    RETRY_MAX   = 3,
+    RETRY_DELAY = 1.5,
 }
 
 local C = {
@@ -202,7 +204,6 @@ local function api(path, body)
         requestDone = true
     end)
 
-    -- Ждём ответ максимум 15 секунд
     local startTime = os.clock()
     while not requestDone and os.clock() - startTime < 15 do
         task.wait(0.1)
@@ -243,6 +244,37 @@ local function api(path, body)
     end
 
     return decoded
+end
+
+-- ==== API С RETRY (для /activate) ====
+local function apiWithRetry(path, body, maxAttempts, delay)
+    maxAttempts = maxAttempts or CONFIG.RETRY_MAX
+    delay = delay or CONFIG.RETRY_DELAY
+
+    local lastErr = nil
+
+    for attempt = 1, maxAttempts do
+        local result, err = api(path, body)
+
+        if result then
+            return result, nil, attempt
+        end
+
+        lastErr = err
+        local errText = tostring(err or ""):lower()
+
+        -- Таймаут — пробуем ещё раз
+        if errText:find("таймаут") or errText:find("timeout") then
+            if attempt < maxAttempts then
+                task.wait(delay)
+            end
+        else
+            -- Другая ошибка — не retry
+            return nil, err, attempt
+        end
+    end
+
+    return nil, lastErr, maxAttempts
 end
 
 local function makeToast(guiObj, parentFrame)
@@ -604,6 +636,7 @@ end)
 
 local onAuthSuccess
 
+-- ==== АКТИВАЦИЯ КЛЮЧА С RETRY ====
 local function activateKey(rawKey)
     local key = tostring(rawKey or ""):gsub("%s+", "")
 
@@ -627,7 +660,12 @@ local function activateKey(rawKey)
             install_hash = STATE.deviceId,
         }
 
-        local result, err = api("/activate", body)
+        -- RETRY-логика: до 3 попыток
+        local result, err, attempts = apiWithRetry("/activate", body, CONFIG.RETRY_MAX, CONFIG.RETRY_DELAY)
+
+        if attempts > 1 then
+            setStatus("Попытка " .. attempts .. " успешна", "ok")
+        end
 
         if not result then
             setBusy(false)
@@ -639,10 +677,13 @@ local function activateKey(rawKey)
                 authToast("Неверный ключ", "err")
             elseif low:find("bound to another") then
                 setStatus("❌ Ключ привязан к другому устройству", "err")
-                authToast("Ключ занят", "err")
+                authToast("Ключ занят другим устройством", "err")
             elseif low:find("expired") then
                 setStatus("❌ Ключ истёк", "err")
                 authToast("Ключ истёк", "err")
+            elseif low:find("таймаут") or low:find("timeout") then
+                setStatus("❌ Сервер не отвечает. Попробуй позже.", "err")
+                authToast("Сервер не отвечает. Попробуй ещё раз.", "err")
             else
                 setStatus("❌ " .. msg, "err")
                 authToast(msg, "err")
@@ -1064,7 +1105,7 @@ end
 section(homePage, "ГЛАВНАЯ")
 infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
 infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
-infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа. Когда заканчивается — перезапуск на авторизацию.")
+infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа.")
 infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
 
 -- ============ MOVE ============
@@ -1469,7 +1510,6 @@ task.spawn(function()
     local localRemaining = nil
     local heartbeatActive = true
 
-    -- Локальный счётчик — раз в секунду
     task.spawn(function()
         while heartbeatActive do
             if STATE.authed and localRemaining and localRemaining > 0 then
@@ -1498,7 +1538,6 @@ task.spawn(function()
         end
     end)
 
-    -- Опрос сервера раз в 5 секунд
     while heartbeatActive do
         if STATE.authed and STATE.token then
             local result, err = api("/verify", { token = STATE.token })
