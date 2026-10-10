@@ -1,16 +1,8 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.6
+    Version: 0.0.2-alpha
     Platform: Roblox / Delta Executor / iOS
-
-    CHANGELOG 1.6:
-      - WalkSpeed + Stealth Mode (beta)
-      - ⚡ Teleport Rush (дочерний от WalkSpeed)
-      - Плавный CFrame stepper для ⚡
-      - Hook WalkSpeed при Rush
-      - Edit mode для кнопки ⚡
-      - Сохранение позиции в RH_HUB_CONFIG.dat
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -24,7 +16,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "1.6",
+    VERSION     = "0.0.2-alpha",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -109,9 +101,8 @@ local function hasFileAPI()
        and type(isfile) == "function"
 end
 
--- ============ CONFIG FILE (позиция ⚡ + настройки) ============
 local savedCfg = {
-    rushBtnPos = { x = -70, y = -140 },  -- дефолт: рядом с прыжком
+    rushBtnPos = { x = -70, y = -140 },
 }
 
 local function loadConfig()
@@ -305,7 +296,7 @@ local function apiWithRetry(path, body, maxAttempts, delay)
     return nil, lastErr, maxAttempts
 end
 
-local function makeToast(guiObj, parentFrame)
+local function makeToast(parentFrame)
     local container = create("Frame", {
         Position = UDim2.new(0, 0, 1, -180),
         Size = UDim2.new(1, 0, 0, 170),
@@ -598,7 +589,8 @@ local function setStatus(text, kind)
     end
 end
 
-local authToast = makeToast(authGui, authGui)
+local authToast = makeToast(authGui)
+_G.RH_HUB_TOAST = function(text, kind) authToast(text, kind) end
 
 local function setBusy(busy)
     STATE.busy = busy
@@ -791,6 +783,19 @@ task.spawn(function()
 end)
 
 -- [КОНЕЦ ЧАСТИ 1]
+
+-- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ (до всего остального) ============
+-- Будут переопределены в MOVE-секции, но объявлены сейчас,
+-- чтобы Часть 3 не падала при вызове
+_G.RH_HUB_IS_WALKSPEED_ON = function() return false end
+_G.RH_HUB_IS_RUSH_ON = function() return false end
+_G.RH_HUB_RUSH_ACTIVE = function() return false end
+_G.RH_HUB_SET_RUSH_VISIBLE = function(v) end
+_G.RH_HUB_SET_RUSH_SPEED = function(v) end
+_G.RH_HUB_SET_RUSH_HEIGHT = function(v) end
+_G.RH_HUB_ENTER_RUSH_EDIT = function(v) end
+_G.RH_HUB_RUSH_SPEED = 200
+_G.RH_HUB_RUSH_HEIGHT = 5
 
 -- ============ MAIN GUI ============
 local mainGui = create("ScreenGui", {
@@ -1132,13 +1137,18 @@ infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH |
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
 
--- Глобальные переменные
 local walkSpeedEnabled = false
 local stealthEnabled = false
 local walkSpeedValue = 100
 local rushModeEnabled = false
 local rushSpeedValue = 200
 local rushHeightValue = 5
+
+-- Экспорты (реальные, перезаписывают заглушки сверху)
+_G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
+_G.RH_HUB_IS_RUSH_ON = function() return rushModeEnabled end
+_G.RH_HUB_RUSH_SPEED = rushSpeedValue
+_G.RH_HUB_RUSH_HEIGHT = rushHeightValue
 
 local currentHumanoid = nil
 local currentHRP = nil
@@ -1154,7 +1164,7 @@ local walkSpeedToggleWrap = create("Frame", {
 }, movePage)
 corner(walkSpeedToggleWrap, 10)
 
-local walkSpeedToggleLabel = create("TextLabel", {
+create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 0),
     Size = UDim2.new(1, -80, 1, 0),
     BackgroundTransparency = 1,
@@ -1187,7 +1197,7 @@ local walkSpeedToggleBtn = create("TextButton", {
     Text = "",
 }, walkSpeedToggleWrap)
 
--- ===== UI: SLIDER SPEED =====
+-- ===== UI: SLIDER WALKSPEED =====
 local sliderWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 56),
     BackgroundColor3 = C.surface,
@@ -1289,7 +1299,7 @@ local stealthToggleBtn = create("TextButton", {
     Text = "",
 }, stealthToggleWrap)
 
--- ===== UI: RUSH MODE TOGGLE =====
+-- ===== UI: RUSH TOGGLE =====
 local rushToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 50),
     BackgroundColor3 = C.surface,
@@ -1347,22 +1357,15 @@ local rushToggleBtn = create("TextButton", {
     Text = "",
 }, rushToggleWrap)
 
--- ===== UI: RUSH SETTINGS (скорость + высота) =====
+-- ===== UI: RUSH SETTINGS =====
 local rushSettingsWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 110),
     BackgroundColor3 = C.surface,
-    BackgroundTransparency = 0.5,
     BorderSizePixel = 0,
     Visible = false,
 }, movePage)
 corner(rushSettingsWrap, 10)
-local rushSettingsStroke = create("UIStroke", {
-    Color = C.border,
-    Thickness = 1,
-    Transparency = 0.4,
-}, rushSettingsWrap)
 
--- Скорость ⚡
 local rushSpeedLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 6),
     Size = UDim2.new(1, -24, 0, 16),
@@ -1398,7 +1401,6 @@ local rushSpeedKnob = create("Frame", {
 }, rushSpeedTrack)
 corner(rushSpeedKnob, 9)
 
--- Высота ⚡
 local rushHeightLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 54),
     Size = UDim2.new(1, -24, 0, 16),
@@ -1420,7 +1422,7 @@ corner(rushHeightTrack, 4)
 
 local rushHeightFill = create("Frame", {
     Size = UDim2.new(rushHeightValue / 10, 0, 1, 0),
-    BackgroundColor3 = C.accent2 or C.accent,
+    BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
 }, rushHeightTrack)
 corner(rushHeightFill, 4)
@@ -1434,26 +1436,20 @@ local rushHeightKnob = create("Frame", {
 }, rushHeightTrack)
 corner(rushHeightKnob, 9)
 
--- ===== UI: EDIT RUSH BUTTON =====
+-- ===== UI: EDIT BUTTON =====
 local rushEditWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 38),
     BackgroundColor3 = C.surface,
-    BackgroundTransparency = 0.5,
     BorderSizePixel = 0,
     Visible = false,
 }, movePage)
 corner(rushEditWrap, 10)
-local rushEditStroke = create("UIStroke", {
-    Color = C.border,
-    Thickness = 1,
-    Transparency = 0.4,
-}, rushEditWrap)
 
 local rushEditBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 1, 0),
     BackgroundTransparency = 1,
     Text = "📐  РЕДАКТИРОВАТЬ ПОЗИЦИЮ ⚡",
-    TextColor3 = C.muted,
+    TextColor3 = C.text,
     TextSize = 10,
     Font = Enum.Font.GothamBold,
 }, rushEditWrap)
@@ -1474,10 +1470,6 @@ local function cleanupStealthObjects()
     currentBodyVelocity = nil
     currentAttachment = nil
 end
-
--- Временное хранилище для Stealth-объектов (используется в Части 3)
-_G.RH_HUB_CLEANUP_STEALTH = cleanupStealthObjects
-_G.RH_HUB_APPLY_WALKSPEED = applyWalkSpeed
 
 local function updateSpeedState()
     applyWalkSpeed()
@@ -1519,9 +1511,9 @@ local function updateSpeedState()
     end
 end
 
--- Основной цикл Stealth
 RunService.RenderStepped:Connect(function()
     if not walkSpeedEnabled then return end
+    if _G.RH_HUB_RUSH_ACTIVE and _G.RH_HUB_RUSH_ACTIVE() then return end
 
     local char = LocalPlayer.Character
     if not char then return end
@@ -1557,9 +1549,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- ===== ЛОГИКА РОДИТЕЛЯ-ДОЧЕРНЕГО =====
 local function updateChildStates()
-    -- Stealth
     if walkSpeedEnabled then
         stealthToggleWrap.BackgroundTransparency = 0
         stealthToggleStroke.Transparency = 0.2
@@ -1574,13 +1564,12 @@ local function updateChildStates()
         stealthToggleHint.Text = "Включи ускорение, чтобы разблокировать"
     end
 
-    -- Rush
     if walkSpeedEnabled then
         rushToggleWrap.BackgroundTransparency = 0
         rushToggleStroke.Transparency = 0.2
         rushToggleLabel.TextColor3 = C.text
         rushToggleLabel.Text = "⚡ Teleport Rush"
-        rushToggleHint.Text = "Кнопка появится на экране"
+        rushToggleHint.Text = "Зажми ⚡ на экране для рывка"
     else
         rushToggleWrap.BackgroundTransparency = 0.5
         rushToggleStroke.Transparency = 0.5
@@ -1589,27 +1578,11 @@ local function updateChildStates()
         rushToggleHint.Text = "Включи ускорение, чтобы разблокировать"
     end
 
-    -- Rush settings
-    if walkSpeedEnabled and rushModeEnabled then
-        rushSettingsWrap.Visible = true
-        rushSettingsWrap.BackgroundTransparency = 0
-        rushSettingsStroke.Transparency = 0.2
-    else
-        rushSettingsWrap.Visible = false
-    end
-
-    -- Rush edit button
-    if walkSpeedEnabled and rushModeEnabled then
-        rushEditWrap.Visible = true
-        rushEditWrap.BackgroundTransparency = 0
-        rushEditStroke.Transparency = 0.2
-        rushEditBtn.TextColor3 = C.text
-    else
-        rushEditWrap.Visible = false
-    end
+    rushSettingsWrap.Visible = walkSpeedEnabled and rushModeEnabled
+    rushEditWrap.Visible = walkSpeedEnabled and rushModeEnabled
 end
 
--- ===== ТОГГЛ: WALKSPEED =====
+-- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
 
@@ -1623,7 +1596,6 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     sliderWrap.Visible = walkSpeedEnabled
 
     if not walkSpeedEnabled then
-        -- Принудительно выключаем дочерние
         if stealthEnabled then
             stealthEnabled = false
             TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
@@ -1633,10 +1605,7 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
             rushModeEnabled = false
             TweenService:Create(rushToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
             TweenService:Create(rushToggleKnob, TweenInfo.new(0.2), { Position = UDim2.new(0, 2, 0, 2) }):Play()
-            -- Скрыть кнопку ⚡
-            if _G.RH_HUB_SET_RUSH_BTN_VISIBLE then
-                _G.RH_HUB_SET_RUSH_BTN_VISIBLE(false)
-            end
+            _G.RH_HUB_SET_RUSH_VISIBLE(false)
         end
     end
 
@@ -1658,44 +1627,36 @@ local function updateSliderFromX(x)
     sliderLabel.Text = "Скорость: " .. walkSpeedValue
 
     local newAlpha = (walkSpeedValue - 16) / (500 - 16)
-    TweenService:Create(sliderFill, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(newAlpha, 0, 1, 0),
-    }):Play()
-    TweenService:Create(sliderKnob, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
-        Position = UDim2.new(newAlpha, 0, 0.5, 0),
-    }):Play()
+    TweenService:Create(sliderFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
+    TweenService:Create(sliderKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
 
     updateSpeedState()
 end
 
 sliderTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         sliderDragging = true
         updateSliderFromX(input.Position.X)
     end
 end)
 sliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         sliderDragging = true
         updateSliderFromX(input.Position.X)
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if sliderDragging and (input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         updateSliderFromX(input.Position.X)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         sliderDragging = false
     end
 end)
 
--- ===== ТОГГЛ: STEALTH =====
+-- ===== ТОГГЛ STEALTH =====
 stealthToggleBtn.MouseButton1Click:Connect(function()
     if not walkSpeedEnabled then return end
 
@@ -1711,7 +1672,7 @@ stealthToggleBtn.MouseButton1Click:Connect(function()
     updateSpeedState()
 end)
 
--- ===== ТОГГЛ: RUSH MODE =====
+-- ===== ТОГГЛ RUSH =====
 rushToggleBtn.MouseButton1Click:Connect(function()
     if not walkSpeedEnabled then return end
 
@@ -1726,10 +1687,7 @@ rushToggleBtn.MouseButton1Click:Connect(function()
 
     updateChildStates()
 
-    -- Показать / скрыть кнопку ⚡
-    if _G.RH_HUB_SET_RUSH_BTN_VISIBLE then
-        _G.RH_HUB_SET_RUSH_BTN_VISIBLE(rushModeEnabled)
-    end
+    _G.RH_HUB_SET_RUSH_VISIBLE(rushModeEnabled)
 end)
 
 -- ===== СЛАЙДЕР RUSH SPEED =====
@@ -1746,39 +1704,31 @@ local function updateRushSpeedFromX(x)
     rushSpeedLabel.Text = "⚡ Скорость: " .. rushSpeedValue
 
     local newAlpha = rushSpeedValue / 500
-    TweenService:Create(rushSpeedFill, TweenInfo.new(0.08), {
-        Size = UDim2.new(newAlpha, 0, 1, 0),
-    }):Play()
-    TweenService:Create(rushSpeedKnob, TweenInfo.new(0.08), {
-        Position = UDim2.new(newAlpha, 0, 0.5, 0),
-    }):Play()
+    TweenService:Create(rushSpeedFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
+    TweenService:Create(rushSpeedKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
 
-    _G.RH_HUB_RUSH_SPEED = rushSpeedValue
+    _G.RH_HUB_SET_RUSH_SPEED(rushSpeedValue)
 end
 
 rushSpeedTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushSpeedDragging = true
         updateRushSpeedFromX(input.Position.X)
     end
 end)
 rushSpeedKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushSpeedDragging = true
         updateRushSpeedFromX(input.Position.X)
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if rushSpeedDragging and (input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+    if rushSpeedDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         updateRushSpeedFromX(input.Position.X)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushSpeedDragging = false
     end
 end)
@@ -1797,55 +1747,51 @@ local function updateRushHeightFromX(x)
     rushHeightLabel.Text = "⚡ Высота: " .. rushHeightValue .. " стадов"
 
     local newAlpha = rushHeightValue / 10
-    TweenService:Create(rushHeightFill, TweenInfo.new(0.08), {
-        Size = UDim2.new(newAlpha, 0, 1, 0),
-    }):Play()
-    TweenService:Create(rushHeightKnob, TweenInfo.new(0.08), {
-        Position = UDim2.new(newAlpha, 0, 0.5, 0),
-    }):Play()
+    TweenService:Create(rushHeightFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
+    TweenService:Create(rushHeightKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
 
-    _G.RH_HUB_RUSH_HEIGHT = rushHeightValue
+    _G.RH_HUB_SET_RUSH_HEIGHT(rushHeightValue)
 end
 
 rushHeightTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushHeightDragging = true
         updateRushHeightFromX(input.Position.X)
     end
 end)
 rushHeightKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushHeightDragging = true
         updateRushHeightFromX(input.Position.X)
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if rushHeightDragging and (input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+    if rushHeightDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
         updateRushHeightFromX(input.Position.X)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         rushHeightDragging = false
     end
 end)
 
--- ===== EDIT RUSH BUTTON =====
+-- ===== EDIT BUTTON =====
+local rushEditActive = false
+
 rushEditBtn.MouseButton1Click:Connect(function()
-    if _G.RH_HUB_ENTER_RUSH_EDIT then
-        _G.RH_HUB_ENTER_RUSH_EDIT()
+    if not rushEditActive then
+        rushEditActive = true
+        rushEditBtn.Text = "✓  СОХРАНИТЬ ПОЗИЦИЮ ⚡"
+        rushEditBtn.TextColor3 = C.green
+        _G.RH_HUB_ENTER_RUSH_EDIT(true)
+    else
+        rushEditActive = false
+        rushEditBtn.Text = "📐  РЕДАКТИРОВАТЬ ПОЗИЦИЮ ⚡"
+        rushEditBtn.TextColor3 = C.text
+        _G.RH_HUB_ENTER_RUSH_EDIT(false)
     end
 end)
-
--- Сохраняем ссылки для Части 3
-_G.RH_HUB_RUSH_SPEED = rushSpeedValue
-_G.RH_HUB_RUSH_HEIGHT = rushHeightValue
-_G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
-_G.RH_HUB_IS_RUSH_ON = function() return rushModeEnabled end
 
 updateChildStates()
 
@@ -2029,7 +1975,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ CIRCLE (Кружок HUB) ============
+-- ============ CIRCLE ============
 local circleGui = create("ScreenGui", {
     Name = "RH_HUB_CIRCLE",
     ResetOnSpawn = false,
@@ -2121,7 +2067,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ MINIMIZE / CIRCLE / OVERLAY LOGIC ============
+-- ============ MINIMIZE / CIRCLE / OVERLAY ============
 local function setMode(newMode)
     if STATE.mode == newMode then return end
 
@@ -2164,7 +2110,7 @@ overlayFrame.MouseButton1Click:Connect(function()
     lastOverlayTap = now
 end)
 
--- ============ ⚡ TELEPORT RUSH — ГЛОБАЛЬНАЯ КНОПКА ============
+-- ============ ⚡ RUSH — ГЛОБАЛЬНАЯ КНОПКА ============
 local rushGui = create("ScreenGui", {
     Name = "RH_HUB_RUSH",
     ResetOnSpawn = false,
@@ -2175,50 +2121,30 @@ local rushGui = create("ScreenGui", {
 })
 safeParent(rushGui)
 
--- Кнопка ⚡
 local rushBtn = create("TextButton", {
     Name = "RushBtn",
     AnchorPoint = Vector2.new(1, 1),
     Position = UDim2.new(1, savedCfg.rushBtnPos.x, 1, savedCfg.rushBtnPos.y),
     Size = UDim2.fromOffset(64, 64),
     BackgroundColor3 = C.accent,
-    BackgroundTransparency = 0.2,
+    BackgroundTransparency = 0.15,
     BorderSizePixel = 0,
     Text = "⚡",
     TextColor3 = Color3.new(1, 1, 1),
     TextSize = 28,
     Font = Enum.Font.GothamBlack,
     AutoButtonColor = false,
-    Visible = false,  -- скрыта пока Rush Mode не включён
+    Visible = false,
 }, rushGui)
 corner(rushBtn, 32)
-stroke(rushBtn, C.pink, 2, 0.15)
-
--- Кнопка ✓ (появляется в edit)
-local rushCheckBtn = create("TextButton", {
-    Name = "CheckBtn",
-    AnchorPoint = Vector2.new(1, 1),
-    Position = UDim2.new(1, savedCfg.rushBtnPos.x - 76, 1, savedCfg.rushBtnPos.y),
-    Size = UDim2.fromOffset(44, 44),
-    BackgroundColor3 = C.green,
-    BorderSizePixel = 0,
-    Text = "✓",
-    TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 22,
-    Font = Enum.Font.GothamBlack,
-    AutoButtonColor = false,
-    Visible = false,
-    ZIndex = 5,
-}, rushGui)
-corner(rushCheckBtn, 22)
-stroke(rushCheckBtn, C.green, 2, 0)
+local rushStroke = stroke(rushBtn, C.pink, 2, 0.15)
 
 -- ============ HOOK WALKSPEED ============
+local hookInstalled = false
 local hookActive = false
-local hooksInstalled = false
 
 local function setupWalkSpeedHook()
-    if hooksInstalled then return end
+    if hookInstalled then return end
     if type(hookmetamethod) ~= "function" or type(newcclosure) ~= "function" then
         return
     end
@@ -2226,30 +2152,26 @@ local function setupWalkSpeedHook()
     local oldIndex, oldNewIndex
 
     oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
-        if key == "WalkSpeed" then
+        if key == "WalkSpeed" and hookActive then
             local char = LocalPlayer.Character
             if char and self == char:FindFirstChildOfClass("Humanoid") then
-                if hookActive then
-                    return 16  -- сервер видит 16
-                end
+                return 16
             end
         end
         return oldIndex(self, key)
     end))
 
     oldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
-        if key == "WalkSpeed" then
+        if key == "WalkSpeed" and hookActive then
             local char = LocalPlayer.Character
             if char and self == char:FindFirstChildOfClass("Humanoid") then
-                if hookActive then
-                    return oldNewIndex(self, key, 16)
-                end
+                return oldNewIndex(self, key, 16)
             end
         end
         return oldNewIndex(self, key, value)
     end))
 
-    hooksInstalled = true
+    hookInstalled = true
 end
 
 setupWalkSpeedHook()
@@ -2258,32 +2180,27 @@ setupWalkSpeedHook()
 local rushActive = false
 local rushEditMode = false
 
-local rushLongPressTimer = nil
-local rushHolding = false
-local rushHoldingStart = 0
+-- Перезаписываем заглушку (объявлена в Части 2)
+_G.RH_HUB_RUSH_ACTIVE = function() return rushActive end
 
-local rushDrag = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
-local RUSH_DRAG_THRESHOLD = 6
-
--- Активация Rush
 local function activateRush()
+    if rushActive then return end
     if not _G.RH_HUB_IS_WALKSPEED_ON() then return end
     if not _G.RH_HUB_IS_RUSH_ON() then return end
-    if rushActive then return end
-
-    rushActive = true
-    hookActive = true
 
     local char = LocalPlayer.Character
-    if not char then rushActive = false; hookActive = false; return end
+    if not char then return end
 
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid then rushActive = false; hookActive = false; return end
+    if not hrp or not humanoid then return end
 
-    -- Подъём
-    local targetPos = hrp.CFrame + Vector3.new(0, _G.RH_HUB_RUSH_HEIGHT or 5, 0)
-    hrp.CFrame = targetPos
+    hookActive = true
+
+    local height = _G.RH_HUB_RUSH_HEIGHT or 5
+    hrp.CFrame = hrp.CFrame + Vector3.new(0, height, 0)
+
+    rushActive = true
 end
 
 local function deactivateRush()
@@ -2293,25 +2210,26 @@ local function deactivateRush()
 
     local char = LocalPlayer.Character
     if not char then return end
+
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Raycast вниз — найти землю
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { char }
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = { char }
 
     local origin = hrp.Position
     local direction = Vector3.new(0, -1000, 0)
 
-    local result = workspace:Raycast(origin, direction, params)
+    local result = workspace:Raycast(origin, direction, rayParams)
+
     if result then
         local groundY = result.Position.Y + 3
         hrp.CFrame = CFrame.new(hrp.Position.X, groundY, hrp.Position.Z)
     end
 end
 
--- CFrame Stepper — во время Rush
+-- CFrame Stepper — только когда rushActive
 RunService.RenderStepped:Connect(function(dt)
     if not rushActive then return end
     if rushEditMode then return end
@@ -2323,78 +2241,25 @@ RunService.RenderStepped:Connect(function(dt)
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not humanoid then return end
 
-    -- Направление движения игрока
     local moveDir = humanoid.MoveDirection
+
     if moveDir.Magnitude > 0 then
-        local speed = (_G.RH_HUB_RUSH_SPEED or 200) / 60
-        local step = moveDir.Unit * speed * dt * 60
+        local speed = _G.RH_HUB_RUSH_SPEED or 200
+        local step = moveDir.Unit * (speed / 60)
         hrp.CFrame = hrp.CFrame + step
     end
-
-    -- Держим высоту
-    local height = _G.RH_HUB_RUSH_HEIGHT or 5
-    -- (постоянный подъём уже задан при активации)
 end)
 
--- ===== НАЖАТИЕ НА ⚡ =====
-local function setRushVisible(visible)
-    if rushEditMode then
-        rushBtn.Visible = true
-    else
-        rushBtn.Visible = visible
-    end
-end
-
-_G.RH_HUB_SET_RUSH_BTN_VISIBLE = setRushVisible
-
+-- Обработчики ⚡
 rushBtn.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Touch
     and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
         return
     end
 
-    rushHolding = true
-    rushHoldingStart = os.clock()
+    if rushEditMode then return end
 
-    -- Проверка долгого тапа (2 сек) — только если Rush выключен
-    if not rushActive then
-        rushLongPressTimer = task.delay(2, function()
-            if rushHolding and (os.clock() - rushHoldingStart) >= 1.9 then
-                -- Входим в edit mode
-                rushEditMode = true
-                rushCheckBtn.Visible = true
-                rushBtn.BackgroundTransparency = 0.5
-                rushBtn.Text = "⚡"
-
-                -- Начинаем drag
-                rushDrag.active = true
-                rushDrag.input = input
-                rushDrag.startPointer = input.Position
-                rushDrag.startPos = Vector2.new(rushBtn.Position.X.Offset, rushBtn.Position.Y.Offset)
-                rushDrag.moved = false
-            end
-        end)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if not rushDrag.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-
-    local d = input.Position - rushDrag.startPointer
-    if math.abs(d.X) > RUSH_DRAG_THRESHOLD or math.abs(d.Y) > RUSH_DRAG_THRESHOLD then
-        rushDrag.moved = true
-    end
-
-    if rushDrag.moved then
-        local cam = workspace.CurrentCamera
-        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
-        local x = math.clamp(rushDrag.startPos.X + d.X, -vp.X + rushBtn.AbsoluteSize.X, 0)
-        local y = math.clamp(rushDrag.startPos.Y + d.Y, -vp.Y + rushBtn.AbsoluteSize.Y, 0)
-        rushBtn.Position = UDim2.new(1, x, 1, y)
-        rushCheckBtn.Position = UDim2.new(1, x - 76, 1, y)
-    end
+    activateRush()
 end)
 
 rushBtn.InputEnded:Connect(function(input)
@@ -2403,90 +2268,94 @@ rushBtn.InputEnded:Connect(function(input)
         return
     end
 
-    rushHolding = false
-    if rushLongPressTimer then
-        task.cancel(rushLongPressTimer)
-        rushLongPressTimer = nil
-    end
-
-    -- Если был edit — выходим
-    if rushEditMode then
-        rushDrag.active = false
-        -- Не выходим из edit по отпусканию — ждём тап ✓
-        return
-    end
-
-    -- Обычная логика — стоп
-    if rushActive then
-        deactivateRush()
-    end
-end)
-
--- Простой тап = активация (вне edit)
-rushBtn.MouseButton1Click:Connect(function()
     if rushEditMode then return end
-    if not _G.RH_HUB_IS_RUSH_ON() then return end
-    if rushActive then return end
 
-    -- Если это был короткий тап — активируем Rush
-    if (os.clock() - rushHoldingStart) < 0.5 then
-        -- Но hold-логика: Rush активируется ПОКА ДЕРЖИШЬ
-        -- Проверим — если всё ещё держим, активируем
-    end
+    deactivateRush()
 end)
 
--- Переопределяем: активация через InputBegan
+-- Перемещение кнопки в edit mode
+local rushDrag = { active = false, input = nil, startPointer = nil, startPos = nil }
+local RUSH_DRAG_THRESHOLD = 4
+
 rushBtn.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Touch
     and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
         return
     end
-    if rushEditMode then return end
-    if not _G.RH_HUB_IS_RUSH_ON() then return end
 
-    -- Активируем сразу при нажатии (если не edit)
-    task.delay(0.3, function()
-        if rushHolding and not rushEditMode and _G.RH_HUB_IS_RUSH_ON() then
-            activateRush()
-        end
-    end)
-end)
-
--- ===== КНОПКА ✓ — СОХРАНИТЬ =====
-rushCheckBtn.MouseButton1Click:Connect(function()
     if not rushEditMode then return end
 
-    rushEditMode = false
-    rushDrag.active = false
-    rushCheckBtn.Visible = false
-    rushBtn.BackgroundTransparency = 0.2
+    rushDrag.active = true
+    rushDrag.input = input
+    rushDrag.startPointer = input.Position
+    rushDrag.startPos = Vector2.new(rushBtn.Position.X.Offset, rushBtn.Position.Y.Offset)
+end)
 
-    -- Сохраняем позицию
-    savedCfg.rushBtnPos = {
-        x = rushBtn.Position.X.Offset,
-        y = rushBtn.Position.Y.Offset,
-    }
-    saveConfig()
+UserInputService.InputChanged:Connect(function(input)
+    if not rushDrag.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
 
-    -- Если Rush Mode выключен — скрыть кнопку
-    if not _G.RH_HUB_IS_RUSH_ON() then
-        rushBtn.Visible = false
-    end
+    local d = input.Position - rushDrag.startPointer
 
-    if _G.RH_HUB_TOAST then
-        _G.RH_HUB_TOAST("Позиция ⚡ сохранена", "ok")
+    if math.abs(d.X) > RUSH_DRAG_THRESHOLD or math.abs(d.Y) > RUSH_DRAG_THRESHOLD then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(rushDrag.startPos.X + d.X, -vp.X + rushBtn.AbsoluteSize.X, 0)
+        local y = math.clamp(rushDrag.startPos.Y + d.Y, -vp.Y + rushBtn.AbsoluteSize.Y, 0)
+        rushBtn.Position = UDim2.new(1, x, 1, y)
     end
 end)
 
--- ===== ВНЕШНЯЯ ФУНКЦИЯ ДЛЯ EDIT (из MOVE) =====
-_G.RH_HUB_ENTER_RUSH_EDIT = function()
-    rushEditMode = true
-    rushCheckBtn.Visible = true
-    rushBtn.Visible = true
-    rushBtn.BackgroundTransparency = 0.5
+UserInputService.InputEnded:Connect(function(input)
+    if not rushDrag.active then return end
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushDrag.active = false
+    end
+end)
 
-    if _G.RH_HUB_TOAST then
-        _G.RH_HUB_TOAST("Перетащи ⚡ и нажми ✓", "info")
+-- Внешние функции (перезаписываем заглушки из Части 2)
+_G.RH_HUB_SET_RUSH_VISIBLE = function(visible)
+    if rushEditMode then
+        rushBtn.Visible = true
+        return
+    end
+    rushBtn.Visible = visible
+end
+
+_G.RH_HUB_SET_RUSH_SPEED = function(speed)
+    _G.RH_HUB_RUSH_SPEED = speed
+end
+
+_G.RH_HUB_SET_RUSH_HEIGHT = function(height)
+    _G.RH_HUB_RUSH_HEIGHT = height
+end
+
+_G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
+    rushEditMode = enter
+
+    if enter then
+        rushBtn.Visible = true
+        rushBtn.BackgroundTransparency = 0.5
+        rushBtn.Text = "✥"
+        rushBtn.TextSize = 26
+        rushStroke.Transparency = 0.5
+    else
+        savedCfg.rushBtnPos = {
+            x = rushBtn.Position.X.Offset,
+            y = rushBtn.Position.Y.Offset,
+        }
+        saveConfig()
+
+        rushBtn.BackgroundTransparency = 0.15
+        rushBtn.Text = "⚡"
+        rushBtn.TextSize = 28
+        rushStroke.Transparency = 0.15
+
+        if not _G.RH_HUB_IS_RUSH_ON() then
+            rushBtn.Visible = false
+        end
     end
 end
 
@@ -2534,11 +2403,6 @@ onAuthSuccess = function(token)
     setStatus("Успешная авторизация!", "ok")
     authToast("Добро пожаловать!", "ok")
 
-    -- Экспортируем toast наружу (для глобальной кнопки ⚡)
-    _G.RH_HUB_TOAST = function(text, kind)
-        authToast(text, kind)
-    end
-
     task.spawn(function()
         task.wait(0.7)
 
@@ -2571,7 +2435,7 @@ onAuthSuccess = function(token)
     end)
 end
 
--- ============ HEARTBEAT (5 сек) + ТАЙМЕР ============
+-- ============ HEARTBEAT ============
 task.spawn(function()
     task.wait(2)
 
