@@ -1,15 +1,14 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.4 "Safe Mode"
+    Version: 1.5
     Platform: Roblox / Delta Executor / iOS
 
-    CHANGELOG 1.4:
-      - Retry /activate — 3 попытки при таймауте
-      - Понятные ошибки для юзера
-      - Защита от потери ключа при плохой сети
-      - Таймер оставшегося времени в хедере
-      - Heartbeat: проверка каждые 5 секунд
+    CHANGELOG 1.5:
+      - WalkSpeed с Stealth Mode (beta)
+      - Плавный слайдер
+      - Reapply on respawn
+      - Прогрессивное раскрытие (замки на дочерних функциях)
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -23,7 +22,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "1.4",
+    VERSION     = "1.5",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -169,7 +168,6 @@ local function getRequestFn()
     return nil
 end
 
--- ==== API С ТАЙМАУТОМ (15 секунд) ====
 local function api(path, body)
     local req = getRequestFn()
     if not req then return nil, "Executor не поддерживает HTTP-запросы" end
@@ -246,7 +244,6 @@ local function api(path, body)
     return decoded
 end
 
--- ==== API С RETRY (для /activate) ====
 local function apiWithRetry(path, body, maxAttempts, delay)
     maxAttempts = maxAttempts or CONFIG.RETRY_MAX
     delay = delay or CONFIG.RETRY_DELAY
@@ -255,21 +252,16 @@ local function apiWithRetry(path, body, maxAttempts, delay)
 
     for attempt = 1, maxAttempts do
         local result, err = api(path, body)
-
-        if result then
-            return result, nil, attempt
-        end
+        if result then return result, nil, attempt end
 
         lastErr = err
         local errText = tostring(err or ""):lower()
 
-        -- Таймаут — пробуем ещё раз
         if errText:find("таймаут") or errText:find("timeout") then
             if attempt < maxAttempts then
                 task.wait(delay)
             end
         else
-            -- Другая ошибка — не retry
             return nil, err, attempt
         end
     end
@@ -348,7 +340,6 @@ local function makeToast(guiObj, parentFrame)
     end
 end
 
--- AUTH GUI
 local authGui = create("ScreenGui", {
     Name = "RH_HUB_AUTH_GUI",
     ResetOnSpawn = false,
@@ -636,7 +627,6 @@ end)
 
 local onAuthSuccess
 
--- ==== АКТИВАЦИЯ КЛЮЧА С RETRY ====
 local function activateKey(rawKey)
     local key = tostring(rawKey or ""):gsub("%s+", "")
 
@@ -655,15 +645,11 @@ local function activateKey(rawKey)
             STATE.deviceId = generateDeviceId()
         end
 
-        local body = {
-            key = key,
-            install_hash = STATE.deviceId,
-        }
+        local body = { key = key, install_hash = STATE.deviceId }
 
-        -- RETRY-логика: до 3 попыток
         local result, err, attempts = apiWithRetry("/activate", body, CONFIG.RETRY_MAX, CONFIG.RETRY_DELAY)
 
-        if attempts > 1 then
+        if attempts > 1 and result then
             setStatus("Попытка " .. attempts .. " успешна", "ok")
         end
 
@@ -683,7 +669,7 @@ local function activateKey(rawKey)
                 authToast("Ключ истёк", "err")
             elseif low:find("таймаут") or low:find("timeout") then
                 setStatus("❌ Сервер не отвечает. Попробуй позже.", "err")
-                authToast("Сервер не отвечает. Попробуй ещё раз.", "err")
+                authToast("Сервер не отвечает", "err")
             else
                 setStatus("❌ " .. msg, "err")
                 authToast(msg, "err")
@@ -845,7 +831,6 @@ create("TextLabel", {
     TextXAlignment = Enum.TextXAlignment.Left,
 }, header)
 
--- Таймер оставшегося времени
 local timerLabel = create("TextLabel", {
     Position = UDim2.new(1, -170, 0, 8),
     Size = UDim2.new(0, 90, 0, 30),
@@ -1109,8 +1094,388 @@ infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху вид�
 infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
 
 -- ============ MOVE ============
-section(movePage, "ДВИЖЕНИЕ")
-soonCard(movePage)
+section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
+
+local walkSpeedEnabled = false
+local stealthEnabled = false
+local walkSpeedValue = 100
+local currentHumanoid = nil
+local currentHRP = nil
+local currentLinearVelocity = nil
+local currentBodyVelocity = nil
+local currentAttachment = nil
+
+local STEALTH_MODE = "linear"  -- "linear" | "body" — используется fallback
+
+local function cleanupStealthObjects()
+    if currentLinearVelocity then pcall(function() currentLinearVelocity:Destroy() end) end
+    if currentBodyVelocity then pcall(function() currentBodyVelocity:Destroy() end) end
+    if currentAttachment then pcall(function() currentAttachment:Destroy() end) end
+    currentLinearVelocity = nil
+    currentBodyVelocity = nil
+    currentAttachment = nil
+end
+
+local function applyWalkSpeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    currentHumanoid = char:FindFirstChildOfClass("Humanoid")
+    currentHRP = char:FindFirstChild("HumanoidRootPart")
+end
+
+local function updateSpeedState()
+    applyWalkSpeed()
+    if not currentHumanoid then return end
+
+    if walkSpeedEnabled and not stealthEnabled then
+        -- Обычный WalkSpeed
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = walkSpeedValue
+    elseif walkSpeedEnabled and stealthEnabled then
+        -- Stealth: не трогаем WalkSpeed, добавляем LinearVelocity или BodyVelocity
+        currentHumanoid.WalkSpeed = 16
+
+        if not currentHRP then return end
+
+        if not currentLinearVelocity and not currentBodyVelocity then
+            -- Пробуем LinearVelocity
+            local ok = pcall(function()
+                currentAttachment = Instance.new("Attachment")
+                currentAttachment.Parent = currentHRP
+
+                currentLinearVelocity = Instance.new("LinearVelocity")
+                currentLinearVelocity.Attachment0 = currentAttachment
+                currentLinearVelocity.MaxForce = math.huge
+                currentLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+                currentLinearVelocity.Parent = currentHRP
+            end)
+
+            if not ok or not currentLinearVelocity then
+                -- Fallback на BodyVelocity
+                cleanupStealthObjects()
+                pcall(function()
+                    currentBodyVelocity = Instance.new("BodyVelocity")
+                    currentBodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    currentBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                    currentBodyVelocity.Parent = currentHRP
+                end)
+                STEALTH_MODE = "body"
+            else
+                STEALTH_MODE = "linear"
+            end
+        end
+    else
+        -- Всё выключено — сброс
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = 16
+    end
+end
+
+-- Основной цикл Stealth-движения
+RunService.RenderStepped:Connect(function()
+    if not walkSpeedEnabled then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
+
+    if stealthEnabled then
+        humanoid.WalkSpeed = 16
+
+        local moveDir = humanoid.MoveDirection
+        local velocity = moveDir.Magnitude > 0
+            and moveDir.Unit * walkSpeedValue
+            or Vector3.new(0, 0, 0)
+
+        if currentLinearVelocity and currentLinearVelocity.Parent then
+            currentLinearVelocity.VectorVelocity = velocity
+        elseif currentBodyVelocity and currentBodyVelocity.Parent then
+            currentBodyVelocity.Velocity = velocity
+        end
+    else
+        humanoid.WalkSpeed = walkSpeedValue
+    end
+end)
+
+-- Восстановление после респавна
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    applyWalkSpeed()
+    if walkSpeedEnabled then
+        cleanupStealthObjects()
+        if not stealthEnabled then
+            if currentHumanoid then currentHumanoid.WalkSpeed = walkSpeedValue end
+        else
+            updateSpeedState()
+        end
+    end
+end)
+
+-- ==== UI: TOGGLE WALKSPEED ====
+local walkSpeedToggleWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 44),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+}, movePage)
+corner(walkSpeedToggleWrap, 10)
+
+local walkSpeedToggleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 0),
+    Size = UDim2.new(1, -80, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "Ускорение ходьбы",
+    TextColor3 = C.text,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, walkSpeedToggleWrap)
+
+local walkSpeedToggleTrack = create("Frame", {
+    Position = UDim2.new(1, -62, 0.5, -12),
+    Size = UDim2.new(0, 46, 0, 24),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, walkSpeedToggleWrap)
+corner(walkSpeedToggleTrack, 12)
+
+local walkSpeedToggleKnob = create("Frame", {
+    Position = UDim2.new(0, 2, 0, 2),
+    Size = UDim2.new(0, 20, 0, 20),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, walkSpeedToggleTrack)
+corner(walkSpeedToggleKnob, 10)
+
+local walkSpeedToggleBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+}, walkSpeedToggleWrap)
+
+-- ==== UI: SPEED SLIDER ====
+local sliderWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 56),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Visible = false,
+}, movePage)
+corner(sliderWrap, 10)
+
+local sliderLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 6),
+    Size = UDim2.new(1, -24, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "Скорость: " .. walkSpeedValue,
+    TextColor3 = C.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, sliderWrap)
+
+local sliderTrack = create("Frame", {
+    Position = UDim2.new(0, 12, 0, 32),
+    Size = UDim2.new(1, -24, 0, 8),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, sliderWrap)
+corner(sliderTrack, 4)
+
+local sliderFill = create("Frame", {
+    Size = UDim2.new((walkSpeedValue - 16) / (500 - 16), 0, 1, 0),
+    BackgroundColor3 = C.accent,
+    BorderSizePixel = 0,
+}, sliderTrack)
+corner(sliderFill, 4)
+
+local sliderKnob = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new((walkSpeedValue - 16) / (500 - 16), 0, 0.5, 0),
+    Size = UDim2.fromOffset(18, 18),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, sliderTrack)
+corner(sliderKnob, 9)
+
+local sliderDragging = false
+
+local function updateSliderFromX(x)
+    local left = sliderTrack.AbsolutePosition.X
+    local width = math.max(1, sliderTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor((16 + alpha * (500 - 16)) / 5 + 0.5) * 5
+    value = math.clamp(value, 16, 500)
+    walkSpeedValue = value
+
+    sliderLabel.Text = "Скорость: " .. walkSpeedValue
+
+    local newAlpha = (walkSpeedValue - 16) / (500 - 16)
+
+    TweenService:Create(sliderFill, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(newAlpha, 0, 1, 0),
+    }):Play()
+
+    TweenService:Create(sliderKnob, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(newAlpha, 0, 0.5, 0),
+    }):Play()
+
+    updateSpeedState()
+end
+
+sliderTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = true
+        updateSliderFromX(input.Position.X)
+    end
+end)
+
+sliderKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = true
+        updateSliderFromX(input.Position.X)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateSliderFromX(input.Position.X)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = false
+    end
+end)
+
+-- ==== UI: STEALTH TOGGLE ====
+local stealthToggleWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,  -- тусклая пока walkSpeed выкл
+    BorderSizePixel = 0,
+}, movePage)
+corner(stealthToggleWrap, 10)
+local stealthToggleStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, stealthToggleWrap)
+
+local stealthToggleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 8),
+    Size = UDim2.new(1, -80, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "Stealth Mode (beta) 🔒",
+    TextColor3 = C.muted,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, stealthToggleWrap)
+
+local stealthToggleHint = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 26),
+    Size = UDim2.new(1, -80, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "Включи ускорение, чтобы разблокировать",
+    TextColor3 = C.muted,
+    TextSize = 8,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, stealthToggleWrap)
+
+local stealthToggleTrack = create("Frame", {
+    Position = UDim2.new(1, -62, 0.5, -12),
+    Size = UDim2.new(0, 46, 0, 24),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, stealthToggleWrap)
+corner(stealthToggleTrack, 12)
+
+local stealthToggleKnob = create("Frame", {
+    Position = UDim2.new(0, 2, 0, 2),
+    Size = UDim2.new(0, 20, 0, 20),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, stealthToggleTrack)
+corner(stealthToggleKnob, 10)
+
+local stealthToggleBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+}, stealthToggleWrap)
+
+-- ==== ЛОГИКА TOGGLE ====
+local function updateStealthVisual()
+    if walkSpeedEnabled then
+        -- Разблокировано
+        stealthToggleWrap.BackgroundTransparency = 0
+        stealthToggleStroke.Transparency = 0.2
+        stealthToggleLabel.TextColor3 = C.text
+        stealthToggleLabel.Text = "Stealth Mode (beta)"
+        stealthToggleHint.Text = "Сервер не видит изменение скорости"
+    else
+        -- Заблокировано
+        stealthToggleWrap.BackgroundTransparency = 0.5
+        stealthToggleStroke.Transparency = 0.5
+        stealthToggleLabel.TextColor3 = C.muted
+        stealthToggleLabel.Text = "Stealth Mode (beta) 🔒"
+        stealthToggleHint.Text = "Включи ускорение, чтобы разблокировать"
+    end
+end
+
+walkSpeedToggleBtn.MouseButton1Click:Connect(function()
+    walkSpeedEnabled = not walkSpeedEnabled
+
+    -- Анимация toggle
+    TweenService:Create(walkSpeedToggleTrack, TweenInfo.new(0.2), {
+        BackgroundColor3 = walkSpeedEnabled and C.accent or C.button,
+    }):Play()
+    TweenService:Create(walkSpeedToggleKnob, TweenInfo.new(0.2), {
+        Position = walkSpeedEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+    }):Play()
+
+    -- Показать/скрыть слайдер
+    sliderWrap.Visible = walkSpeedEnabled
+
+    -- Если ВЫКЛ — принудительно выключить Stealth
+    if not walkSpeedEnabled and stealthEnabled then
+        stealthEnabled = false
+        TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), {
+            BackgroundColor3 = C.button,
+        }):Play()
+        TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), {
+            Position = UDim2.new(0, 2, 0, 2),
+        }):Play()
+    end
+
+    updateStealthVisual()
+    updateSpeedState()
+end)
+
+stealthToggleBtn.MouseButton1Click:Connect(function()
+    if not walkSpeedEnabled then return end  -- заблокировано
+
+    stealthEnabled = not stealthEnabled
+
+    TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), {
+        BackgroundColor3 = stealthEnabled and C.accent or C.button,
+    }):Play()
+    TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), {
+        Position = stealthEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+    }):Play()
+
+    updateSpeedState()
+end)
+
+updateStealthVisual()
 
 -- ============ VISUAL ============
 section(visualPage, "ВИЗУАЛИЗАЦИЯ")
@@ -1122,7 +1487,7 @@ soonCard(tpPage)
 
 -- ============ SETTINGS ============
 section(settingsPage, "НАСТРОЙКИ")
-infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена. При следующем запуске — экран авторизации.")
+infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена.")
 
 local logoutBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 38),
