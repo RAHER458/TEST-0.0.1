@@ -1,14 +1,16 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 1.5
+    Version: 1.6
     Platform: Roblox / Delta Executor / iOS
 
-    CHANGELOG 1.5:
-      - WalkSpeed с Stealth Mode (beta)
-      - Плавный слайдер
-      - Reapply on respawn
-      - Прогрессивное раскрытие (замки на дочерних функциях)
+    CHANGELOG 1.6:
+      - WalkSpeed + Stealth Mode (beta)
+      - ⚡ Teleport Rush (дочерний от WalkSpeed)
+      - Плавный CFrame stepper для ⚡
+      - Hook WalkSpeed при Rush
+      - Edit mode для кнопки ⚡
+      - Сохранение позиции в RH_HUB_CONFIG.dat
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -22,11 +24,12 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "1.5",
+    VERSION     = "1.6",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
     DEVICE_FILE = "RH_HUB_DEVICE.dat",
+    CONFIG_FILE = "RH_HUB_CONFIG.dat",
     TG_LINK     = "https://t.me/generalvaneska2024",
     WINDOW_W    = 340,
     WINDOW_H    = 440,
@@ -53,13 +56,13 @@ local C = {
 
 pcall(function()
     local core = game:GetService("CoreGui")
-    for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
+    for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE", "RH_HUB_RUSH"}) do
         local old = core:FindFirstChild(name)
         if old then old:Destroy() end
     end
     local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if playerGui then
-        for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
+        for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE", "RH_HUB_RUSH"}) do
             local old = playerGui:FindFirstChild(name)
             if old then old:Destroy() end
         end
@@ -106,6 +109,39 @@ local function hasFileAPI()
        and type(isfile) == "function"
 end
 
+-- ============ CONFIG FILE (позиция ⚡ + настройки) ============
+local savedCfg = {
+    rushBtnPos = { x = -70, y = -140 },  -- дефолт: рядом с прыжком
+}
+
+local function loadConfig()
+    if not hasFileAPI() then return end
+    local ok, result = pcall(function()
+        if isfile(CONFIG.CONFIG_FILE) then
+            local raw = readfile(CONFIG.CONFIG_FILE)
+            if type(raw) == "string" and raw ~= "" then
+                local dec = HttpService:JSONDecode(raw)
+                if type(dec) == "table" then return dec end
+            end
+        end
+        return nil
+    end)
+    if ok and type(result) == "table" then
+        for k, v in pairs(result) do savedCfg[k] = v end
+    end
+end
+
+local function saveConfig()
+    if not hasFileAPI() then return end
+    pcall(function()
+        local raw = HttpService:JSONEncode(savedCfg)
+        writefile(CONFIG.CONFIG_FILE, raw)
+    end)
+end
+
+loadConfig()
+
+-- ============ DEVICE ID ============
 local function generateDeviceId()
     return "RH-" .. HttpService:GenerateGUID(false)
 end
@@ -1096,125 +1132,21 @@ infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH |
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
 
+-- Глобальные переменные
 local walkSpeedEnabled = false
 local stealthEnabled = false
 local walkSpeedValue = 100
+local rushModeEnabled = false
+local rushSpeedValue = 200
+local rushHeightValue = 5
+
 local currentHumanoid = nil
 local currentHRP = nil
 local currentLinearVelocity = nil
 local currentBodyVelocity = nil
 local currentAttachment = nil
 
-local STEALTH_MODE = "linear"  -- "linear" | "body" — используется fallback
-
-local function cleanupStealthObjects()
-    if currentLinearVelocity then pcall(function() currentLinearVelocity:Destroy() end) end
-    if currentBodyVelocity then pcall(function() currentBodyVelocity:Destroy() end) end
-    if currentAttachment then pcall(function() currentAttachment:Destroy() end) end
-    currentLinearVelocity = nil
-    currentBodyVelocity = nil
-    currentAttachment = nil
-end
-
-local function applyWalkSpeed()
-    local char = LocalPlayer.Character
-    if not char then return end
-    currentHumanoid = char:FindFirstChildOfClass("Humanoid")
-    currentHRP = char:FindFirstChild("HumanoidRootPart")
-end
-
-local function updateSpeedState()
-    applyWalkSpeed()
-    if not currentHumanoid then return end
-
-    if walkSpeedEnabled and not stealthEnabled then
-        -- Обычный WalkSpeed
-        cleanupStealthObjects()
-        currentHumanoid.WalkSpeed = walkSpeedValue
-    elseif walkSpeedEnabled and stealthEnabled then
-        -- Stealth: не трогаем WalkSpeed, добавляем LinearVelocity или BodyVelocity
-        currentHumanoid.WalkSpeed = 16
-
-        if not currentHRP then return end
-
-        if not currentLinearVelocity and not currentBodyVelocity then
-            -- Пробуем LinearVelocity
-            local ok = pcall(function()
-                currentAttachment = Instance.new("Attachment")
-                currentAttachment.Parent = currentHRP
-
-                currentLinearVelocity = Instance.new("LinearVelocity")
-                currentLinearVelocity.Attachment0 = currentAttachment
-                currentLinearVelocity.MaxForce = math.huge
-                currentLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
-                currentLinearVelocity.Parent = currentHRP
-            end)
-
-            if not ok or not currentLinearVelocity then
-                -- Fallback на BodyVelocity
-                cleanupStealthObjects()
-                pcall(function()
-                    currentBodyVelocity = Instance.new("BodyVelocity")
-                    currentBodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
-                    currentBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-                    currentBodyVelocity.Parent = currentHRP
-                end)
-                STEALTH_MODE = "body"
-            else
-                STEALTH_MODE = "linear"
-            end
-        end
-    else
-        -- Всё выключено — сброс
-        cleanupStealthObjects()
-        currentHumanoid.WalkSpeed = 16
-    end
-end
-
--- Основной цикл Stealth-движения
-RunService.RenderStepped:Connect(function()
-    if not walkSpeedEnabled then return end
-
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not hrp then return end
-
-    if stealthEnabled then
-        humanoid.WalkSpeed = 16
-
-        local moveDir = humanoid.MoveDirection
-        local velocity = moveDir.Magnitude > 0
-            and moveDir.Unit * walkSpeedValue
-            or Vector3.new(0, 0, 0)
-
-        if currentLinearVelocity and currentLinearVelocity.Parent then
-            currentLinearVelocity.VectorVelocity = velocity
-        elseif currentBodyVelocity and currentBodyVelocity.Parent then
-            currentBodyVelocity.Velocity = velocity
-        end
-    else
-        humanoid.WalkSpeed = walkSpeedValue
-    end
-end)
-
--- Восстановление после респавна
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    applyWalkSpeed()
-    if walkSpeedEnabled then
-        cleanupStealthObjects()
-        if not stealthEnabled then
-            if currentHumanoid then currentHumanoid.WalkSpeed = walkSpeedValue end
-        else
-            updateSpeedState()
-        end
-    end
-end)
-
--- ==== UI: TOGGLE WALKSPEED ====
+-- ===== UI: TOGGLE WALKSPEED =====
 local walkSpeedToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
     BackgroundColor3 = C.surface,
@@ -1255,7 +1187,7 @@ local walkSpeedToggleBtn = create("TextButton", {
     Text = "",
 }, walkSpeedToggleWrap)
 
--- ==== UI: SPEED SLIDER ====
+-- ===== UI: SLIDER SPEED =====
 local sliderWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 56),
     BackgroundColor3 = C.surface,
@@ -1299,66 +1231,11 @@ local sliderKnob = create("Frame", {
 }, sliderTrack)
 corner(sliderKnob, 9)
 
-local sliderDragging = false
-
-local function updateSliderFromX(x)
-    local left = sliderTrack.AbsolutePosition.X
-    local width = math.max(1, sliderTrack.AbsoluteSize.X)
-    local alpha = math.clamp((x - left) / width, 0, 1)
-    local value = math.floor((16 + alpha * (500 - 16)) / 5 + 0.5) * 5
-    value = math.clamp(value, 16, 500)
-    walkSpeedValue = value
-
-    sliderLabel.Text = "Скорость: " .. walkSpeedValue
-
-    local newAlpha = (walkSpeedValue - 16) / (500 - 16)
-
-    TweenService:Create(sliderFill, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
-        Size = UDim2.new(newAlpha, 0, 1, 0),
-    }):Play()
-
-    TweenService:Create(sliderKnob, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
-        Position = UDim2.new(newAlpha, 0, 0.5, 0),
-    }):Play()
-
-    updateSpeedState()
-end
-
-sliderTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        sliderDragging = true
-        updateSliderFromX(input.Position.X)
-    end
-end)
-
-sliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        sliderDragging = true
-        updateSliderFromX(input.Position.X)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if sliderDragging and (input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseMovement) then
-        updateSliderFromX(input.Position.X)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        sliderDragging = false
-    end
-end)
-
--- ==== UI: STEALTH TOGGLE ====
+-- ===== UI: STEALTH TOGGLE =====
 local stealthToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 50),
     BackgroundColor3 = C.surface,
-    BackgroundTransparency = 0.5,  -- тусклая пока walkSpeed выкл
+    BackgroundTransparency = 0.5,
     BorderSizePixel = 0,
 }, movePage)
 corner(stealthToggleWrap, 10)
@@ -1412,29 +1289,330 @@ local stealthToggleBtn = create("TextButton", {
     Text = "",
 }, stealthToggleWrap)
 
--- ==== ЛОГИКА TOGGLE ====
-local function updateStealthVisual()
+-- ===== UI: RUSH MODE TOGGLE =====
+local rushToggleWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+}, movePage)
+corner(rushToggleWrap, 10)
+local rushToggleStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, rushToggleWrap)
+
+local rushToggleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 8),
+    Size = UDim2.new(1, -80, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Teleport Rush 🔒",
+    TextColor3 = C.muted,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushToggleWrap)
+
+local rushToggleHint = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 26),
+    Size = UDim2.new(1, -80, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "Включи ускорение, чтобы разблокировать",
+    TextColor3 = C.muted,
+    TextSize = 8,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushToggleWrap)
+
+local rushToggleTrack = create("Frame", {
+    Position = UDim2.new(1, -62, 0.5, -12),
+    Size = UDim2.new(0, 46, 0, 24),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushToggleWrap)
+corner(rushToggleTrack, 12)
+
+local rushToggleKnob = create("Frame", {
+    Position = UDim2.new(0, 2, 0, 2),
+    Size = UDim2.new(0, 20, 0, 20),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushToggleTrack)
+corner(rushToggleKnob, 10)
+
+local rushToggleBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+}, rushToggleWrap)
+
+-- ===== UI: RUSH SETTINGS (скорость + высота) =====
+local rushSettingsWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 110),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+    Visible = false,
+}, movePage)
+corner(rushSettingsWrap, 10)
+local rushSettingsStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, rushSettingsWrap)
+
+-- Скорость ⚡
+local rushSpeedLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 6),
+    Size = UDim2.new(1, -24, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Скорость: " .. rushSpeedValue,
+    TextColor3 = C.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushSettingsWrap)
+
+local rushSpeedTrack = create("Frame", {
+    Position = UDim2.new(0, 12, 0, 28),
+    Size = UDim2.new(1, -24, 0, 8),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushSettingsWrap)
+corner(rushSpeedTrack, 4)
+
+local rushSpeedFill = create("Frame", {
+    Size = UDim2.new(rushSpeedValue / 500, 0, 1, 0),
+    BackgroundColor3 = C.pink,
+    BorderSizePixel = 0,
+}, rushSpeedTrack)
+corner(rushSpeedFill, 4)
+
+local rushSpeedKnob = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(rushSpeedValue / 500, 0, 0.5, 0),
+    Size = UDim2.fromOffset(18, 18),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushSpeedTrack)
+corner(rushSpeedKnob, 9)
+
+-- Высота ⚡
+local rushHeightLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 54),
+    Size = UDim2.new(1, -24, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Высота: " .. rushHeightValue .. " стадов",
+    TextColor3 = C.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushSettingsWrap)
+
+local rushHeightTrack = create("Frame", {
+    Position = UDim2.new(0, 12, 0, 76),
+    Size = UDim2.new(1, -24, 0, 8),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushSettingsWrap)
+corner(rushHeightTrack, 4)
+
+local rushHeightFill = create("Frame", {
+    Size = UDim2.new(rushHeightValue / 10, 0, 1, 0),
+    BackgroundColor3 = C.accent2 or C.accent,
+    BorderSizePixel = 0,
+}, rushHeightTrack)
+corner(rushHeightFill, 4)
+
+local rushHeightKnob = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(rushHeightValue / 10, 0, 0.5, 0),
+    Size = UDim2.fromOffset(18, 18),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushHeightTrack)
+corner(rushHeightKnob, 9)
+
+-- ===== UI: EDIT RUSH BUTTON =====
+local rushEditWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 38),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+    Visible = false,
+}, movePage)
+corner(rushEditWrap, 10)
+local rushEditStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, rushEditWrap)
+
+local rushEditBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "📐  РЕДАКТИРОВАТЬ ПОЗИЦИЮ ⚡",
+    TextColor3 = C.muted,
+    TextSize = 10,
+    Font = Enum.Font.GothamBold,
+}, rushEditWrap)
+
+-- ===== ЛОГИКА WALKSPEED =====
+local function applyWalkSpeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    currentHumanoid = char:FindFirstChildOfClass("Humanoid")
+    currentHRP = char:FindFirstChild("HumanoidRootPart")
+end
+
+local function cleanupStealthObjects()
+    if currentLinearVelocity then pcall(function() currentLinearVelocity:Destroy() end) end
+    if currentBodyVelocity then pcall(function() currentBodyVelocity:Destroy() end) end
+    if currentAttachment then pcall(function() currentAttachment:Destroy() end) end
+    currentLinearVelocity = nil
+    currentBodyVelocity = nil
+    currentAttachment = nil
+end
+
+-- Временное хранилище для Stealth-объектов (используется в Части 3)
+_G.RH_HUB_CLEANUP_STEALTH = cleanupStealthObjects
+_G.RH_HUB_APPLY_WALKSPEED = applyWalkSpeed
+
+local function updateSpeedState()
+    applyWalkSpeed()
+    if not currentHumanoid then return end
+
+    if walkSpeedEnabled and not stealthEnabled then
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = walkSpeedValue
+    elseif walkSpeedEnabled and stealthEnabled then
+        currentHumanoid.WalkSpeed = 16
+
+        if not currentHRP then return end
+
+        if not currentLinearVelocity and not currentBodyVelocity then
+            local ok = pcall(function()
+                currentAttachment = Instance.new("Attachment")
+                currentAttachment.Parent = currentHRP
+
+                currentLinearVelocity = Instance.new("LinearVelocity")
+                currentLinearVelocity.Attachment0 = currentAttachment
+                currentLinearVelocity.MaxForce = math.huge
+                currentLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+                currentLinearVelocity.Parent = currentHRP
+            end)
+
+            if not ok or not currentLinearVelocity then
+                cleanupStealthObjects()
+                pcall(function()
+                    currentBodyVelocity = Instance.new("BodyVelocity")
+                    currentBodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    currentBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                    currentBodyVelocity.Parent = currentHRP
+                end)
+            end
+        end
+    else
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = 16
+    end
+end
+
+-- Основной цикл Stealth
+RunService.RenderStepped:Connect(function()
+    if not walkSpeedEnabled then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
+
+    if stealthEnabled then
+        humanoid.WalkSpeed = 16
+
+        local moveDir = humanoid.MoveDirection
+        local velocity = moveDir.Magnitude > 0
+            and moveDir.Unit * walkSpeedValue
+            or Vector3.new(0, 0, 0)
+
+        if currentLinearVelocity and currentLinearVelocity.Parent then
+            currentLinearVelocity.VectorVelocity = velocity
+        elseif currentBodyVelocity and currentBodyVelocity.Parent then
+            currentBodyVelocity.Velocity = velocity
+        end
+    else
+        humanoid.WalkSpeed = walkSpeedValue
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    applyWalkSpeed()
     if walkSpeedEnabled then
-        -- Разблокировано
+        cleanupStealthObjects()
+        updateSpeedState()
+    end
+end)
+
+-- ===== ЛОГИКА РОДИТЕЛЯ-ДОЧЕРНЕГО =====
+local function updateChildStates()
+    -- Stealth
+    if walkSpeedEnabled then
         stealthToggleWrap.BackgroundTransparency = 0
         stealthToggleStroke.Transparency = 0.2
         stealthToggleLabel.TextColor3 = C.text
         stealthToggleLabel.Text = "Stealth Mode (beta)"
         stealthToggleHint.Text = "Сервер не видит изменение скорости"
     else
-        -- Заблокировано
         stealthToggleWrap.BackgroundTransparency = 0.5
         stealthToggleStroke.Transparency = 0.5
         stealthToggleLabel.TextColor3 = C.muted
         stealthToggleLabel.Text = "Stealth Mode (beta) 🔒"
         stealthToggleHint.Text = "Включи ускорение, чтобы разблокировать"
     end
+
+    -- Rush
+    if walkSpeedEnabled then
+        rushToggleWrap.BackgroundTransparency = 0
+        rushToggleStroke.Transparency = 0.2
+        rushToggleLabel.TextColor3 = C.text
+        rushToggleLabel.Text = "⚡ Teleport Rush"
+        rushToggleHint.Text = "Кнопка появится на экране"
+    else
+        rushToggleWrap.BackgroundTransparency = 0.5
+        rushToggleStroke.Transparency = 0.5
+        rushToggleLabel.TextColor3 = C.muted
+        rushToggleLabel.Text = "⚡ Teleport Rush 🔒"
+        rushToggleHint.Text = "Включи ускорение, чтобы разблокировать"
+    end
+
+    -- Rush settings
+    if walkSpeedEnabled and rushModeEnabled then
+        rushSettingsWrap.Visible = true
+        rushSettingsWrap.BackgroundTransparency = 0
+        rushSettingsStroke.Transparency = 0.2
+    else
+        rushSettingsWrap.Visible = false
+    end
+
+    -- Rush edit button
+    if walkSpeedEnabled and rushModeEnabled then
+        rushEditWrap.Visible = true
+        rushEditWrap.BackgroundTransparency = 0
+        rushEditStroke.Transparency = 0.2
+        rushEditBtn.TextColor3 = C.text
+    else
+        rushEditWrap.Visible = false
+    end
 end
 
+-- ===== ТОГГЛ: WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
 
-    -- Анимация toggle
     TweenService:Create(walkSpeedToggleTrack, TweenInfo.new(0.2), {
         BackgroundColor3 = walkSpeedEnabled and C.accent or C.button,
     }):Play()
@@ -1442,26 +1620,84 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
         Position = walkSpeedEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
     }):Play()
 
-    -- Показать/скрыть слайдер
     sliderWrap.Visible = walkSpeedEnabled
 
-    -- Если ВЫКЛ — принудительно выключить Stealth
-    if not walkSpeedEnabled and stealthEnabled then
-        stealthEnabled = false
-        TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), {
-            BackgroundColor3 = C.button,
-        }):Play()
-        TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), {
-            Position = UDim2.new(0, 2, 0, 2),
-        }):Play()
+    if not walkSpeedEnabled then
+        -- Принудительно выключаем дочерние
+        if stealthEnabled then
+            stealthEnabled = false
+            TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
+            TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), { Position = UDim2.new(0, 2, 0, 2) }):Play()
+        end
+        if rushModeEnabled then
+            rushModeEnabled = false
+            TweenService:Create(rushToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
+            TweenService:Create(rushToggleKnob, TweenInfo.new(0.2), { Position = UDim2.new(0, 2, 0, 2) }):Play()
+            -- Скрыть кнопку ⚡
+            if _G.RH_HUB_SET_RUSH_BTN_VISIBLE then
+                _G.RH_HUB_SET_RUSH_BTN_VISIBLE(false)
+            end
+        end
     end
 
-    updateStealthVisual()
+    updateChildStates()
     updateSpeedState()
 end)
 
+-- ===== СЛАЙДЕР WALKSPEED =====
+local sliderDragging = false
+
+local function updateSliderFromX(x)
+    local left = sliderTrack.AbsolutePosition.X
+    local width = math.max(1, sliderTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor((16 + alpha * (500 - 16)) / 5 + 0.5) * 5
+    value = math.clamp(value, 16, 500)
+    walkSpeedValue = value
+
+    sliderLabel.Text = "Скорость: " .. walkSpeedValue
+
+    local newAlpha = (walkSpeedValue - 16) / (500 - 16)
+    TweenService:Create(sliderFill, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(newAlpha, 0, 1, 0),
+    }):Play()
+    TweenService:Create(sliderKnob, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {
+        Position = UDim2.new(newAlpha, 0, 0.5, 0),
+    }):Play()
+
+    updateSpeedState()
+end
+
+sliderTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = true
+        updateSliderFromX(input.Position.X)
+    end
+end)
+sliderKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = true
+        updateSliderFromX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateSliderFromX(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        sliderDragging = false
+    end
+end)
+
+-- ===== ТОГГЛ: STEALTH =====
 stealthToggleBtn.MouseButton1Click:Connect(function()
-    if not walkSpeedEnabled then return end  -- заблокировано
+    if not walkSpeedEnabled then return end
 
     stealthEnabled = not stealthEnabled
 
@@ -1475,7 +1711,143 @@ stealthToggleBtn.MouseButton1Click:Connect(function()
     updateSpeedState()
 end)
 
-updateStealthVisual()
+-- ===== ТОГГЛ: RUSH MODE =====
+rushToggleBtn.MouseButton1Click:Connect(function()
+    if not walkSpeedEnabled then return end
+
+    rushModeEnabled = not rushModeEnabled
+
+    TweenService:Create(rushToggleTrack, TweenInfo.new(0.2), {
+        BackgroundColor3 = rushModeEnabled and C.accent or C.button,
+    }):Play()
+    TweenService:Create(rushToggleKnob, TweenInfo.new(0.2), {
+        Position = rushModeEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+    }):Play()
+
+    updateChildStates()
+
+    -- Показать / скрыть кнопку ⚡
+    if _G.RH_HUB_SET_RUSH_BTN_VISIBLE then
+        _G.RH_HUB_SET_RUSH_BTN_VISIBLE(rushModeEnabled)
+    end
+end)
+
+-- ===== СЛАЙДЕР RUSH SPEED =====
+local rushSpeedDragging = false
+
+local function updateRushSpeedFromX(x)
+    local left = rushSpeedTrack.AbsolutePosition.X
+    local width = math.max(1, rushSpeedTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor(alpha * 500 / 5 + 0.5) * 5
+    value = math.clamp(value, 0, 500)
+    rushSpeedValue = value
+
+    rushSpeedLabel.Text = "⚡ Скорость: " .. rushSpeedValue
+
+    local newAlpha = rushSpeedValue / 500
+    TweenService:Create(rushSpeedFill, TweenInfo.new(0.08), {
+        Size = UDim2.new(newAlpha, 0, 1, 0),
+    }):Play()
+    TweenService:Create(rushSpeedKnob, TweenInfo.new(0.08), {
+        Position = UDim2.new(newAlpha, 0, 0.5, 0),
+    }):Play()
+
+    _G.RH_HUB_RUSH_SPEED = rushSpeedValue
+end
+
+rushSpeedTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = true
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+rushSpeedKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = true
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if rushSpeedDragging and (input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = false
+    end
+end)
+
+-- ===== СЛАЙДЕР RUSH HEIGHT =====
+local rushHeightDragging = false
+
+local function updateRushHeightFromX(x)
+    local left = rushHeightTrack.AbsolutePosition.X
+    local width = math.max(1, rushHeightTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor(alpha * 10 + 0.5)
+    value = math.clamp(value, 0, 10)
+    rushHeightValue = value
+
+    rushHeightLabel.Text = "⚡ Высота: " .. rushHeightValue .. " стадов"
+
+    local newAlpha = rushHeightValue / 10
+    TweenService:Create(rushHeightFill, TweenInfo.new(0.08), {
+        Size = UDim2.new(newAlpha, 0, 1, 0),
+    }):Play()
+    TweenService:Create(rushHeightKnob, TweenInfo.new(0.08), {
+        Position = UDim2.new(newAlpha, 0, 0.5, 0),
+    }):Play()
+
+    _G.RH_HUB_RUSH_HEIGHT = rushHeightValue
+end
+
+rushHeightTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = true
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+rushHeightKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = true
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if rushHeightDragging and (input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = false
+    end
+end)
+
+-- ===== EDIT RUSH BUTTON =====
+rushEditBtn.MouseButton1Click:Connect(function()
+    if _G.RH_HUB_ENTER_RUSH_EDIT then
+        _G.RH_HUB_ENTER_RUSH_EDIT()
+    end
+end)
+
+-- Сохраняем ссылки для Части 3
+_G.RH_HUB_RUSH_SPEED = rushSpeedValue
+_G.RH_HUB_RUSH_HEIGHT = rushHeightValue
+_G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
+_G.RH_HUB_IS_RUSH_ON = function() return rushModeEnabled end
+
+updateChildStates()
 
 -- ============ VISUAL ============
 section(visualPage, "ВИЗУАЛИЗАЦИЯ")
@@ -1792,6 +2164,332 @@ overlayFrame.MouseButton1Click:Connect(function()
     lastOverlayTap = now
 end)
 
+-- ============ ⚡ TELEPORT RUSH — ГЛОБАЛЬНАЯ КНОПКА ============
+local rushGui = create("ScreenGui", {
+    Name = "RH_HUB_RUSH",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    DisplayOrder = 99997,
+    Enabled = true,
+})
+safeParent(rushGui)
+
+-- Кнопка ⚡
+local rushBtn = create("TextButton", {
+    Name = "RushBtn",
+    AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, savedCfg.rushBtnPos.x, 1, savedCfg.rushBtnPos.y),
+    Size = UDim2.fromOffset(64, 64),
+    BackgroundColor3 = C.accent,
+    BackgroundTransparency = 0.2,
+    BorderSizePixel = 0,
+    Text = "⚡",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 28,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    Visible = false,  -- скрыта пока Rush Mode не включён
+}, rushGui)
+corner(rushBtn, 32)
+stroke(rushBtn, C.pink, 2, 0.15)
+
+-- Кнопка ✓ (появляется в edit)
+local rushCheckBtn = create("TextButton", {
+    Name = "CheckBtn",
+    AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, savedCfg.rushBtnPos.x - 76, 1, savedCfg.rushBtnPos.y),
+    Size = UDim2.fromOffset(44, 44),
+    BackgroundColor3 = C.green,
+    BorderSizePixel = 0,
+    Text = "✓",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 22,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    Visible = false,
+    ZIndex = 5,
+}, rushGui)
+corner(rushCheckBtn, 22)
+stroke(rushCheckBtn, C.green, 2, 0)
+
+-- ============ HOOK WALKSPEED ============
+local hookActive = false
+local hooksInstalled = false
+
+local function setupWalkSpeedHook()
+    if hooksInstalled then return end
+    if type(hookmetamethod) ~= "function" or type(newcclosure) ~= "function" then
+        return
+    end
+
+    local oldIndex, oldNewIndex
+
+    oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        if key == "WalkSpeed" then
+            local char = LocalPlayer.Character
+            if char and self == char:FindFirstChildOfClass("Humanoid") then
+                if hookActive then
+                    return 16  -- сервер видит 16
+                end
+            end
+        end
+        return oldIndex(self, key)
+    end))
+
+    oldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
+        if key == "WalkSpeed" then
+            local char = LocalPlayer.Character
+            if char and self == char:FindFirstChildOfClass("Humanoid") then
+                if hookActive then
+                    return oldNewIndex(self, key, 16)
+                end
+            end
+        end
+        return oldNewIndex(self, key, value)
+    end))
+
+    hooksInstalled = true
+end
+
+setupWalkSpeedHook()
+
+-- ============ ⚡ RUSH — ЛОГИКА ============
+local rushActive = false
+local rushEditMode = false
+
+local rushLongPressTimer = nil
+local rushHolding = false
+local rushHoldingStart = 0
+
+local rushDrag = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local RUSH_DRAG_THRESHOLD = 6
+
+-- Активация Rush
+local function activateRush()
+    if not _G.RH_HUB_IS_WALKSPEED_ON() then return end
+    if not _G.RH_HUB_IS_RUSH_ON() then return end
+    if rushActive then return end
+
+    rushActive = true
+    hookActive = true
+
+    local char = LocalPlayer.Character
+    if not char then rushActive = false; hookActive = false; return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then rushActive = false; hookActive = false; return end
+
+    -- Подъём
+    local targetPos = hrp.CFrame + Vector3.new(0, _G.RH_HUB_RUSH_HEIGHT or 5, 0)
+    hrp.CFrame = targetPos
+end
+
+local function deactivateRush()
+    if not rushActive then return end
+    rushActive = false
+    hookActive = false
+
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- Raycast вниз — найти землю
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { char }
+
+    local origin = hrp.Position
+    local direction = Vector3.new(0, -1000, 0)
+
+    local result = workspace:Raycast(origin, direction, params)
+    if result then
+        local groundY = result.Position.Y + 3
+        hrp.CFrame = CFrame.new(hrp.Position.X, groundY, hrp.Position.Z)
+    end
+end
+
+-- CFrame Stepper — во время Rush
+RunService.RenderStepped:Connect(function(dt)
+    if not rushActive then return end
+    if rushEditMode then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    -- Направление движения игрока
+    local moveDir = humanoid.MoveDirection
+    if moveDir.Magnitude > 0 then
+        local speed = (_G.RH_HUB_RUSH_SPEED or 200) / 60
+        local step = moveDir.Unit * speed * dt * 60
+        hrp.CFrame = hrp.CFrame + step
+    end
+
+    -- Держим высоту
+    local height = _G.RH_HUB_RUSH_HEIGHT or 5
+    -- (постоянный подъём уже задан при активации)
+end)
+
+-- ===== НАЖАТИЕ НА ⚡ =====
+local function setRushVisible(visible)
+    if rushEditMode then
+        rushBtn.Visible = true
+    else
+        rushBtn.Visible = visible
+    end
+end
+
+_G.RH_HUB_SET_RUSH_BTN_VISIBLE = setRushVisible
+
+rushBtn.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    rushHolding = true
+    rushHoldingStart = os.clock()
+
+    -- Проверка долгого тапа (2 сек) — только если Rush выключен
+    if not rushActive then
+        rushLongPressTimer = task.delay(2, function()
+            if rushHolding and (os.clock() - rushHoldingStart) >= 1.9 then
+                -- Входим в edit mode
+                rushEditMode = true
+                rushCheckBtn.Visible = true
+                rushBtn.BackgroundTransparency = 0.5
+                rushBtn.Text = "⚡"
+
+                -- Начинаем drag
+                rushDrag.active = true
+                rushDrag.input = input
+                rushDrag.startPointer = input.Position
+                rushDrag.startPos = Vector2.new(rushBtn.Position.X.Offset, rushBtn.Position.Y.Offset)
+                rushDrag.moved = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not rushDrag.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
+    local d = input.Position - rushDrag.startPointer
+    if math.abs(d.X) > RUSH_DRAG_THRESHOLD or math.abs(d.Y) > RUSH_DRAG_THRESHOLD then
+        rushDrag.moved = true
+    end
+
+    if rushDrag.moved then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(rushDrag.startPos.X + d.X, -vp.X + rushBtn.AbsoluteSize.X, 0)
+        local y = math.clamp(rushDrag.startPos.Y + d.Y, -vp.Y + rushBtn.AbsoluteSize.Y, 0)
+        rushBtn.Position = UDim2.new(1, x, 1, y)
+        rushCheckBtn.Position = UDim2.new(1, x - 76, 1, y)
+    end
+end)
+
+rushBtn.InputEnded:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    rushHolding = false
+    if rushLongPressTimer then
+        task.cancel(rushLongPressTimer)
+        rushLongPressTimer = nil
+    end
+
+    -- Если был edit — выходим
+    if rushEditMode then
+        rushDrag.active = false
+        -- Не выходим из edit по отпусканию — ждём тап ✓
+        return
+    end
+
+    -- Обычная логика — стоп
+    if rushActive then
+        deactivateRush()
+    end
+end)
+
+-- Простой тап = активация (вне edit)
+rushBtn.MouseButton1Click:Connect(function()
+    if rushEditMode then return end
+    if not _G.RH_HUB_IS_RUSH_ON() then return end
+    if rushActive then return end
+
+    -- Если это был короткий тап — активируем Rush
+    if (os.clock() - rushHoldingStart) < 0.5 then
+        -- Но hold-логика: Rush активируется ПОКА ДЕРЖИШЬ
+        -- Проверим — если всё ещё держим, активируем
+    end
+end)
+
+-- Переопределяем: активация через InputBegan
+rushBtn.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+    if rushEditMode then return end
+    if not _G.RH_HUB_IS_RUSH_ON() then return end
+
+    -- Активируем сразу при нажатии (если не edit)
+    task.delay(0.3, function()
+        if rushHolding and not rushEditMode and _G.RH_HUB_IS_RUSH_ON() then
+            activateRush()
+        end
+    end)
+end)
+
+-- ===== КНОПКА ✓ — СОХРАНИТЬ =====
+rushCheckBtn.MouseButton1Click:Connect(function()
+    if not rushEditMode then return end
+
+    rushEditMode = false
+    rushDrag.active = false
+    rushCheckBtn.Visible = false
+    rushBtn.BackgroundTransparency = 0.2
+
+    -- Сохраняем позицию
+    savedCfg.rushBtnPos = {
+        x = rushBtn.Position.X.Offset,
+        y = rushBtn.Position.Y.Offset,
+    }
+    saveConfig()
+
+    -- Если Rush Mode выключен — скрыть кнопку
+    if not _G.RH_HUB_IS_RUSH_ON() then
+        rushBtn.Visible = false
+    end
+
+    if _G.RH_HUB_TOAST then
+        _G.RH_HUB_TOAST("Позиция ⚡ сохранена", "ok")
+    end
+end)
+
+-- ===== ВНЕШНЯЯ ФУНКЦИЯ ДЛЯ EDIT (из MOVE) =====
+_G.RH_HUB_ENTER_RUSH_EDIT = function()
+    rushEditMode = true
+    rushCheckBtn.Visible = true
+    rushBtn.Visible = true
+    rushBtn.BackgroundTransparency = 0.5
+
+    if _G.RH_HUB_TOAST then
+        _G.RH_HUB_TOAST("Перетащи ⚡ и нажми ✓", "info")
+    end
+end
+
 -- ============ TIMER HELPERS ============
 local function formatRemaining(sec)
     if sec == nil then return "∞" end
@@ -1835,6 +2533,11 @@ onAuthSuccess = function(token)
 
     setStatus("Успешная авторизация!", "ok")
     authToast("Добро пожаловать!", "ok")
+
+    -- Экспортируем toast наружу (для глобальной кнопки ⚡)
+    _G.RH_HUB_TOAST = function(text, kind)
+        authToast(text, kind)
+    end
 
     task.spawn(function()
         task.wait(0.7)
@@ -1889,6 +2592,7 @@ task.spawn(function()
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+                    if rushGui and rushGui.Parent then pcall(function() rushGui:Destroy() end) end
 
                     pcall(function()
                         loadstring(game:HttpGet(
@@ -1932,6 +2636,7 @@ task.spawn(function()
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+                    if rushGui and rushGui.Parent then pcall(function() rushGui:Destroy() end) end
 
                     pcall(function()
                         loadstring(game:HttpGet(
