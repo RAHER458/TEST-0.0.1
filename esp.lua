@@ -102,36 +102,6 @@ local function hasFileAPI()
        and type(isfile) == "function"
 end
 
-local savedCfg = {}
-
-local function loadConfig()
-    if not hasFileAPI() then return end
-    local ok, result = pcall(function()
-        if isfile(CONFIG.CONFIG_FILE) then
-            local raw = readfile(CONFIG.CONFIG_FILE)
-            if type(raw) == "string" and raw ~= "" then
-                local dec = HttpService:JSONDecode(raw)
-                if type(dec) == "table" then return dec end
-            end
-        end
-        return nil
-    end)
-    if ok and type(result) == "table" then
-        for k, v in pairs(result) do savedCfg[k] = v end
-    end
-end
-
-local function saveConfig()
-    if not hasFileAPI() then return end
-    pcall(function()
-        local raw = HttpService:JSONEncode(savedCfg)
-        writefile(CONFIG.CONFIG_FILE, raw)
-    end)
-end
-
-loadConfig()
-
--- ============ DEVICE ID ============
 local function generateDeviceId()
     return "RH-" .. HttpService:GenerateGUID(false)
 end
@@ -307,7 +277,6 @@ local function makeToast(parentFrame)
     end
 end
 
--- ============ AUTH GUI ============
 local authGui = create("ScreenGui", {
     Name = "RH_HUB_AUTH_GUI",
     ResetOnSpawn = false,
@@ -698,7 +667,6 @@ if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain)
 end
 
--- ============ HEADER ============
 local header = create("Frame", {
     Name = "Header",
     Size = UDim2.new(1, 0, 0, 46),
@@ -782,7 +750,6 @@ local circleBtn = create("TextButton", {
 }, header)
 corner(circleBtn, 8)
 
--- ============ NAV TABS ============
 local navBar = create("Frame", {
     Position = UDim2.new(0, 8, 0, 52),
     Size = UDim2.new(1, -16, 0, 34),
@@ -1486,10 +1453,9 @@ infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024
 -- ============ GAMES ============
 section(gamesPage, "ИГРЫ  •  СПИСОК")
 
--- ============ Загрузка AutoFarm с патчем зоны ============
 local AutoFarm = nil
 task.spawn(function()
-    local url = CONFIG.AUTOFARM_URL .. "?v=4&t=" .. os.time()
+    local url = CONFIG.AUTOFARM_URL .. "?v=5&t=" .. os.time()
     local ok, src = pcall(function() return game:HttpGet(url) end)
 
     if not ok or type(src) ~= "string" or #src < 100 then
@@ -1497,9 +1463,9 @@ task.spawn(function()
         return
     end
 
-    print("[RH-HUB] AutoFarm: скачан, размер " .. #src .. " байт")
+    print("[RH-HUB] AutoFarm: скачан, " .. #src .. " байт")
 
-    -- === ПАТЧ: замена определения зоны на X-позицию ===
+    -- ПАТЧ зоны по X-позиции
     local patchTarget = "local J=Dk(t,H,B)"
     local patchReplace = [[local J
                 local __px = H.X
@@ -1518,23 +1484,18 @@ task.spawn(function()
 
     local escaped = patchTarget:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
     local patched, count = src:gsub(escaped, patchReplace, 1)
-
-    if count == 0 then
-        warn("[RH-HUB] AutoFarm: патч зоны НЕ применён (строка 'local J=Dk(t,H,B)' не найдена)")
-    else
-        print("[RH-HUB] AutoFarm: патч зоны применён (" .. count .. " совпад.)")
+    if count > 0 then
+        print("[RH-HUB] AutoFarm: патч зоны применён")
         src = patched
+    else
+        warn("[RH-HUB] AutoFarm: патч зоны НЕ применён")
     end
 
-    -- === ПАТЧ 2: принудительный дефолт зон — только Forest ===
-    local zonePatchTarget = 'local r={[ "Light Dark" ]= true ,[ "Titan Temple" ]= true ,[ "Cherry Blossom" ]= true ;'
-    local zonePatchReplace = 'local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;'
-    local src2, count2 = src:gsub(
-        zonePatchTarget:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"),
-        zonePatchReplace,
-        1
-    )
-    if count2 > 0 then
+    -- ПАТЧ дефолт-зон: Forest=true, остальное=false
+    local zt = 'local r={[ "Light Dark" ]= true ,[ "Titan Temple" ]= true ,[ "Cherry Blossom" ]= true ;'
+    local zr = 'local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;'
+    local src2, c2 = src:gsub(zt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), zr, 1)
+    if c2 > 0 then
         print("[RH-HUB] AutoFarm: патч дефолт-зон применён")
         src = src2
     end
@@ -1544,11 +1505,10 @@ task.spawn(function()
         AutoFarm = result
         print("[RH-HUB] AutoFarm loaded successfully")
     else
-        warn("[RH-HUB] AutoFarm: ошибка внутри модуля: " .. tostring(result))
+        warn("[RH-HUB] AutoFarm: ошибка модуля: " .. tostring(result))
     end
 end)
 
--- Ждём загрузки модуля
 task.spawn(function()
     local waited = 0
     while not AutoFarm and waited < 10 do
@@ -1574,24 +1534,11 @@ task.spawn(function()
             TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
         }, warnCard)
-        create("TextLabel", {
-            Position = UDim2.new(0, 15, 0, 36),
-            Size = UDim2.new(1, -30, 0, 55),
-            BackgroundTransparency = 1,
-            Font = Enum.Font.Gotham,
-            Text = "Проверь консоль Delta. URL: " .. CONFIG.AUTOFARM_URL,
-            TextColor3 = C.muted,
-            TextSize = 10,
-            TextWrapped = true,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextYAlignment = Enum.TextYAlignment.Top,
-        }, warnCard)
         return
     end
 
     local h = AutoFarm.State
 
-    -- Карточка игры
     local stealWrap = create("Frame", {
         Size = UDim2.new(1, 0, 0, 64),
         BackgroundColor3 = C.surface,
@@ -1666,7 +1613,6 @@ task.spawn(function()
         PaddingRight = UDim.new(0, 4),
     }, stealBody)
 
-    -- Status Card
     local statusCard = create("Frame", {
         Size = UDim2.new(1, 0, 0, 55),
         BackgroundColor3 = C.surface2,
@@ -1674,7 +1620,6 @@ task.spawn(function()
     }, stealBody)
     corner(statusCard, 10)
     stroke(statusCard, C.accent, 1, 0.4)
-
     create("TextLabel", {
         Position = UDim2.new(0, 12, 0, 8),
         Size = UDim2.new(1, -20, 0, 18),
@@ -1685,7 +1630,6 @@ task.spawn(function()
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, statusCard)
-
     local statusDesc = create("TextLabel", {
         Position = UDim2.new(0, 12, 0, 26),
         Size = UDim2.new(1, -20, 0, 22),
@@ -1697,7 +1641,6 @@ task.spawn(function()
         TextXAlignment = Enum.TextXAlignment.Left,
     }, statusCard)
 
-    -- Контролы
     AddToggle(stealBody, "Auto Steal (Tween)", "Плавный полёт к яйцу", h.pureTweenFarm == true, function(state)
         AutoFarm.SetFarmMode(state and "TWEEN" or "NONE")
     end)
@@ -1714,23 +1657,19 @@ task.spawn(function()
     AddToggle(stealBody, "Auto Hatch", "Авто-вылупление", h.autoHatch ~= false, function(state)
         h.autoHatch = state
     end)
-
-    AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор и сразу домой, без ожидания босса", h.fastPickup ~= false, function(state)
+    AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор и сразу домой", h.fastPickup ~= false, function(state)
         h.fastPickup = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
     AddToggle(stealBody, "Ignore Rarity Filter", "Красть ВСЕ яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
         h.ignoreRarity = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
     AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
         task.spawn(function()
             AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
         end)
     end)
-
     AddToggle(stealBody, "Auto Treadmill", "Бег на дорожке", h.autoTreadmill ~= false, function(state)
         h.autoTreadmill = state
         AutoFarm.SaveEggSelectConfig(h)
@@ -1743,7 +1682,6 @@ task.spawn(function()
         h.autoBuyTrails = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
     AddMultiDropdown(stealBody, "Target Zones", AutoFarm.ZoneList, h.selectedZones, function(selectedMap)
         h.selectedZones = selectedMap
         AutoFarm.SaveEggSelectConfig(h)
@@ -1752,20 +1690,16 @@ task.spawn(function()
         h.selectedRarities = selectedMap
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
-    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine, из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
+    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
         h.alwaysCollectSecretPlus = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
     AddSlider(stealBody, "Flight Cruise Speed", 100, 1000, h.glideSpeed or 600, function(val)
         h.glideSpeed = val
         AutoFarm.SaveSpeed(val)
     end)
 
-    -- Раскрытие
     local stealExpanded = false
-
     local function refreshStealHeight()
         task.wait()
         if stealExpanded then
@@ -1816,12 +1750,11 @@ task.spawn(function()
 end)
 
 -- ============ DRAG MAIN WINDOW ============
-local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
+local dragMain = { active = false, startPointer = nil, startPos = nil }
 
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = true
-        dragMain.input = input
         dragMain.startPointer = input.Position
         dragMain.startPos = main.Position
     end
@@ -1838,7 +1771,6 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = false
-        dragMain.input = nil
     end
 end)
 
@@ -1871,7 +1803,6 @@ stroke(overlayFrame, C.accent, 1, 0.2)
 
 local statsService = game:GetService("Stats")
 local fpsFrames, fpsElapsed = 0, 0
-
 local function readPing()
     local ping = nil
     pcall(function() ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue() end)
@@ -1891,7 +1822,6 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 local dragOverlay = { active = false, startPointer = nil, startPos = nil, moved = false }
-local OVERLAY_THRESHOLD = 6
 overlayFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragOverlay.active = true
@@ -1904,7 +1834,7 @@ UserInputService.InputChanged:Connect(function(input)
     if not dragOverlay.active then return end
     if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     local d = input.Position - dragOverlay.startPointer
-    if math.abs(d.X) > OVERLAY_THRESHOLD or math.abs(d.Y) > OVERLAY_THRESHOLD then dragOverlay.moved = true end
+    if math.abs(d.X) > 6 or math.abs(d.Y) > 6 then dragOverlay.moved = true end
     if dragOverlay.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
@@ -1939,7 +1869,7 @@ local circleButton = create("TextButton", {
     BorderSizePixel = 0,
     Text = "HUB",
     TextColor3 = Color3.new(1, 1, 1),
-TextSize = 13,
+    TextSize = 13,
     Font = Enum.Font.GothamBlack,
     AutoButtonColor = false,
 }, circleGui)
@@ -1965,7 +1895,6 @@ local function startCirclePulse()
 end
 
 local dragCircle = { active = false, startPointer = nil, startPos = nil, moved = false }
-local CIRCLE_THRESHOLD = 6
 circleButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = true
@@ -1978,7 +1907,7 @@ UserInputService.InputChanged:Connect(function(input)
     if not dragCircle.active then return end
     if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     local d = input.Position - dragCircle.startPointer
-    if math.abs(d.X) > CIRCLE_THRESHOLD or math.abs(d.Y) > CIRCLE_THRESHOLD then dragCircle.moved = true end
+    if math.abs(d.X) > 6 or math.abs(d.Y) > 6 then dragCircle.moved = true end
     if dragCircle.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
