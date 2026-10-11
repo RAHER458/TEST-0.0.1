@@ -27,6 +27,7 @@ local CONFIG = {
     WINDOW_H    = 440,
     RETRY_MAX   = 3,
     RETRY_DELAY = 1.5,
+    AUTOFARM_URL = "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/autofarm.lua",
 }
 
 local C = {
@@ -783,6 +784,7 @@ end)
 
 -- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ ============
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
+_G.RH_HUB_FARM_ACTIVE = function() return false end
 
 -- ============ MAIN GUI ============
 local mainGui = create("ScreenGui", {
@@ -936,6 +938,7 @@ local navButtons = {}
 local TABS = {
     {id = "HOME",     name = "HOME"},
     {id = "MOVE",     name = "MOVE"},
+    {id = "GAMES",    name = "GAMES"},
     {id = "VISUAL",   name = "VISUAL"},
     {id = "TELEPORT", name = "TP"},
     {id = "SETTINGS", name = "SET"},
@@ -991,7 +994,7 @@ end
 local function makeNavButton(id, label, order)
     local b = create("TextButton", {
         Name = id,
-        Size = UDim2.new(1/6, -3, 1, 0),
+        Size = UDim2.new(1/7, -3, 1, 0),
         BackgroundColor3 = C.button,
         BorderSizePixel = 0,
         Text = label,
@@ -1017,6 +1020,7 @@ end
 
 local homePage     = createPage("HOME")
 local movePage     = createPage("MOVE")
+local gamesPage    = createPage("GAMES")
 local visualPage   = createPage("VISUAL")
 local tpPage       = createPage("TELEPORT")
 local settingsPage = createPage("SETTINGS")
@@ -1114,12 +1118,359 @@ local function soonCard(parent)
     return frame
 end
 
+-- ============ UI: TOGGLE ============
+local function AddToggle(parentPage, title, description, defaultState, callback)
+    local toggled = defaultState or false
+
+    local ToggleContainer = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 50),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, parentPage)
+    corner(ToggleContainer, 12)
+    stroke(ToggleContainer, C.border, 1, 0.3)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -70, 0, 18),
+        Position = UDim2.new(0, 15, 0, 8),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = C.text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, ToggleContainer)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -70, 0, 15),
+        Position = UDim2.new(0, 15, 0, 26),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = description or "",
+        TextColor3 = C.muted,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, ToggleContainer)
+
+    local SwitchBg = create("Frame", {
+        Size = UDim2.new(0, 42, 0, 22),
+        Position = UDim2.new(1, -54, 0.5, -11),
+        BackgroundColor3 = toggled and C.accent or C.button,
+        BorderSizePixel = 0,
+    }, ToggleContainer)
+    corner(SwitchBg, 11)
+
+    local SwitchKnob = create("Frame", {
+        Size = UDim2.fromOffset(16, 16),
+        Position = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+    }, SwitchBg)
+    corner(SwitchKnob, 8)
+
+    local ClickBtn = create("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+    }, ToggleContainer)
+
+    local function Update(state, noCallback)
+        toggled = state
+        local targetColor = toggled and C.accent or C.button
+        local targetPos = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        TweenService:Create(SwitchBg, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
+        TweenService:Create(SwitchKnob, TweenInfo.new(0.2), {Position = targetPos}):Play()
+        if not noCallback and callback then pcall(function() callback(toggled) end) end
+    end
+
+    ClickBtn.MouseButton1Click:Connect(function()
+        Update(not toggled)
+    end)
+
+    return {
+        Set = function(state) Update(state) end,
+        Get = function() return toggled end
+    }
+end
+
+-- ============ UI: SLIDER ============
+local function AddSlider(parentPage, title, min, max, default, callback)
+    local value = default or min
+
+    local SliderContainer = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 60),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, parentPage)
+    corner(SliderContainer, 12)
+    stroke(SliderContainer, C.border, 1, 0.3)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -70, 0, 18),
+        Position = UDim2.new(0, 15, 0, 10),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = C.text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, SliderContainer)
+
+    local ValueLabel = create("TextLabel", {
+        Size = UDim2.new(0, 50, 0, 18),
+        Position = UDim2.new(1, -65, 0, 10),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamMedium,
+        Text = tostring(value),
+        TextColor3 = C.accent,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right,
+    }, SliderContainer)
+
+    local SliderTrack = create("Frame", {
+        Size = UDim2.new(1, -30, 0, 6),
+        Position = UDim2.new(0, 15, 0, 40),
+        BackgroundColor3 = C.button,
+        BorderSizePixel = 0,
+    }, SliderContainer)
+    corner(SliderTrack, 3)
+
+    local SliderFill = create("Frame", {
+        Size = UDim2.new(math.clamp((value - min) / (max - min), 0, 1), 0, 1, 0),
+        BackgroundColor3 = C.accent,
+        BorderSizePixel = 0,
+    }, SliderTrack)
+    corner(SliderFill, 3)
+
+    local SliderKnob = create("Frame", {
+        Size = UDim2.fromOffset(12, 12),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(SliderFill.Size.X.Scale, 0, 0.5, 0),
+        BackgroundColor3 = Color3.new(1, 1, 1),
+        BorderSizePixel = 0,
+    }, SliderTrack)
+    corner(SliderKnob, 6)
+
+    local sliding = false
+
+    local function UpdateSlider(input)
+        local posX = input.Position.X - SliderTrack.AbsolutePosition.X
+        local pct = math.clamp(posX / SliderTrack.AbsoluteSize.X, 0, 1)
+        value = math.floor(min + (max - min) * pct)
+        SliderFill.Size = UDim2.new(pct, 0, 1, 0)
+        SliderKnob.Position = UDim2.new(pct, 0, 0.5, 0)
+        ValueLabel.Text = tostring(value)
+        if callback then pcall(function() callback(value) end) end
+    end
+
+    SliderTrack.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            sliding = true
+            UpdateSlider(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            UpdateSlider(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            sliding = false
+        end
+    end)
+
+    return {
+        Set = function(val)
+            value = math.clamp(val, min, max)
+            local pct = (value - min) / (max - min)
+            SliderFill.Size = UDim2.new(pct, 0, 1, 0)
+            SliderKnob.Position = UDim2.new(pct, 0, 0.5, 0)
+            ValueLabel.Text = tostring(value)
+            if callback then pcall(function() callback(value) end) end
+        end,
+        Get = function() return value end
+    }
+end
+
+-- ============ UI: BUTTON ============
+local function AddButton(parentPage, title, description, callback)
+    local ButtonContainer = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 50),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, parentPage)
+    corner(ButtonContainer, 12)
+    stroke(ButtonContainer, C.border, 1, 0.3)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -30, 0, 18),
+        Position = UDim2.new(0, 15, 0, 8),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = C.text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, ButtonContainer)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -30, 0, 15),
+        Position = UDim2.new(0, 15, 0, 26),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = description or "",
+        TextColor3 = C.muted,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, ButtonContainer)
+
+    local ClickBtn = create("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+    }, ButtonContainer)
+
+    ClickBtn.MouseEnter:Connect(function()
+        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), {BackgroundColor3 = C.surface2}):Play()
+    end)
+    ClickBtn.MouseLeave:Connect(function()
+        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), {BackgroundColor3 = C.surface}):Play()
+    end)
+    ClickBtn.MouseButton1Click:Connect(function()
+        if callback then pcall(callback) end
+    end)
+end
+
+-- ============ UI: MULTI DROPDOWN ============
+local function AddMultiDropdown(parentPage, title, options, selectedMap, callback)
+    selectedMap = selectedMap or {}
+    local isExpanded = false
+
+    local DropdownContainer = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 48),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+    }, parentPage)
+    corner(DropdownContainer, 12)
+    stroke(DropdownContainer, C.border, 1, 0.3)
+
+    create("TextLabel", {
+        Size = UDim2.new(0, 150, 0, 48),
+        Position = UDim2.new(0, 15, 0, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = C.text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, DropdownContainer)
+
+    local function CountSelected()
+        local c = 0
+        for _, opt in ipairs(options) do
+            if selectedMap[opt] == true then c = c + 1 end
+        end
+        return c
+    end
+
+    local SelectedBtn = create("TextButton", {
+        Size = UDim2.new(0, 160, 0, 28),
+        Position = UDim2.new(1, -175, 0, 10),
+        BackgroundColor3 = C.surface2,
+        Font = Enum.Font.GothamMedium,
+        Text = tostring(CountSelected()) .. " / " .. tostring(#options) .. "  ▼",
+        TextColor3 = C.text,
+        TextSize = 12,
+    }, DropdownContainer)
+    corner(SelectedBtn, 6)
+
+    local ListHolder = create("ScrollingFrame", {
+        Size = UDim2.new(1, -30, 0, 0),
+        Position = UDim2.new(0, 15, 0, 48),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 2,
+        ScrollBarImageColor3 = C.border,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+    }, DropdownContainer)
+
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 4),
+    }, ListHolder)
+
+    local optionButtons = {}
+
+    local function UpdateButtonVisual(opt, btn)
+        if selectedMap[opt] == true then
+            btn.BackgroundColor3 = C.accent
+            btn.TextColor3 = Color3.new(1, 1, 1)
+        else
+            btn.BackgroundColor3 = C.surface
+            btn.TextColor3 = C.muted
+        end
+    end
+
+    local function RefreshOptions(newOptions)
+        for _, child in ipairs(ListHolder:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        optionButtons = {}
+        for _, opt in ipairs(newOptions) do
+            local OptBtn = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, 28),
+                BorderSizePixel = 0,
+                Font = Enum.Font.Gotham,
+                Text = tostring(opt),
+                TextSize = 12,
+            }, ListHolder)
+            corner(OptBtn, 4)
+            optionButtons[opt] = OptBtn
+            UpdateButtonVisual(opt, OptBtn)
+            OptBtn.MouseButton1Click:Connect(function()
+                selectedMap[opt] = not (selectedMap[opt] == true)
+                UpdateButtonVisual(opt, OptBtn)
+                SelectedBtn.Text = tostring(CountSelected()) .. " / " .. tostring(#newOptions) .. "  ▼"
+                if callback then pcall(function() callback(selectedMap) end) end
+            end)
+        end
+    end
+    RefreshOptions(options)
+
+    SelectedBtn.MouseButton1Click:Connect(function()
+        isExpanded = not isExpanded
+        if isExpanded then
+            local listHeight = math.clamp(#options * 32, 32, 140)
+            ListHolder.Size = UDim2.new(1, -30, 0, listHeight)
+            TweenService:Create(DropdownContainer, TweenInfo.new(0.25), {Size = UDim2.new(1, 0, 0, 52 + listHeight)}):Play()
+        else
+            TweenService:Create(DropdownContainer, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 48)}):Play()
+            ListHolder.Size = UDim2.new(1, -30, 0, 0)
+        end
+    end)
+
+    return {
+        Get = function() return selectedMap end,
+        SetMap = function(newMap)
+            selectedMap = newMap
+            for opt, btn in pairs(optionButtons) do
+                UpdateButtonVisual(opt, btn)
+            end
+            SelectedBtn.Text = tostring(CountSelected()) .. " / " .. tostring(#options) .. "  ▼"
+            if callback then pcall(function() callback(selectedMap) end) end
+        end
+    }
+end
+
 -- ============ HOME ============
 section(homePage, "ГЛАВНАЯ")
 infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
 infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
 infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа.")
-infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
+infoCard(homePage, "ИГРЫ", "Вкладка GAMES — список игр с авто-скриптами. Сейчас: Steal An Egg.")
 
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
@@ -1130,8 +1481,7 @@ local walkSpeedValue = 200
 _G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
 
 -- ============================================================
--- SPEEDHACK: стабильные микро-телепортации через CFrame
--- Humanoid остаётся, WalkSpeed = 16, физика гасится каждый кадр
+-- SPEEDHACK: микро-телепортации через CFrame
 -- ============================================================
 local SPEEDHACK = {
     stepLimit    = 30,
@@ -1177,11 +1527,11 @@ end
 
 local function speedhackStep(dt)
     if not walkSpeedEnabled then return end
+    if _G.RH_HUB_FARM_ACTIVE and _G.RH_HUB_FARM_ACTIVE() then return end
 
     local char, hrp, hum = getCharacter()
     if not char or not hrp or not hum then return end
 
-    -- ГЛАВНОЕ: гасим физику, чтобы Humanoid не тянул назад
     hrp.AssemblyLinearVelocity  = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 
@@ -1304,7 +1654,6 @@ local sliderKnob = create("Frame", {
 }, sliderTrack)
 corner(sliderKnob, 9)
 
--- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
 
@@ -1319,7 +1668,7 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     smoothedDir = Vector3.zero
 
     if not walkSpeedEnabled then
-        local char, hrp, hum = getCharacter()
+        local _, hrp, hum = getCharacter()
         if hum then hum.WalkSpeed = 16 end
         if hrp then
             hrp.AssemblyLinearVelocity  = Vector3.zero
@@ -1328,7 +1677,6 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ===== СЛАЙДЕР WALKSPEED =====
 local sliderDragging = false
 
 local function updateSliderFromX(x)
@@ -1419,6 +1767,300 @@ infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
 
+-- ============ GAMES ============
+section(gamesPage, "ИГРЫ  •  СПИСОК")
+
+-- Загрузка AutoFarm
+local AutoFarm = nil
+task.spawn(function()
+    local url = CONFIG.AUTOFARM_URL .. "?t=" .. os.time()
+    local ok, src = pcall(function() return game:HttpGet(url) end)
+    if ok and type(src) == "string" and #src > 100 then
+        local loadOK, result = pcall(function() return loadstring(src)() end)
+        if loadOK and type(result) == "table" and result.State then
+            AutoFarm = result
+            print("[RH-HUB] AutoFarm loaded successfully")
+        else
+            warn("[RH-HUB] AutoFarm: ошибка внутри модуля: " .. tostring(result))
+        end
+    else
+        warn("[RH-HUB] AutoFarm: не удалось скачать autofarm.lua")
+    end
+end)
+
+-- Ждём загрузки модуля и строим UI карточки
+task.spawn(function()
+    -- Ждём до 8 секунд пока модуль загрузится
+    local waited = 0
+    while not AutoFarm and waited < 8 do
+        task.wait(0.25)
+        waited = waited + 0.25
+    end
+
+    if not AutoFarm then
+        -- Заглушка если модуль не загрузился
+        local warnCard = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 100),
+            BackgroundColor3 = C.surface,
+            BorderSizePixel = 0,
+        }, gamesPage)
+        corner(warnCard, 12)
+        stroke(warnCard, C.yellow, 1, 0.3)
+
+        create("TextLabel", {
+            Position = UDim2.new(0, 15, 0, 12),
+            Size = UDim2.new(1, -30, 0, 20),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            Text = "⚠ AutoFarm не загрузился",
+            TextColor3 = C.yellow,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+        }, warnCard)
+
+        create("TextLabel", {
+            Position = UDim2.new(0, 15, 0, 36),
+            Size = UDim2.new(1, -30, 0, 55),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.Gotham,
+            Text = "Проверь консоль Delta на ошибки. Убедись что autofarm.lua доступен в репо по ссылке " .. CONFIG.AUTOFARM_URL,
+            TextColor3 = C.muted,
+            TextSize = 10,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+        }, warnCard)
+        return
+    end
+
+    local h = AutoFarm.State
+
+    -- Карточка игры
+    local stealWrap = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 64),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+        ClipsDescendants = false,
+    }, gamesPage)
+    corner(stealWrap, 12)
+    local stealStroke = stroke(stealWrap, C.border, 1, 0.3)
+
+    local stealHeadBtn = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 64),
+        BackgroundTransparency = 1,
+        Text = "",
+    }, stealWrap)
+
+    local stealIcon = create("TextLabel", {
+        Size = UDim2.fromOffset(40, 40),
+        Position = UDim2.new(0, 12, 0, 12),
+        BackgroundColor3 = C.surface2,
+        Text = "🥚",
+        TextColor3 = C.text,
+        TextSize = 20,
+        Font = Enum.Font.GothamBold,
+    }, stealWrap)
+    corner(stealIcon, 10)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 62, 0, 12),
+        Size = UDim2.new(1, -110, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "Steal An Egg",
+        TextColor3 = C.text,
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, stealWrap)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 62, 0, 32),
+        Size = UDim2.new(1, -110, 0, 16),
+        BackgroundTransparency = 1,
+        Text = "Auto-farm, Guard Strike, Auto Place, Auto Hatch",
+        TextColor3 = C.muted,
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, stealWrap)
+
+    local stealArrow = create("TextLabel", {
+        Position = UDim2.new(1, -36, 0, 0),
+        Size = UDim2.fromOffset(36, 64),
+        BackgroundTransparency = 1,
+        Text = "▶",
+        TextColor3 = C.muted,
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+    }, stealWrap)
+
+    local stealBody = create("Frame", {
+        Position = UDim2.new(0, 0, 0, 68),
+        Size = UDim2.new(1, 0, 0, 0),
+        BackgroundTransparency = 1,
+        ClipsDescendants = true,
+        Visible = false,
+    }, stealWrap)
+
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+    }, stealBody)
+    create("UIPadding", {
+        PaddingTop = UDim.new(0, 6),
+        PaddingBottom = UDim.new(0, 6),
+        PaddingLeft = UDim.new(0, 4),
+        PaddingRight = UDim.new(0, 4),
+    }, stealBody)
+
+    -- Status Card
+    local statusCard = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 55),
+        BackgroundColor3 = C.surface2,
+        BorderSizePixel = 0,
+    }, stealBody)
+    corner(statusCard, 10)
+    stroke(statusCard, C.accent, 1, 0.4)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 12, 0, 8),
+        Size = UDim2.new(1, -20, 0, 18),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = "SYSTEM STATUS",
+        TextColor3 = C.accent,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, statusCard)
+
+    local statusDesc = create("TextLabel", {
+        Position = UDim2.new(0, 12, 0, 26),
+        Size = UDim2.new(1, -20, 0, 22),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamMedium,
+        Text = "Ready",
+        TextColor3 = C.text,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, statusCard)
+
+    -- Контролы
+    AddToggle(stealBody, "Auto Steal (Tween)", "Плавный полёт к яйцу вдоль Z=-360", h.pureTweenFarm == true, function(state)
+        AutoFarm.SetFarmMode(state and "TWEEN" or "NONE")
+    end)
+
+    AddToggle(stealBody, "Auto Steal (Teleport)", "Warp-snipe через PivotTo", h.autoFarmLoop == true, function(state)
+        AutoFarm.SetFarmMode(state and "WARP" or "NONE")
+    end)
+
+    AddToggle(stealBody, "Auto Return", "Возврат на X=525 после кражи", h.autoGlide ~= false, function(state)
+        h.autoGlide = state
+    end)
+
+    AddToggle(stealBody, "Auto Place (Every 5)", "Установка яиц каждые 5 краж", h.autoPlaceEvery5 == true, function(state)
+        h.autoPlaceEvery5 = state
+        if not state then h.batchStealCount = 0 end
+    end)
+
+    AddToggle(stealBody, "Auto Hatch", "Авто-вылупление готовых яиц", h.autoHatch ~= false, function(state)
+        h.autoHatch = state
+    end)
+
+    AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
+        task.spawn(function()
+            AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
+        end)
+    end)
+
+    AddToggle(stealBody, "Auto Treadmill", "Бег на дорожке, когда нет целей", h.autoTreadmill ~= false, function(state)
+        h.autoTreadmill = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddToggle(stealBody, "Auto Upgrade Treadmill", "Авто-апгрейд дорожки", h.autoUpgradeTreadmill ~= false, function(state)
+        h.autoUpgradeTreadmill = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddToggle(stealBody, "Auto Buy & Equip Trails", "Покупка лучшего доступного трейла", h.autoBuyTrails ~= false, function(state)
+        h.autoBuyTrails = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddMultiDropdown(stealBody, "Target Zones", AutoFarm.ZoneList, h.selectedZones, function(selectedMap)
+        h.selectedZones = selectedMap
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddMultiDropdown(stealBody, "Target Rarities", AutoFarm.RarityList, h.selectedRarities, function(selectedMap)
+        h.selectedRarities = selectedMap
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret / Eternal / Divine из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
+        h.alwaysCollectSecretPlus = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
+
+    AddSlider(stealBody, "Flight Cruise Speed", 100, 1000, h.glideSpeed or 600, function(val)
+        h.glideSpeed = val
+        AutoFarm.SaveSpeed(val)
+    end)
+
+    -- Раскрытие
+    local stealExpanded = false
+
+    local function refreshStealHeight()
+        task.wait()
+        if stealExpanded then
+            local contentHeight = stealBody.UIListLayout.AbsoluteContentSize.Y + 12
+            stealBody.Size = UDim2.new(1, 0, 0, contentHeight)
+            stealWrap.Size = UDim2.new(1, 0, 0, 64 + 8 + contentHeight)
+        else
+            stealBody.Size = UDim2.new(1, 0, 0, 0)
+            stealWrap.Size = UDim2.new(1, 0, 0, 64)
+        end
+    end
+
+    stealHeadBtn.MouseButton1Click:Connect(function()
+        stealExpanded = not stealExpanded
+        stealBody.Visible = stealExpanded
+        stealArrow.Text = stealExpanded and "▼" or "▶"
+        stealStroke.Color = stealExpanded and C.accent or C.border
+        TweenService:Create(stealStroke, TweenInfo.new(0.2), {
+            Transparency = stealExpanded and 0.1 or 0.3,
+        }):Play()
+        refreshStealHeight()
+    end)
+
+    stealBody.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if stealExpanded then refreshStealHeight() end
+    end)
+
+    -- Live статус
+    task.spawn(function()
+        while gamesPage and gamesPage.Parent do
+            if statusDesc and statusDesc.Parent then
+                local carried = AutoFarm.GetTotalEggCount()
+                local statusStr = tostring(h.statusText or "Ready")
+                if statusStr:sub(1, 1) == "[" then
+                    statusDesc.Text = string.format("%s • Bag: %d eggs", statusStr, carried)
+                else
+                    statusDesc.Text = string.format("[%s] • Bag: %d eggs", statusStr, carried)
+                end
+            end
+            task.wait(0.25)
+        end
+    end)
+
+    -- Флаг активности
+    _G.RH_HUB_FARM_ACTIVE = function()
+        return h.pureTweenFarm or h.autoFarmLoop or h.teleporting
+            or h.glidingToTarget or h.securingEgg or h.delivering
+            or h.isReturning
+    end
+end)
+
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
@@ -1452,7 +2094,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ OVERLAY (RH | FPS | PING) ============
+-- ============ OVERLAY ============
 local overlayGui = create("ScreenGui", {
     Name = "RH_HUB_OVERLAY",
     ResetOnSpawn = false,
@@ -1639,7 +2281,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ MINIMIZE / CIRCLE / OVERLAY ============
+-- ============ MODES ============
 local function setMode(newMode)
     if STATE.mode == newMode then return end
 
