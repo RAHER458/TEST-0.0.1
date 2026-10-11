@@ -1,8 +1,7 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 0.0.3-alpha
-    Platform: Roblox / Delta Executor / iOS
+    Version: 0.0.4-alpha
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -16,8 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "0.0.3-alpha",
-    NAME        = "RH-HUB",
+    VERSION     = "0.0.4-alpha",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
     DEVICE_FILE = "RH_HUB_DEVICE.dat",
@@ -34,7 +32,6 @@ local C = {
     bg      = Color3.fromRGB(11, 12, 18),
     surface = Color3.fromRGB(20, 23, 32),
     surface2= Color3.fromRGB(28, 32, 45),
-    surface3= Color3.fromRGB(36, 41, 55),
     button  = Color3.fromRGB(36, 41, 55),
     input   = Color3.fromRGB(24, 27, 36),
     border  = Color3.fromRGB(58, 64, 88),
@@ -53,22 +50,16 @@ pcall(function()
         local old = core:FindFirstChild(name)
         if old then old:Destroy() end
     end
-    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if playerGui then
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pg then
         for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
-            local old = playerGui:FindFirstChild(name)
+            local old = pg:FindFirstChild(name)
             if old then old:Destroy() end
         end
     end
 end)
 
-local STATE = {
-    authed   = false,
-    token    = nil,
-    deviceId = nil,
-    busy     = false,
-    mode     = "window",
-}
+local STATE = { authed = false, token = nil, deviceId = nil, busy = false, mode = "window" }
 
 local function create(class, props, parent)
     local obj = Instance.new(class)
@@ -89,67 +80,53 @@ local function stroke(parent, color, thickness, transparency)
     }, parent)
 end
 
-local function safeParent(guiObj)
-    local ok = pcall(function() guiObj.Parent = game:GetService("CoreGui") end)
-    if not ok or not guiObj.Parent then
-        guiObj.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+local function safeParent(g)
+    local ok = pcall(function() g.Parent = game:GetService("CoreGui") end)
+    if not ok or not g.Parent then g.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 end
 
 local function hasFileAPI()
-    return type(readfile) == "function"
-       and type(writefile) == "function"
-       and type(isfile) == "function"
+    return type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function"
 end
 
-local function generateDeviceId()
-    return "RH-" .. HttpService:GenerateGUID(false)
-end
+local function generateDeviceId() return "RH-" .. HttpService:GenerateGUID(false) end
 
 local function loadDeviceId()
     if hasFileAPI() then
-        local ok, result = pcall(function()
+        local ok, r = pcall(function()
             if isfile(CONFIG.DEVICE_FILE) then
-                local val = readfile(CONFIG.DEVICE_FILE)
-                if type(val) == "string" and #val >= 16 then
-                    return tostring(val):gsub("%s+", "")
-                end
+                local v = readfile(CONFIG.DEVICE_FILE)
+                if type(v) == "string" and #v >= 16 then return tostring(v):gsub("%s+", "") end
             end
-            local val = generateDeviceId()
-            writefile(CONFIG.DEVICE_FILE, val)
-            return val
+            local v = generateDeviceId()
+            writefile(CONFIG.DEVICE_FILE, v)
+            return v
         end)
-        if ok and type(result) == "string" then return result end
+        if ok and type(r) == "string" then return r end
     end
     return generateDeviceId()
 end
 
 STATE.deviceId = loadDeviceId()
 
-local function saveToken(token)
-    if hasFileAPI() then pcall(writefile, CONFIG.TOKEN_FILE, tostring(token)) end
-end
+local function saveToken(t) if hasFileAPI() then pcall(writefile, CONFIG.TOKEN_FILE, tostring(t)) end end
 
 local function loadToken()
     if not hasFileAPI() then return nil end
-    local ok, result = pcall(function()
+    local ok, r = pcall(function()
         if isfile(CONFIG.TOKEN_FILE) then
-            local val = readfile(CONFIG.TOKEN_FILE)
-            if type(val) == "string" and #val >= 16 then
-                return tostring(val):gsub("%s+", "")
-            end
+            local v = readfile(CONFIG.TOKEN_FILE)
+            if type(v) == "string" and #v >= 16 then return tostring(v):gsub("%s+", "") end
         end
         return nil
     end)
-    if ok then return result end
+    if ok then return r end
     return nil
 end
 
 local function clearToken()
     if hasFileAPI() and type(delfile) == "function" then
-        pcall(function()
-            if isfile(CONFIG.TOKEN_FILE) then delfile(CONFIG.TOKEN_FILE) end
-        end)
+        pcall(function() if isfile(CONFIG.TOKEN_FILE) then delfile(CONFIG.TOKEN_FILE) end end)
     end
 end
 
@@ -162,10 +139,10 @@ end
 
 local function api(path, body)
     local req = getRequestFn()
-    if not req then return nil, "Executor не поддерживает HTTP" end
+    if not req then return nil, "No HTTP" end
     local payload
     local encOK, encErr = pcall(function() payload = HttpService:JSONEncode(body or {}) end)
-    if not encOK then return nil, "Ошибка JSON: " .. tostring(encErr) end
+    if not encOK then return nil, "JSON: " .. tostring(encErr) end
 
     local response, requestDone = nil, false
     task.spawn(function()
@@ -183,8 +160,8 @@ local function api(path, body)
 
     local t0 = os.clock()
     while not requestDone and os.clock() - t0 < 15 do task.wait(0.1) end
-    if not requestDone then return nil, "Таймаут запроса" end
-    if not response or type(response) ~= "table" then return nil, "Не удалось выполнить запрос" end
+    if not requestDone then return nil, "Timeout" end
+    if not response or type(response) ~= "table" then return nil, "No response" end
     if response.__error then return nil, response.__error end
 
     local status = tonumber(response.StatusCode or response.Status or 0) or 0
@@ -197,7 +174,7 @@ local function api(path, body)
         if not message and raw ~= "" then message = tostring(raw):sub(1, 120) end
         return nil, tostring(message or ("HTTP " .. status))
     end
-    if not decOK or type(decoded) ~= "table" then return nil, "Некорректный ответ" end
+    if not decOK or type(decoded) ~= "table" then return nil, "Bad response" end
     return decoded
 end
 
@@ -210,7 +187,7 @@ local function apiWithRetry(path, body, maxAttempts, delay)
         if result then return result, nil, attempt end
         lastErr = err
         local errText = tostring(err or ""):lower()
-        if errText:find("таймаут") or errText:find("timeout") then
+        if errText:find("timeout") or errText:find("таймаут") then
             if attempt < maxAttempts then task.wait(delay) end
         else
             return nil, err, attempt
@@ -277,6 +254,7 @@ local function makeToast(parentFrame)
     end
 end
 
+-- AUTH GUI
 local authGui = create("ScreenGui", {
     Name = "RH_HUB_AUTH_GUI",
     ResetOnSpawn = false,
@@ -561,15 +539,10 @@ local function activateKey(rawKey)
             setBusy(false)
             local msg = tostring(err or "неизвестная ошибка")
             local low = msg:lower()
-            if low:find("invalid license") then
-                setStatus("❌ Неверный ключ", "err")
-            elseif low:find("bound to another") then
-                setStatus("❌ Ключ занят другим устройством", "err")
-            elseif low:find("expired") then
-                setStatus("❌ Ключ истёк", "err")
-            else
-                setStatus("❌ " .. msg, "err")
-            end
+            if low:find("invalid license") then setStatus("❌ Неверный ключ", "err")
+            elseif low:find("bound to another") then setStatus("❌ Ключ занят", "err")
+            elseif low:find("expired") then setStatus("❌ Ключ истёк", "err")
+            else setStatus("❌ " .. msg, "err") end
             authToast(msg, "err")
             return
         end
@@ -619,22 +592,18 @@ task.spawn(function()
         onAuthSuccess(saved)
     else
         setBusy(false)
-        if reason == "expired" then
-            setStatus("⏱ Ключ истёк", "warn")
+        if reason == "expired" then setStatus("⏱ Ключ истёк", "warn")
         elseif reason == "invalid" then
             clearToken()
             setStatus("Сессия недействительна", "warn")
-        else
-            setStatus("Введите ключ доступа", nil)
-        end
+        else setStatus("Введите ключ доступа", nil) end
     end
 end)
 
--- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ ============
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
 _G.RH_HUB_FARM_ACTIVE = function() return false end
 
--- ============ MAIN GUI ============
+-- MAIN GUI
 local mainGui = create("ScreenGui", {
     Name = "RH_HUB_GUI",
     ResetOnSpawn = false,
@@ -922,7 +891,6 @@ local function soonCard(parent)
     return frame
 end
 
--- ============ UI: TOGGLE ============
 local function AddToggle(parentPage, title, description, defaultState, callback)
     local toggled = defaultState or false
     local ToggleContainer = create("Frame", {
@@ -983,7 +951,6 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
     return { Set = function(state) Update(state) end, Get = function() return toggled end }
 end
 
--- ============ UI: SLIDER ============
 local function AddSlider(parentPage, title, min, max, default, callback)
     local value = default or min
     local SliderContainer = create("Frame", {
@@ -1073,7 +1040,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
     }
 end
 
--- ============ UI: BUTTON ============
 local function AddButton(parentPage, title, description, callback)
     local ButtonContainer = create("Frame", {
         Size = UDim2.new(1, 0, 0, 50),
@@ -1116,7 +1082,6 @@ local function AddButton(parentPage, title, description, callback)
     ClickBtn.MouseButton1Click:Connect(function() if callback then pcall(callback) end end)
 end
 
--- ============ UI: MULTI DROPDOWN ============
 local function AddMultiDropdown(parentPage, title, options, selectedMap, callback)
     selectedMap = selectedMap or {}
     local isExpanded = false
@@ -1453,90 +1418,56 @@ infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024
 -- ============ GAMES ============
 section(gamesPage, "ИГРЫ  •  СПИСОК")
 
+-- Синхронная загрузка AutoFarm (без task.spawn, чтобы UI точно построился)
 local AutoFarm = nil
-task.spawn(function()
-    local url = CONFIG.AUTOFARM_URL .. "?v=5&t=" .. os.time()
+do
+    local url = CONFIG.AUTOFARM_URL .. "?v=7&t=" .. os.time()
     local ok, src = pcall(function() return game:HttpGet(url) end)
 
     if not ok or type(src) ~= "string" or #src < 100 then
-        warn("[RH-HUB] AutoFarm: не удалось скачать autofarm.lua")
-        return
-    end
-
-    print("[RH-HUB] AutoFarm: скачан, " .. #src .. " байт")
-
-    -- ПАТЧ зоны по X-позиции
-    local patchTarget = "local J=Dk(t,H,B)"
-    local patchReplace = [[local J
-                local __px = H.X
-                if __px >= 5200 then J = "Light Dark"
-                elseif __px >= 4750 then J = "Titan Temple"
-                elseif __px >= 4000 then J = "Cherry Blossom"
-                elseif __px >= 3350 then J = "Cosmic"
-                elseif __px >= 2780 then J = "Prehistoric"
-                elseif __px >= 2250 then J = "Abyss Ocean"
-                elseif __px >= 1850 then J = "Volcano"
-                elseif __px >= 1450 then J = "Snow"
-                elseif __px >= 1150 then J = "Jungle"
-                elseif __px >= 920 then J = "Desert"
-                elseif __px >= 720 then J = "Lake"
-                else J = "Forest" end]]
-
-    local escaped = patchTarget:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
-    local patched, count = src:gsub(escaped, patchReplace, 1)
-    if count > 0 then
-        print("[RH-HUB] AutoFarm: патч зоны применён")
-        src = patched
+        warn("[RH-HUB] AutoFarm: не удалось скачать")
     else
-        warn("[RH-HUB] AutoFarm: патч зоны НЕ применён")
-    end
+        print("[RH-HUB] AutoFarm: " .. #src .. " байт")
 
-    -- ПАТЧ дефолт-зон: Forest=true, остальное=false
-    local zt = 'local r={[ "Light Dark" ]= true ,[ "Titan Temple" ]= true ,[ "Cherry Blossom" ]= true ;'
-    local zr = 'local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;'
-    local src2, c2 = src:gsub(zt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), zr, 1)
-    if c2 > 0 then
-        print("[RH-HUB] AutoFarm: патч дефолт-зон применён")
-        src = src2
-    end
+        -- Патч зоны по X
+        local pt = "local J=Dk(t,H,B)"
+        local pr = [[local J
+local __px = H.X
+if __px >= 5200 then J = "Light Dark"
+elseif __px >= 4750 then J = "Titan Temple"
+elseif __px >= 4000 then J = "Cherry Blossom"
+elseif __px >= 3350 then J = "Cosmic"
+elseif __px >= 2780 then J = "Prehistoric"
+elseif __px >= 2250 then J = "Abyss Ocean"
+elseif __px >= 1850 then J = "Volcano"
+elseif __px >= 1450 then J = "Snow"
+elseif __px >= 1150 then J = "Jungle"
+elseif __px >= 920 then J = "Desert"
+elseif __px >= 720 then J = "Lake"
+else J = "Forest" end]]
+        local src2, cnt = src:gsub(pt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), pr, 1)
+        if cnt > 0 then
+            print("[RH-HUB] AutoFarm: патч зоны ок")
+            src = src2
+        end
 
-    local loadOK, result = pcall(function() return loadstring(src)() end)
-    if loadOK and type(result) == "table" and result.State then
-        AutoFarm = result
-        print("[RH-HUB] AutoFarm loaded successfully")
-    else
-        warn("[RH-HUB] AutoFarm: ошибка модуля: " .. tostring(result))
+        local fn, err = loadstring(src)
+        if fn then
+            local runOK, result = pcall(fn)
+            if runOK and type(result) == "table" and result.State then
+                AutoFarm = result
+                print("[RH-HUB] AutoFarm loaded successfully")
+            else
+                warn("[RH-HUB] AutoFarm runtime: " .. tostring(result))
+            end
+        else
+            warn("[RH-HUB] AutoFarm syntax: " .. tostring(err))
+        end
     end
-end)
+end
 
-task.spawn(function()
-    local waited = 0
-    while not AutoFarm and waited < 10 do
-        task.wait(0.25)
-        waited = waited + 0.25
-    end
-
-    if not AutoFarm then
-        local warnCard = create("Frame", {
-            Size = UDim2.new(1, 0, 0, 100),
-            BackgroundColor3 = C.surface,
-            BorderSizePixel = 0,
-        }, gamesPage)
-        corner(warnCard, 12)
-        stroke(warnCard, C.yellow, 1, 0.3)
-        create("TextLabel", {
-            Position = UDim2.new(0, 15, 0, 12),
-            Size = UDim2.new(1, -30, 0, 20),
-            BackgroundTransparency = 1,
-            Font = Enum.Font.GothamBold,
-            Text = "⚠ AutoFarm не загрузился",
-            TextColor3 = C.yellow,
-            TextSize = 12,
-            TextXAlignment = Enum.TextXAlignment.Left,
-        }, warnCard)
-        return
-    end
-
+-- UI карточки
+if AutoFarm then
     local h = AutoFarm.State
 
     local stealWrap = create("Frame", {
@@ -1661,11 +1592,11 @@ task.spawn(function()
         h.fastPickup = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-    AddToggle(stealBody, "Ignore Rarity Filter", "Красть ВСЕ яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
+    AddToggle(stealBody, "Ignore Rarity Filter", "Все яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
         h.ignoreRarity = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-    AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
+    AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить всё", function()
         task.spawn(function()
             AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
         end)
@@ -1690,7 +1621,7 @@ task.spawn(function()
         h.selectedRarities = selectedMap
         AutoFarm.SaveEggSelectConfig(h)
     end)
-    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
+    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine", h.alwaysCollectSecretPlus ~= false, function(state)
         h.alwaysCollectSecretPlus = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
@@ -1747,11 +1678,40 @@ task.spawn(function()
             or h.glidingToTarget or h.securingEgg or h.delivering
             or h.isReturning
     end
-end)
+else
+    local warnCard = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 100),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+    }, gamesPage)
+    corner(warnCard, 12)
+    stroke(warnCard, C.yellow, 1, 0.3)
+    create("TextLabel", {
+        Position = UDim2.new(0, 15, 0, 12),
+        Size = UDim2.new(1, -30, 0, 20),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = "⚠ AutoFarm не загрузился",
+        TextColor3 = C.yellow,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, warnCard)
+    create("TextLabel", {
+        Position = UDim2.new(0, 15, 0, 36),
+        Size = UDim2.new(1, -30, 0, 55),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = "Проверь авторизацию и ссылку autofarm.lua",
+        TextColor3 = C.muted,
+        TextSize = 10,
+        TextWrapped = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+    }, warnCard)
+end
 
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, startPointer = nil, startPos = nil }
-
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = true
