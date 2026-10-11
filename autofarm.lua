@@ -1,6 +1,6 @@
 -- RH-HUB AutoFarm Module
 -- Extracted from KerryHub for Steal An Egg
--- With Fast Pickup mode (skip guard strike)
+-- With Fast Pickup + Ignore Rarity + Strict Zone Filter
 
 local AutoFarm = (function()
 local e=game:GetService( "Players" )
@@ -209,7 +209,7 @@ local function T(...)
     [ "Common" ]= false }
     if type(e)~= "table" then
         e={[ "selectedZones" ]=r;
-        [ "selectedRarities" ]=y,[ "alwaysCollectSecretPlus" ]= true ,[ "fastPickup" ]= true ,[ "minRarityTier" ]= 2 ;
+        [ "selectedRarities" ]=y,[ "alwaysCollectSecretPlus" ]= true ,[ "fastPickup" ]= true ,[ "ignoreRarity" ]= true ,[ "minRarityTier" ]= 2 ;
         [ "autoTreadmill" ]= true ;
         [ "autoUpgradeTreadmill" ]= true ,[ "autoBuyTrails" ]= true ;
         [ "hideNotEnoughMoney" ]= true ;
@@ -232,6 +232,9 @@ local function T(...)
         end
         if e.fastPickup ==nil then
             e.fastPickup = true
+        end
+        if e.ignoreRarity ==nil then
+            e.ignoreRarity = true
         end
         if e.minRarityTier ==nil then
             e.minRarityTier = 2
@@ -267,7 +270,7 @@ local function x(...) pcall(function(...)
         if writefile and(a and h)then
             local r={[ "selectedZones" ]=h.selectedZones or{};
             [ "selectedRarities" ]=h.selectedRarities or{};
-            [ "alwaysCollectSecretPlus" ]=(h.alwaysCollectSecretPlus ~= false ),[ "fastPickup" ]=(h.fastPickup ~= false ),[ "minRarityTier" ]=h.minRarityTier or 2 ,[ "autoTreadmill" ]=(h.autoTreadmill == true );
+            [ "alwaysCollectSecretPlus" ]=(h.alwaysCollectSecretPlus ~= false ),[ "fastPickup" ]=(h.fastPickup ~= false ),[ "ignoreRarity" ]=(h.ignoreRarity ~= false ),[ "minRarityTier" ]=h.minRarityTier or 2 ,[ "autoTreadmill" ]=(h.autoTreadmill == true );
             [ "autoUpgradeTreadmill" ]=(h.autoUpgradeTreadmill == true ),[ "autoBuyTrails" ]=(h.autoBuyTrails == true );
             [ "hideNotEnoughMoney" ]=(h.hideNotEnoughMoney == true );
             [ "performanceMode" ]=(h.performanceMode == true );
@@ -279,7 +282,7 @@ local function x(...) pcall(function(...)
     end
     )
 end
-local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= true ,[ "fastPickup" ]=(W.fastPickup ~= false ) ;
+local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= true ,[ "fastPickup" ]=(W.fastPickup ~= false ),[ "ignoreRarity" ]=(W.ignoreRarity ~= false ) ;
 [ "autoPlaceEvery5" ]= false ;
 [ "batchStealCount" ]= 0 ,[ "isBatchPlacing" ]= false ,[ "isHatching" ]= false ;
 [ "autoFarmLoop" ]= false ,[ "pureTweenFarm" ]= false ;
@@ -3076,14 +3079,28 @@ N4=function(...)
                 local v=(K>= 4 or c== "Secret" or c== "Eternal" or c== "Divine" )
                 local i=(h.selectedZones and h.selectedZones [J]== true )
                 local R=(h.selectedRarities and h.selectedRarities [c]== true )
+
+                -- НОВАЯ ЛОГИКА:
+                -- Если зона выбрана и ignoreRarity включён → берём ВСЕ яйца в зоне
+                -- Если зона выбрана и ignoreRarity выключен → проверяем редкость
                 local g= false
-                if v then
-                    g= true
+                if h.ignoreRarity == true then
+                    if i then
+                        g = true
+                    else
+                        -- Secret+ всё равно берём (если alwaysCollectSecretPlus)
+                        if v and h.alwaysCollectSecretPlus ~= false then
+                            g = true
+                        end
+                    end
                 else
-                    if i and R then
-                        g= true
+                    if v then
+                        g = true
+                    elseif i and R then
+                        g = true
                     end
                 end
+
                 if g then
                     local k=tonumber(r.AssetScale or r.Scale )or 1
                     local a= 1
@@ -3148,12 +3165,17 @@ N4=function(...)
         end
         return o
     end
+    -- СТРОГИЙ РЕЖИМ: без fallback-проходов
+    -- Если ничего в выбранных зонах — ждём респавна
     local V=a( false , false )
     if not V then
-        X4={}V=a( false , true )
+        X4={}
+        V=a( false , true )
     end
+    -- Фallback на h4(true) — принудительное обновление снапшота
     if not V then
-        e=h4( true )V=a( false , true )
+        e=h4( true )
+        V=a( false , true )
     end
     if V and r:FindFirstChild( "AreaEggSlotsClient" )then
         for e,r in ipairs(r.AreaEggSlotsClient :GetChildren())do
@@ -3308,10 +3330,7 @@ U4=function(e,u,w,j,...)
     end
     return R
 end
--- ============================================================
--- Fast Pickup — альтернатива U4 без ожидания Guard Strike
--- Включается флагом h.fastPickup
--- ============================================================
+-- Fast Pickup
 U4_Fast=function(e,u,w,j,...)
     local k=o.Character
     local a=k and k:FindFirstChild( "HumanoidRootPart" )
@@ -3342,17 +3361,12 @@ U4_Fast=function(e,u,w,j,...)
         end
         )
     end
-    h.statusText = "[FastPick] Direct pickup (no guard wait)..." H(string.format ( "[FastPick] Direct pickup for %s" ,tostring(e)))
-
+    h.statusText = "[FastPick] Direct pickup..." H(string.format ( "[FastPick] Direct pickup for %s" ,tostring(e)))
     local p=os.clock ()+ 1.2
     local grabbed = false
     while os.clock ()<p and(h.alive and h.securingEgg )do
-        if j and O4~=j then
-            break
-        end
-        if not h.pureTweenFarm and(not h.autoFarmLoop and not h.teleporting )then
-            break
-        end
+        if j and O4~=j then break end
+        if not h.pureTweenFarm and(not h.autoFarmLoop and not h.teleporting )then break end
         k:PivotTo(u*CFrame.new ( 0 , 0.4 , 0 ))d4(w,s)
         if e and i then
             task.spawn (function(...) pcall(function(...)
@@ -3367,27 +3381,17 @@ U4_Fast=function(e,u,w,j,...)
             )
         end
         y.Heartbeat :Wait()
-        if j4(e) then
-            grabbed = true
-            break
-        end
+        if j4(e) then grabbed = true break end
     end
-
     local R = grabbed or j4(e)
-    if not R then
-        task.wait ( 0.1 )R = j4(e)
-    end
+    if not R then task.wait ( 0.1 )R = j4(e) end
     h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
-    if j and O4~=j then
-        return false
-    end
+    if j and O4~=j then return false end
     if R then
         pcall(u4)H( "[FastPick] Egg grabbed! Booking it home." )h.statusText = "Egg grabbed! Returning home..."
     else
         t( "[-] Fast pickup failed" )h.statusText = "[-] Pickup failed"
-        if e then
-            X4[e]=os.clock ()+ 2
-        end
+        if e then X4[e]=os.clock ()+ 2 end
     end
     return R
 end
@@ -3650,7 +3654,7 @@ local Ck=os.clock ()task.spawn (function(...)
                                 return
                             end
                             h.currentTargetModel =w.Model h.targetPosition =w.Position h.glidingToTarget = true h.stateTime =os.clock ()
-                            local a=((w.Scale and w.Scale > 1.05 ))and string.format ( " | %.1fx" ,w.Scale )or "" h.statusText =string.format ( "[AutoSteal] Flying to %s (%s%s)..." ,tostring(w.Category or "Egg" ),tostring(w.Area or "Field" ),a)H(string.format ( "[AutoSteal] Flying to %s | Zone: %s%s | Rank: %d (Corridor Z=-360)" ,tostring(w.Category or "Egg" ),tostring(w.Area or "Field" ),a,tonumber(w.Rank )or 1 ))
+                            local a=((w.Scale and w.Scale > 1.05 ))and string.format ( " | %.1fx" ,w.Scale )or "" h.statusText =string.format ( "[AutoSteal] Flying to %s (%s%s)..." ,tostring(w.Category or "Egg" ),tostring(w.Area or "Field" ),a)H(string.format ( "[AutoSteal] Flying to %s | Zone: %s%s | Rank: %d" ,tostring(w.Category or "Egg" ),tostring(w.Area or "Field" ),a,tonumber(w.Rank )or 1 ))
                             if not h.swapped then
                                 A4()
                             end
@@ -3681,10 +3685,10 @@ local Ck=os.clock ()task.spawn (function(...)
                                 if r then
                                     pcall(u4)
                                     if h.autoGlide then
-                                        h.statusText = "[AutoSteal] Secured! Tweening to Safe Line X=525..." H( "[AutoSteal] Egg secured after Guard Strike! Returning smoothly to Safe Line X=525 along Z=-360..." )Q4(h.glideSpeed ,u)pcall(u4)
-                                        local r=y4()h.statusText =string.format ( "Stashed in Bag (%d Eggs). Next steal..." ,r)H(string.format ( "[AutoSteal] Egg stashed in bag (%d total eggs). Hands-Free ready for next steal..." ,r))
+                                        h.statusText = "[AutoSteal] Secured! Tweening to Safe Line X=525..." H( "[AutoSteal] Egg secured! Returning to Safe Line X=525 along Z=-360..." )Q4(h.glideSpeed ,u)pcall(u4)
+                                        local r=y4()h.statusText =string.format ( "Stashed in Bag (%d Eggs). Next steal..." ,r)H(string.format ( "[AutoSteal] Egg stashed in bag (%d total eggs)..." ,r))
                                     else
-                                        h.statusText = "[AutoSteal] Secured! (Auto Return is OFF)" H( "[AutoSteal] Egg secured! Staying at target (Auto Return is OFF)." )
+                                        h.statusText = "[AutoSteal] Secured! (Auto Return OFF)"
                                     end
                                     pcall(u4)h.isReturning = false h.delivering = false h.glidingToTarget = false h.securingEgg = false h.currentTargetModel =nil h.targetPosition =nil
                                     if c4( "TWEEN" )then
@@ -3750,9 +3754,9 @@ local qk=os.clock ()task.spawn (function(...)
                                 pcall(u4)
                                 if h.autoGlide then
                                     h.statusText = "[SnipeLoop] Target secured! Tweening to Safe Line X=525..." Q4(h.glideSpeed ,r)pcall(u4)
-                                    local y=y4()h.statusText =string.format ( "Stashed in Bag (%d Eggs). Next snipe..." ,y)H(string.format ( "[SnipeLoop] Egg stashed in bag (%d total eggs). Hands-Free ready for next snipe..." ,y))
+                                    local y=y4()h.statusText =string.format ( "Stashed in Bag (%d Eggs). Next snipe..." ,y)H(string.format ( "[SnipeLoop] Egg stashed in bag (%d total eggs)..." ,y))
                                 else
-                                    h.statusText = "[SnipeLoop] Target secured! (Auto Return is OFF)" H( "[SnipeLoop] Snipe successful! Staying at target (Auto Return is OFF)." )
+                                    h.statusText = "[SnipeLoop] Target secured! (Auto Return OFF)"
                                 end
                                 pcall(u4)h.isReturning = false h.delivering = false
                                 if c4( "WARP" )then
