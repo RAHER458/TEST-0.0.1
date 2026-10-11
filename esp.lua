@@ -785,7 +785,6 @@ task.spawn(function()
 end)
 
 -- [КОНЕЦ ЧАСТИ 1]
-
 -- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ (до всего остального) ============
 -- Будут переопределены в MOVE-секции, но объявлены сейчас,
 -- чтобы Часть 3 не падала при вызове
@@ -1852,7 +1851,6 @@ infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
 
 -- [КОНЕЦ ЧАСТИ 2]
-
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
@@ -2085,18 +2083,19 @@ local function setMode(newMode)
         mainGui.Enabled = true
     elseif newMode == "overlay" then
         overlayGui.Enabled = true
-    elseif newMode == "circle" then
+    elseif newMode == "0.circle" then
         circleGui.Enabled = true
         startCirclePulse()
-    end
+5    end
 
     STATE.mode = newMode
 end
 
-minimizeBtn.MouseButton1Click:Connect(function()
-    if STATE.mode == "window" then
+minimizeBtn.M
+ouseButton1Click:Connect(function()
+    if STATE.mode == "window" then   
         setMode("overlay")
-    elseif STATE.mode == "overlay" then
+    elseif STATE.mode == "over elselay" then
         setMode("window")
     end
 end)
@@ -2346,8 +2345,7 @@ _G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
         rushBtn.BackgroundTransparency = 0.5
         rushBtn.Text = "✥"
         rushBtn.TextSize = 26
-        rushStroke.Transparency = 0.5
-    else
+        rushStroke.Transparency = 
         savedCfg.rushBtnPos = {
             x = rushBtn.Position.X.Offset,
             y = rushBtn.Position.Y.Offset,
@@ -2365,6 +2363,7 @@ _G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
     end
 end
 
+-- [КОНЕЦ ЧАСТИ 3]
 -- ============ FARM: ENGINE + UI (запускается после авторизации) ============
 local function initFarm()
     if FarmApi then return end
@@ -4023,7 +4022,9 @@ local function initFarm()
             u4()h.isReturning = false h.delivering = false h.statusText = "Arrived at Base PetArea!"
             return true
         end
-        v4=function(e,r,y,...)
+
+-- [КОНЕЦ ЧАСТИ 4]
+v4=function(e,r,y,...)
             local u=o.Character
             local w=u and u:FindFirstChild( "HumanoidRootPart" )
             local j=u and u:FindFirstChildOfClass( "Humanoid" )
@@ -5441,7 +5442,9 @@ local function initFarm()
             end
             return V
         end
-        U4=function(e,u,w,j,...)
+
+-- [КОНЕЦ ЧАСТИ 5]
+U4=function(e,u,w,j,...)
             local k=o.Character
             local a=k and k:FindFirstChild( "HumanoidRootPart" )
             local V=k and k:FindFirstChildOfClass( "Humanoid" )
@@ -6812,5 +6815,5 @@ print("UserId: " .. tostring(LocalPlayer.UserId))
 print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
 
--- [КОНЕЦ ЧАСТИ 3]
+-- [КОНЕЦ ЧАСТИ 6]
 -- [[ КОНЕЦ ФАЙЛА ]]
