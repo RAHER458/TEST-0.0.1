@@ -1,5 +1,6 @@
 -- RH-HUB AutoFarm Module
 -- Extracted from KerryHub for Steal An Egg
+-- With Fast Pickup mode (skip guard strike)
 
 local AutoFarm = (function()
 local e=game:GetService( "Players" )
@@ -208,7 +209,7 @@ local function T(...)
     [ "Common" ]= false }
     if type(e)~= "table" then
         e={[ "selectedZones" ]=r;
-        [ "selectedRarities" ]=y,[ "alwaysCollectSecretPlus" ]= true ,[ "minRarityTier" ]= 2 ;
+        [ "selectedRarities" ]=y,[ "alwaysCollectSecretPlus" ]= true ,[ "fastPickup" ]= true ,[ "minRarityTier" ]= 2 ;
         [ "autoTreadmill" ]= true ;
         [ "autoUpgradeTreadmill" ]= true ,[ "autoBuyTrails" ]= true ;
         [ "hideNotEnoughMoney" ]= true ;
@@ -228,6 +229,9 @@ local function T(...)
         end
         if e.alwaysCollectSecretPlus ==nil then
             e.alwaysCollectSecretPlus = true
+        end
+        if e.fastPickup ==nil then
+            e.fastPickup = true
         end
         if e.minRarityTier ==nil then
             e.minRarityTier = 2
@@ -263,7 +267,7 @@ local function x(...) pcall(function(...)
         if writefile and(a and h)then
             local r={[ "selectedZones" ]=h.selectedZones or{};
             [ "selectedRarities" ]=h.selectedRarities or{};
-            [ "alwaysCollectSecretPlus" ]=(h.alwaysCollectSecretPlus ~= false ),[ "minRarityTier" ]=h.minRarityTier or 2 ,[ "autoTreadmill" ]=(h.autoTreadmill == true );
+            [ "alwaysCollectSecretPlus" ]=(h.alwaysCollectSecretPlus ~= false ),[ "fastPickup" ]=(h.fastPickup ~= false ),[ "minRarityTier" ]=h.minRarityTier or 2 ,[ "autoTreadmill" ]=(h.autoTreadmill == true );
             [ "autoUpgradeTreadmill" ]=(h.autoUpgradeTreadmill == true ),[ "autoBuyTrails" ]=(h.autoBuyTrails == true );
             [ "hideNotEnoughMoney" ]=(h.hideNotEnoughMoney == true );
             [ "performanceMode" ]=(h.performanceMode == true );
@@ -275,7 +279,7 @@ local function x(...) pcall(function(...)
     end
     )
 end
-local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= true ;
+local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= true ,[ "fastPickup" ]=(W.fastPickup ~= false ) ;
 [ "autoPlaceEvery5" ]= false ;
 [ "batchStealCount" ]= 0 ,[ "isBatchPlacing" ]= false ,[ "isHatching" ]= false ;
 [ "autoFarmLoop" ]= false ,[ "pureTweenFarm" ]= false ;
@@ -320,6 +324,7 @@ local Q4
 local P4
 local N4
 local U4
+local U4_Fast
 local l4
 local D4
 local C4
@@ -3303,6 +3308,89 @@ U4=function(e,u,w,j,...)
     end
     return R
 end
+-- ============================================================
+-- Fast Pickup — альтернатива U4 без ожидания Guard Strike
+-- Включается флагом h.fastPickup
+-- ============================================================
+U4_Fast=function(e,u,w,j,...)
+    local k=o.Character
+    local a=k and k:FindFirstChild( "HumanoidRootPart" )
+    local V=k and k:FindFirstChildOfClass( "Humanoid" )
+    if not a or not V then
+        return false
+    end
+    h.securingEgg = true h.isReturning = false h.stateTime =os.clock ()h.holdingEggForGuard = false
+    local s=u.Position V4(s, 14 )h.currentTargetModel =w h.targetPosition =s a.AssemblyLinearVelocity =Vector3.zero a.AssemblyAngularVelocity =Vector3.zero Z4(k)pcall(function(...) o:RequestStreamAroundAsync(s)
+    end
+    )
+    if not w and r:FindFirstChild( "AreaEggSlotsClient" )then
+        for e,r in ipairs(r.AreaEggSlotsClient :GetChildren())do
+            local y=r:FindFirstChildWhichIsA( "BasePart" )or r.PrimaryPart
+            if y and((y.Position -s)).Magnitude <= 16 then
+                w=r h.currentTargetModel =r
+                break
+            end
+        end
+    end
+    if w then
+        pcall(function(...)
+            for r,y in ipairs(w:GetDescendants())do
+                if y:IsA( "BasePart" )and(y.Transparency > 0.8 and(y.Name ~= "Hitbox" and(y.Name ~= "Root" and not y.Name :find( "Pad" ))))then
+                    y.Transparency = 0
+                end
+            end
+        end
+        )
+    end
+    h.statusText = "[FastPick] Direct pickup (no guard wait)..." H(string.format ( "[FastPick] Direct pickup for %s" ,tostring(e)))
+
+    local p=os.clock ()+ 1.2
+    local grabbed = false
+    while os.clock ()<p and(h.alive and h.securingEgg )do
+        if j and O4~=j then
+            break
+        end
+        if not h.pureTweenFarm and(not h.autoFarmLoop and not h.teleporting )then
+            break
+        end
+        k:PivotTo(u*CFrame.new ( 0 , 0.4 , 0 ))d4(w,s)
+        if e and i then
+            task.spawn (function(...) pcall(function(...)
+                    if i:IsA( "RemoteFunction" )then
+                        i:InvokeServer({[ "Uid" ]=e})i:InvokeServer(e)
+                    else
+                        i:FireServer({[ "Uid" ]=e})i:FireServer(e)
+                    end
+                end
+                )
+            end
+            )
+        end
+        y.Heartbeat :Wait()
+        if j4(e) then
+            grabbed = true
+            break
+        end
+    end
+
+    local R = grabbed or j4(e)
+    if not R then
+        task.wait ( 0.1 )R = j4(e)
+    end
+    h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
+    if j and O4~=j then
+        return false
+    end
+    if R then
+        pcall(u4)H( "[FastPick] Egg grabbed! Booking it home." )h.statusText = "Egg grabbed! Returning home..."
+    else
+        t( "[-] Fast pickup failed" )h.statusText = "[-] Pickup failed"
+        if e then
+            X4[e]=os.clock ()+ 2
+        end
+    end
+    return R
+end
 l4=function(e,u,...)
     if h.teleporting or h.glidingToTarget or h.delivering or h.securingEgg then
         return false
@@ -3478,7 +3566,8 @@ l4=function(e,u,...)
         end
     end
     task.wait ( 0.06 )j.Anchored = false k:ChangeState(Enum.HumanoidStateType.Running )
-    local l=U4(V,a,e and e.Model ,u)j.Anchored = false k:ChangeState(Enum.HumanoidStateType.Running )
+    local fn = (h.fastPickup == true) and U4_Fast or U4
+    local l=fn(V,a,e and e.Model ,u)j.Anchored = false k:ChangeState(Enum.HumanoidStateType.Running )
     for e,r in ipairs(w:GetDescendants())do
         if r:IsA( "BasePart" )then
             r.AssemblyLinearVelocity =Vector3.zero r.AssemblyAngularVelocity =Vector3.zero
@@ -3581,7 +3670,8 @@ local Ck=os.clock ()task.spawn (function(...)
                                 return
                             end
                             if h.pureTweenFarm and(Y4== "TWEEN" and((y.Position -w.Position )).Magnitude <= 22 )then
-                                local r=U4(w.Uid ,V,w.Model ,u)
+                                local fn2 = (h.fastPickup == true) and U4_Fast or U4
+                                local r=fn2(w.Uid ,V,w.Model ,u)
                                 if not r and w4()then
                                     r= true
                                 end
