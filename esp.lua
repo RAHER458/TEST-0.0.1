@@ -5146,51 +5146,40 @@ local function initFarm()
             local function nz(s)
                 return (string.lower(tostring(s or "")):gsub("[%s_%-]", ""))
             end
+            -- Prefer physical position over AreaId. Some server records carry a stale or
+            -- generic AreaId, which can make the farm cross to a different zone.
+            local x = r and tonumber(r.X) or nil
+            if x then
+                if x >= 5200 then return "Light Dark"
+                elseif x >= 4750 then return "Titan Temple"
+                elseif x >= 4000 then return "Cherry Blossom"
+                elseif x >= 3350 then return "Cosmic"
+                elseif x >= 2780 then return "Prehistoric"
+                elseif x >= 2250 then return "Abyss Ocean"
+                elseif x >= 1850 then return "Volcano"
+                elseif x >= 1450 then return "Snow"
+                elseif x >= 1150 then return "Jungle"
+                elseif x >= 920 then return "Desert"
+                elseif x >= 720 then return "Lake"
+                elseif x >= 530 then return "Forest"
+                end
+            end
+            -- Fallback to AreaId only when position is outside known zone ranges.
             local byNorm={}
             for _,zn in ipairs(M)do
                 byNorm[nz(zn)]=zn
             end
             byNorm["lightdark"]="Light Dark"
-            -- 1) AreaId from the server record is authoritative
             local an=nz(e)
             if an~="" and an~="unknown" then
-                if byNorm[an]then
-                    return byNorm[an]
-                end
+                if byNorm[an] then return byNorm[an] end
                 for key,zn in pairs(byNorm)do
-                    if string.find(an,key, 1 , true )then
+                    if #key >= 4 and string.find(an,key,1,true) then
                         return zn
                     end
                 end
             end
-            -- 2) physical position of the egg
-            local u=r and r.X or 0
-            if u>= 5200 then
-                return "Light Dark"
-            elseif u>= 4750 then
-                return "Titan Temple"
-            elseif u>= 4000 then
-                return "Cherry Blossom"
-            elseif u>= 3350 then
-                return "Cosmic"
-            elseif u>= 2780 then
-                return "Prehistoric"
-            elseif u>= 2250 then
-                return "Abyss Ocean"
-            elseif u>= 1850 then
-                return "Volcano"
-            elseif u>= 1450 then
-                return "Snow"
-            elseif u>= 1150 then
-                return "Jungle"
-            elseif u>= 920 then
-                return "Desert"
-            elseif u>= 720 then
-                return "Lake"
-            elseif u>= 530 then
-                return "Forest"
-            end
-            -- unknown zone -> nil -> egg is NEVER picked
+            -- Unknown zone -> nil -> egg is never picked.
             return nil
             -- [[DK_END]]
         end
@@ -5524,9 +5513,18 @@ local function initFarm()
                 h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
                 return false
             end
-            -- Fast path: request the guard strike immediately instead of waiting up to 4.5s
-            -- for the patrol to hit the player. Some game states may still require a brief
-            -- server update before the egg can be re-grabbed.
+            -- Egg is already secured: stow it and let the caller return to base immediately.
+            -- Do not request or wait for a guard strike; that was the source of the delay.
+            pcall(u4)
+            h.currentTargetModel = nil
+            h.targetPosition = nil
+            h.securingEgg = false
+            h.holdingEggForGuard = false
+            h.statusText = "Egg secured! Returning to base..."
+            H("[AutoSteal] Egg secured; skipping guard strike and returning to base immediately.")
+            return true
+
+            -- Legacy guard-strike flow retained below but unreachable by design.
             h.statusText = "[2/4] Requesting Guard Strike..." H( "[GuardStrike] Step 2: Requesting strike without the long wait..." )
             if P then
                 task.spawn(function()
@@ -5871,15 +5869,23 @@ local function initFarm()
                                             return
                                         end
                                         if r then
+                                            -- As soon as the game confirms the egg is carried, return immediately.
+                                            -- Do not wait for a guard strike or for a separate stash confirmation.
                                             pcall(u4)
-                                            if h.autoGlide then
-                                                h.statusText = "[AutoSteal] Secured! Tweening to Safe Line X=525..." H( "[AutoSteal] Egg secured after Guard Strike! Returning smoothly to Safe Line X=525 along Z=-360..." )Q4(h.glideSpeed ,u)pcall(u4)
-                                                local r=y4()h.statusText =string.format ( "Stashed in Bag (%d Eggs). Next steal..." ,r)H(string.format ( "[AutoSteal] Egg stashed in bag (%d total eggs). Hands-Free ready for next steal..." ,r))
-                                            else
-                                                h.statusText = "[AutoSteal] Secured! (Auto Return is OFF)" H( "[AutoSteal] Egg secured! Staying at target (Auto Return is OFF)." )
-                                            end
-                                            pcall(u4)h.isReturning = false h.delivering = false h.glidingToTarget = false h.securingEgg = false h.currentTargetModel =nil h.targetPosition =nil
-                                            if c4( "TWEEN" )then
+                                            h.statusText = "[AutoSteal] Egg picked up! Returning to Safe Line immediately..."
+                                            H("[AutoSteal] Egg pickup confirmed; skipping guard-strike wait and returning immediately.")
+                                            Q4(h.glideSpeed, u)
+                                            pcall(u4)
+                                            local bagCount = y4()
+                                            h.statusText = string.format("Returned to Safe Line. Backpack eggs: %d", bagCount)
+                                            H(string.format("[AutoSteal] Returned to Safe Line; backpack/character egg count: %d", bagCount))
+                                            h.isReturning = false
+                                            h.delivering = false
+                                            h.glidingToTarget = false
+                                            h.securingEgg = false
+                                            h.currentTargetModel = nil
+                                            h.targetPosition = nil
+                                            if c4("TWEEN") then
                                                 return
                                             end
                                         else
