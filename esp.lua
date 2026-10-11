@@ -2631,7 +2631,7 @@ local function initFarm()
             end
             )
         end
-        local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= true ;
+        local W=T()h={[ "godmode" ]= true ,[ "autoGlide" ]= true ,[ "autoHatch" ]= false ;
         [ "autoPlaceEvery5" ]= false ;
         [ "batchStealCount" ]= 0 ,[ "isBatchPlacing" ]= false ,[ "isHatching" ]= false ;
         [ "autoFarmLoop" ]= false ,[ "pureTweenFarm" ]= false ;
@@ -2639,8 +2639,8 @@ local function initFarm()
         [ "securingEgg" ]= false ,[ "glideSpeed" ]=O();
         [ "selectedZones" ]=W.selectedZones ;
         [ "selectedRarities" ]=W.selectedRarities ;
-        [ "alwaysCollectSecretPlus" ]=W.alwaysCollectSecretPlus ,[ "minRarityTier" ]=W.minRarityTier ,[ "autoTreadmill" ]=(W.autoTreadmill ~= false );
-        [ "autoUpgradeTreadmill" ]=(W.autoUpgradeTreadmill ~= false ),[ "autoBuyTrails" ]=(W.autoBuyTrails ~= false ),[ "hideNotEnoughMoney" ]= true ;
+        [ "alwaysCollectSecretPlus" ]=W.alwaysCollectSecretPlus ,[ "minRarityTier" ]=W.minRarityTier ,[ "autoTreadmill" ]=(W.autoTreadmill ~= false) ;
+        [ "autoUpgradeTreadmill" ]= false ,[ "autoBuyTrails" ]= false ,[ "hideNotEnoughMoney" ]= false ;
         [ "performanceMode" ]=(W.performanceMode == true ),[ "disable3D" ]=(W.disable3D == true ),[ "antiAFK" ]=(W.antiAFK ~= false ),[ "onTreadmill" ]= false ,[ "lastTreadmillMount" ]= 0 ,[ "laneZ" ]= -360 ,[ "swapped" ]= false ;
         [ "teleporting" ]= false ,[ "isReturning" ]= false ;
         [ "delivering" ]= false ,[ "holdingEggForGuard" ]= false ,[ "currentTargetModel" ]=nil,[ "targetPosition" ]=nil;
@@ -2969,7 +2969,7 @@ local function initFarm()
                     if y and y~= "" then
                         local e=r:GetPivot()
                         local u=e.Position
-                        if u.X >= 530 and not string.find (tostring(y), "FirstArea" )then
+                        if not string.find (tostring(y), "FirstArea" )then
                             if not k[y]then
                                 k[y]= true
                                 local u=r:GetAttribute( "Category" )or r:GetAttribute( "AssetCategory" )or r.Name
@@ -5334,9 +5334,20 @@ local function initFarm()
                     h.statusText = "[Filter] No zones selected"
                     return nil
                 end
+                -- If no rarity chips are selected, treat this as AUTO-PRIORITY mode:
+                -- allow all rarities and rank them from highest to lowest below.
+                local anyRarity = false
+                for _, rarityName in ipairs(X) do
+                    if h.selectedRarities and h.selectedRarities[rarityName] == true then
+                        anyRarity = true
+                        break
+                    end
+                end
                 for e,r in ipairs(e)do
                     local j=(r.State == "Slot" or r.State == "Dropped" or r.State == "GuardCarried" or r.State == 1 )
-                    local a=(r.BoundsCFrame and r.BoundsCFrame.Position .X < 530 )or string.find (tostring(r.Uid ), "FirstArea" )
+                    -- Do not discard every egg solely because its X coordinate is below 530:
+                    -- valid Forest eggs can still be identified by AreaId / physical zone mapping.
+                    local a=string.find (tostring(r.Uid ), "FirstArea" )
                     local o=X4[r.Uid ]and(os.clock ()<X4[r.Uid ])
                     if j and(not a and(((y or not o))and r.BoundsCFrame ))then
                         local e=r.AssetCategory or "Egg"
@@ -5374,7 +5385,7 @@ local function initFarm()
                         local J=Dk(t,H,B)
                         local K,c=k(r,e,o,y)
                         local i=(J~=nil and h.selectedZones and h.selectedZones [J]== true )
-                        local R=(h.selectedRarities and h.selectedRarities [c]== true )
+                        local R=(not anyRarity) or (h.selectedRarities and h.selectedRarities [c]== true )
                         local g=(i and R)
                         if g then
                             local k=tonumber(r.AssetScale or r.Scale )or 1
@@ -5404,7 +5415,21 @@ local function initFarm()
                     return nil
                 end
                 table.sort (u,function(e,r,...)
-                    return e.Distance <r.Distance
+                    if not anyRarity then
+                        -- No rarity selected: collect the rarest tier first, then the largest egg,
+                        -- using distance only as a tie-breaker.
+                        local er = tonumber(e.RarityTier) or 0
+                        local rr = tonumber(r.RarityTier) or 0
+                        if er ~= rr then
+                            return er > rr
+                        end
+                        local es = tonumber(e.Scale) or 1
+                        local rs = tonumber(r.Scale) or 1
+                        if es ~= rs then
+                            return es > rs
+                        end
+                    end
+                    return e.Distance < r.Distance
                 end
                 )
                 return u[ 1 ]
@@ -5499,34 +5524,25 @@ local function initFarm()
                 h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
                 return false
             end
-            h.statusText = "[2/4] Waiting for Guard Strike..." H( "[GuardStrike] Step 2: Egg lifted! Triggering guard strike..." )
-            local J=os.clock ()
-            local K=J+ 4.5
-            local c= false
-            while w4()and(os.clock ()<K and(h.alive and h.securingEgg ))do
-                if j and O4~=j then
-                    t( "[GuardStrike] Cancelled by session switch in Step 2" )
-                    break
-                end
-                if not h.pureTweenFarm and(not h.autoFarmLoop and not h.teleporting )then
-                    break
-                end
-                k:PivotTo(u*CFrame.new ( 0 , 0.4 , 0 ))V4(s, 14 )
-                if P and not c then
-                    task.spawn (function(...) pcall(function(...)
-                            if P:IsA( "RemoteFunction" )then
-                                P:InvokeServer()
-                            else
-                                P:FireServer()
-                            end
+            -- Fast path: request the guard strike immediately instead of waiting up to 4.5s
+            -- for the patrol to hit the player. Some game states may still require a brief
+            -- server update before the egg can be re-grabbed.
+            h.statusText = "[2/4] Requesting Guard Strike..." H( "[GuardStrike] Step 2: Requesting strike without the long wait..." )
+            if P then
+                task.spawn(function()
+                    pcall(function()
+                        if P:IsA("RemoteFunction") then
+                            P:InvokeServer()
+                        else
+                            P:FireServer()
                         end
-                        )
-                    end
-                    )c= true
-                end
-                y.Heartbeat :Wait()
+                    end)
+                end)
             end
-            h.statusText = "[3/4] Re-grabbing Egg..." H( "[GuardStrike] Step 3: Guard struck! Re-grabbing egg..." )
+            k:PivotTo(u*CFrame.new(0, 0.4, 0))
+            V4(s, 14)
+            task.wait(0.15)
+            h.statusText = "[3/4] Re-grabbing Egg..." H( "[GuardStrike] Step 3: Re-grabbing egg immediately..." )
             local v=os.clock ()+ 3
             while not w4()and(os.clock ()<v and(h.alive and h.securingEgg ))do
                 if j and O4~=j then
@@ -5976,7 +5992,7 @@ local function initFarm()
                         local y=e and e:FindFirstChild( "HumanoidRootPart" )
                         if y and not w4()then
                             if not h.onTreadmill and not L4()then
-                                h.statusText = "[AutoTreadmill] Idle without farm. Mounting treadmill..." f4()
+                                h.statusText = "[AutoTreadmill] Idle without farm. Mounting treadmill..." f4()task.wait( 3 )
                             end
                         end
                     end
@@ -6191,7 +6207,7 @@ local function initFarm()
             end
             local u=r.Position
             local w=w4()
-            if u.Y < 45 then
+            if u.Y < 45 and((h.pureTweenFarm or h.autoFarmLoop ))then
                 r.CFrame =CFrame.new (u.X , 72 ,u.Z )r.AssemblyLinearVelocity =Vector3.zero
                 return
             end
@@ -6210,7 +6226,7 @@ local function initFarm()
             if h.pureTweenFarm or h.autoFarmLoop or h.teleporting or h.glidingToTarget or h.delivering or h.securingEgg or h.isReturning then
                 return
             end
-            if h.alive and(h.autoGlide and(w and(not a4()and u.X >E)))then
+            if h.alive and((h.pureTweenFarm or h.autoFarmLoop )and(h.autoGlide and(w and(not a4()and u.X >E))))then
                 task.spawn (function(...) Q4(h.glideSpeed )u4()h.isReturning = false h.delivering = false
                 end
                 )
