@@ -69,7 +69,7 @@ local STATE = {
     mode     = "window",
 }
 
-local FarmApi = nil -- заполняется в initFarm() после авторизации
+local FarmApi = nil
 
 local function create(class, props, parent)
     local obj = Instance.new(class)
@@ -448,9 +448,9 @@ create("TextLabel", {
 task.spawn(function()
     local hue = 0
     while authGui.Parent do
-        hue = (hue + 0.008) % 1
+        hue = (hue + 0.008)HSV % 1
         if authTitle.Parent then
-            authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1)
+            authTitle.TextColor3 = Color3.from(hue, 0.7, 1)
         end
         task.wait(0.05)
     end
@@ -783,12 +783,7 @@ task.spawn(function()
         end
     end
 end)
-
--- [КОНЕЦ ЧАСТИ 1]
-
 -- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ (до всего остального) ============
--- Будут переопределены в MOVE-секции, но объявлены сейчас,
--- чтобы Часть 3 не падала при вызове
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
 _G.RH_HUB_IS_RUSH_ON = function() return false end
 _G.RH_HUB_RUSH_ACTIVE = function() return false end
@@ -1148,7 +1143,6 @@ local rushModeEnabled = false
 local rushSpeedValue = 200
 local rushHeightValue = 5
 
--- Экспорты (реальные, перезаписывают заглушки сверху)
 _G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
 _G.RH_HUB_IS_RUSH_ON = function() return rushModeEnabled end
 _G.RH_HUB_RUSH_SPEED = rushSpeedValue
@@ -1850,9 +1844,6 @@ section(aboutPage, "О ПРОЕКТЕ")
 infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
-
--- [КОНЕЦ ЧАСТИ 2]
-
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
@@ -2186,7 +2177,6 @@ setupWalkSpeedHook()
 local rushActive = false
 local rushEditMode = false
 
--- Перезаписываем заглушку (объявлена в Части 2)
 _G.RH_HUB_RUSH_ACTIVE = function() return rushActive end
 
 local function activateRush()
@@ -2235,7 +2225,6 @@ local function deactivateRush()
     end
 end
 
--- CFrame Stepper — только когда rushActive
 RunService.RenderStepped:Connect(function(dt)
     if not rushActive then return end
     if rushEditMode then return end
@@ -2256,7 +2245,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Обработчики ⚡
 rushBtn.InputBegan:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.Touch
     and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
@@ -2279,7 +2267,6 @@ rushBtn.InputEnded:Connect(function(input)
     deactivateRush()
 end)
 
--- Перемещение кнопки в edit mode
 local rushDrag = { active = false, input = nil, startPointer = nil, startPos = nil }
 local RUSH_DRAG_THRESHOLD = 4
 
@@ -2321,7 +2308,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Внешние функции (перезаписываем заглушки из Части 2)
 _G.RH_HUB_SET_RUSH_VISIBLE = function(visible)
     if rushEditMode then
         rushBtn.Visible = true
@@ -2385,7 +2371,6 @@ local function initFarm()
         local executorCheckCaller=typeof(checkcaller)=="function" and checkcaller or function() return false end
         local safeNewCClosure=typeof(newcclosure)=="function" and newcclosure or function(fn) return fn end
 
-        -- In-game diagnostic history. Kept in memory only and shown on demand in FARM.
         local diagnosticLogs = {}
         local MAX_DIAGNOSTIC_LOGS = 300
         local function diagnosticString(...)
@@ -5161,8 +5146,6 @@ local function initFarm()
             return y
         end
         local function Dk(e,r,y,...)
-            -- Prefer an explicit, recognized AreaId (especially Forest) when the
-            -- server supplies one; use coordinates only when the area id is generic.
             local function nz(s)
                 return (string.lower(tostring(s or "")):gsub("[%s_%-]", ""))
             end
@@ -5175,7 +5158,6 @@ local function initFarm()
             if an~="" and an~="unknown" and byNorm[an] then
                 return byNorm[an]
             end
-            -- Coordinate fallback for missing/generic/stale area metadata.
             local x = r and tonumber(r.X) or nil
             if x then
                 if x >= 5200 then return "Light Dark"
@@ -5192,7 +5174,6 @@ local function initFarm()
                 elseif x >= 530 then return "Forest"
                 end
             end
-            -- Last resort: partial area-name matching.
             if an~="" and an~="unknown" then
                 for key,zn in pairs(byNorm)do
                     if #key >= 4 and string.find(an,key,1,true) then
@@ -5342,8 +5323,6 @@ local function initFarm()
                     h.statusText = "[Filter] No zones selected"
                     return nil
                 end
-                -- If no rarity chips are selected, treat this as AUTO-PRIORITY mode:
-                -- allow all rarities and rank them from highest to lowest below.
                 local anyRarity = false
                 for _, rarityName in ipairs(X) do
                     if h.selectedRarities and h.selectedRarities[rarityName] == true then
@@ -5353,8 +5332,6 @@ local function initFarm()
                 end
                 for e,r in ipairs(e)do
                     local j=(r.State == "Slot" or r.State == "Dropped" or r.State == "GuardCarried" or r.State == 1 )
-                    -- Do not discard every egg solely because its X coordinate is below 530:
-                    -- valid Forest eggs can still be identified by AreaId / physical zone mapping.
                     local a=string.find (tostring(r.Uid ), "FirstArea" )
                     local o=X4[r.Uid ]and(os.clock ()<X4[r.Uid ])
                     if j and(not a and(((y or not o))and r.BoundsCFrame ))then
@@ -5424,8 +5401,6 @@ local function initFarm()
                 end
                 table.sort (u,function(e,r,...)
                     if not anyRarity then
-                        -- No rarity selected: collect the rarest tier first, then the largest egg,
-                        -- using distance only as a tie-breaker.
                         local er = tonumber(e.RarityTier) or 0
                         local rr = tonumber(r.RarityTier) or 0
                         if er ~= rr then
@@ -5443,9 +5418,6 @@ local function initFarm()
                 return u[ 1 ]
             end
             local V=a(false, false)
-            -- Respect per-UID cooldowns. Do not clear the blacklist or bypass it
-            -- when every visible egg has failed pickup; otherwise the farm loops
-            -- through the same unavailable eggs indefinitely.
             if not V then
                 e=h4(true)
                 V=a(false, false)
@@ -5512,8 +5484,6 @@ local function initFarm()
                     end
                 end
                 k:PivotTo(u*CFrame.new ( 0 , 0.4 , 0 ))d4(w,s)
-                -- Throttle pickup requests: the previous loop spawned remote calls
-                -- every Heartbeat, potentially flooding the server and racing requests.
                 if e and i and (os.clock()-lastRemoteRequest)>=0.4 then
                     lastRemoteRequest=os.clock()
                     task.spawn(function()
@@ -5544,8 +5514,6 @@ local function initFarm()
                 h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
                 return false
             end
-            -- Egg is already secured: stow it and let the caller return to base immediately.
-            -- Do not request or wait for a guard strike; that was the source of the delay.
             pcall(u4)
             h.currentTargetModel = nil
             h.targetPosition = nil
@@ -5839,9 +5807,6 @@ local function initFarm()
                                         if not r and w4(w.Uid)then
                                             r= true
                                         end
-                                        -- If the egg respawned but the first pickup request did not register,
-                                        -- retry the SAME target while already standing beside it. Do not hop
-                                        -- between every egg just because the first pickup confirmation timed out.
                                         if not r and O4==u and h.pureTweenFarm and Y4== "TWEEN" then
                                             for pickupRetry=1,2 do
                                                 task.wait(0.35)
@@ -5862,13 +5827,9 @@ local function initFarm()
                                             return
                                         end
                                         if r then
-                                            -- Cool down the picked UID so stale client slot records cannot
-                                            -- immediately send the bot back to the same already-carried egg.
                                             X4[w.Uid]=os.clock()+30
                                             H(string.format("[PickupDiag] Confirmed uid=%s | carriedEggCount=%d | cooling down UID for 30s",
                                                 tostring(w.Uid), tonumber(y4()) or 0))
-                                            -- As soon as the game confirms the egg is carried, return immediately.
-                                            -- Do not wait for a guard strike or for a separate stash confirmation.
                                             pcall(u4)
                                             h.statusText = "[AutoSteal] Egg picked up! Returning to Safe Line immediately..."
                                             H("[AutoSteal] Egg pickup confirmed; skipping guard-strike wait and returning immediately.")
@@ -6331,7 +6292,6 @@ local function initFarm()
     local h = Farm.State
     local toast = makeToast(main)
 
-    -- ---------- UI helpers (в стиле RH-HUB) ----------
     local function row(parent, height)
         local f = create("Frame", {
             Size = UDim2.new(1, 0, 0, height),
@@ -6498,7 +6458,6 @@ local function initFarm()
         return b
     end
 
-    -- сетка чипов (зоны / редкости)
     local function chipGrid(parent, list, map, colors, onChange)
         for _, name in ipairs(list) do
             if map[name] == nil then map[name] = false end
@@ -6597,7 +6556,6 @@ local function initFarm()
         mk("СБРОСИТЬ", 0.5, onNone)
     end
 
-    -- ---------- СТАТУС ----------
     section(farmPage, "СТАТУС")
     local statusCard = row(farmPage, 52)
     stroke(statusCard, C.accent, 1, 0.5)
@@ -6624,7 +6582,7 @@ local function initFarm()
         end
     end)
 
-    -- ---------- ДИАГНОСТИЧЕСКАЯ КОНСОЛЬ (скрыта до нажатия кнопки) ----------
+    -- ---------- ДИАГНОСТИЧЕСКАЯ КОНСОЛЬ (полноценный скролл) ----------
     local consoleToggle = create("TextButton", {
         Size = UDim2.new(1, 0, 0, 34),
         BackgroundColor3 = C.surface2,
@@ -6642,27 +6600,48 @@ local function initFarm()
         BackgroundColor3 = C.surface,
         BorderSizePixel = 0,
         Visible = false,
+        ClipsDescendants = true,
     }, farmPage)
     corner(consolePanel, 10)
     stroke(consolePanel, C.accent, 1, 0.55)
 
-    local consoleHistory = create("TextBox", {
+    local consoleScroll = create("ScrollingFrame", {
         Position = UDim2.new(0, 8, 0, 8),
         Size = UDim2.new(1, -16, 1, -54),
         BackgroundColor3 = C.surface2,
         BorderSizePixel = 0,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = C.accent,
+        ScrollBarImageTransparency = 0.2,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        ClipsDescendants = true,
+        Active = true,
+    }, consolePanel)
+    corner(consoleScroll, 7)
+
+    create("UIPadding", {
+        PaddingTop = UDim.new(0, 6),
+        PaddingBottom = UDim.new(0, 6),
+        PaddingLeft = UDim.new(0, 6),
+        PaddingRight = UDim.new(0, 6),
+    }, consoleScroll)
+
+    local consoleLogLabel = create("TextLabel", {
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
         Text = "История пока пуста.",
         TextColor3 = C.text,
         TextSize = 10,
         Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
-        TextWrapped = false,
-        ClearTextOnFocus = false,
-        MultiLine = true,
-        TextEditable = false,
-    }, consolePanel)
-    corner(consoleHistory, 7)
+        TextWrapped = true,
+        RichText = false,
+    }, consoleScroll)
 
     local consoleClear = create("TextButton", {
         Position = UDim2.new(0, 8, 1, -38),
@@ -6692,14 +6671,23 @@ local function initFarm()
 
     local consoleOpen = false
     local lastRenderedLogs = ""
+
     local function renderDiagnosticLogs(force)
         local logs = Farm.GetDiagnosticLogs and Farm.GetDiagnosticLogs() or {}
-        local joined = #logs > 0 and table.concat(logs, "\n") or "История пуста. Включи авто-кражу, чтобы записать события."
+        local joined = #logs > 0
+            and table.concat(logs, "\n")
+            or "История пуста. Включи авто-кражу, чтобы записать события."
+
         if force or joined ~= lastRenderedLogs then
-            consoleHistory.Text = joined
+            consoleLogLabel.Text = joined
             lastRenderedLogs = joined
+
             task.defer(function()
-                pcall(function() consoleHistory.CursorPosition = #consoleHistory.Text + 1 end)
+                task.wait()
+                pcall(function()
+                    local target = math.max(0, consoleScroll.AbsoluteCanvasSize.Y - consoleScroll.AbsoluteSize.Y)
+                    consoleScroll.CanvasPosition = Vector2.new(0, target)
+                end)
             end)
         end
     end
@@ -6726,11 +6714,11 @@ local function initFarm()
         renderDiagnosticLogs(true)
         local copied = false
         if type(setclipboard) == "function" then
-            copied = pcall(setclipboard, consoleHistory.Text)
+            copied = pcall(setclipboard, consoleLogLabel.Text)
         elseif type(toclipboard) == "function" then
-            copied = pcall(toclipboard, consoleHistory.Text)
+            copied = pcall(toclipboard, consoleLogLabel.Text)
         elseif type(set_clipboard) == "function" then
-            copied = pcall(set_clipboard, consoleHistory.Text)
+            copied = pcall(set_clipboard, consoleLogLabel.Text)
         end
         if copied then
             toast("История скопирована в буфер обмена", "ok")
@@ -6749,7 +6737,6 @@ local function initFarm()
         end
     end)
 
-    -- ---------- РЕЖИМ ----------
     section(farmPage, "РЕЖИМ ФАРМА")
     local farmMode = "NONE"
     local tweenRow, warpRow
@@ -6788,7 +6775,6 @@ local function initFarm()
         h.autoGlide = on
     end)
 
-    -- ---------- ЗОНЫ ----------
     local zonesSection = section(farmPage, "ЗОНЫ")
     local function refreshZoneLabel()
         local n = zonesPicked()
@@ -6801,7 +6787,6 @@ local function initFarm()
     allNoneRow(farmPage, function() zoneGrid.setAll(true) end, function() zoneGrid.setAll(false) end)
     refreshZoneLabel()
 
-    -- ---------- РЕДКОСТЬ ----------
     local rarSection = section(farmPage, "РЕДКОСТЬ")
     local function refreshRarLabel()
         rarSection.Text = "РЕДКОСТЬ  •  ВЫБРАНО " .. countOn(h.selectedRarities, Farm.RarityList) .. " / " .. #Farm.RarityList
@@ -6813,7 +6798,6 @@ local function initFarm()
     allNoneRow(farmPage, function() rarGrid.setAll(true) end, function() rarGrid.setAll(false) end)
     refreshRarLabel()
 
-    -- ---------- ЯЙЦА / ДОРОЖКА ----------
     section(farmPage, "ЯЙЦА И БАЗА")
     toggleRow(farmPage, "Авто-размещение (каждые 5)", "Каждые 5 краж лететь домой и ставить яйца", h.autoPlaceEvery5 == true, function(on)
         h.autoPlaceEvery5 = on
@@ -6845,7 +6829,6 @@ local function initFarm()
         Farm.SaveEggSelectConfig(h)
     end)
 
-    -- ---------- ПОЛЁТ / БЕЗОПАСНОСТЬ ----------
     section(farmPage, "ПОЛЁТ И БЕЗОПАСНОСТЬ")
     sliderRow(farmPage, "Скорость полёта", 100, 1000, 25, h.glideSpeed or 600,
         function(v) h.glideSpeed = v end,
@@ -7044,6 +7027,3 @@ print("Version: " .. CONFIG.VERSION)
 print("UserId: " .. tostring(LocalPlayer.UserId))
 print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
-
--- [КОНЕЦ ЧАСТИ 3]
--- [[ КОНЕЦ ФАЙЛА ]]
