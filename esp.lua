@@ -1,7 +1,7 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 0.0.2-alpha
+    Version: 0.0.3-alpha
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "0.0.2-alpha",
+    VERSION     = "0.0.3-alpha",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -157,9 +157,7 @@ end
 STATE.deviceId = loadDeviceId()
 
 local function saveToken(token)
-    if hasFileAPI() then
-        pcall(writefile, CONFIG.TOKEN_FILE, tostring(token))
-    end
+    if hasFileAPI() then pcall(writefile, CONFIG.TOKEN_FILE, tostring(token)) end
 end
 
 local function loadToken()
@@ -180,9 +178,7 @@ end
 local function clearToken()
     if hasFileAPI() and type(delfile) == "function" then
         pcall(function()
-            if isfile(CONFIG.TOKEN_FILE) then
-                delfile(CONFIG.TOKEN_FILE)
-            end
+            if isfile(CONFIG.TOKEN_FILE) then delfile(CONFIG.TOKEN_FILE) end
         end)
     end
 end
@@ -196,102 +192,60 @@ end
 
 local function api(path, body)
     local req = getRequestFn()
-    if not req then return nil, "Executor не поддерживает HTTP-запросы" end
-
+    if not req then return nil, "Executor не поддерживает HTTP" end
     local payload
-    local encOK, encErr = pcall(function()
-        payload = HttpService:JSONEncode(body or {})
-    end)
+    local encOK, encErr = pcall(function() payload = HttpService:JSONEncode(body or {}) end)
     if not encOK then return nil, "Ошибка JSON: " .. tostring(encErr) end
 
-    local response = nil
-    local requestDone = false
-
+    local response, requestDone = nil, false
     task.spawn(function()
         local callOK, res = pcall(function()
             return req({
                 Url = CONFIG.API_BASE .. path,
                 Method = "POST",
-                Headers = {
-                    ["Content-Type"] = "application/json",
-                    ["Accept"] = "application/json",
-                },
+                Headers = { ["Content-Type"] = "application/json", ["Accept"] = "application/json" },
                 Body = payload,
             })
         end)
-
-        if callOK then
-            response = res
-        else
-            response = { __error = tostring(res) }
-        end
+        if callOK then response = res else response = { __error = tostring(res) } end
         requestDone = true
     end)
 
-    local startTime = os.clock()
-    while not requestDone and os.clock() - startTime < 15 do
-        task.wait(0.1)
-    end
-
-    if not requestDone then
-        return nil, "Таймаут запроса (сервер не отвечает)"
-    end
-
-    if not response or type(response) ~= "table" then
-        return nil, "Не удалось выполнить запрос"
-    end
-
-    if response.__error then
-        return nil, response.__error
-    end
+    local t0 = os.clock()
+    while not requestDone and os.clock() - t0 < 15 do task.wait(0.1) end
+    if not requestDone then return nil, "Таймаут запроса" end
+    if not response or type(response) ~= "table" then return nil, "Не удалось выполнить запрос" end
+    if response.__error then return nil, response.__error end
 
     local status = tonumber(response.StatusCode or response.Status or 0) or 0
     local raw = response.Body or response.body or ""
-
-    local decOK, decoded = pcall(function()
-        return HttpService:JSONDecode(raw)
-    end)
+    local decOK, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
 
     if status < 200 or status >= 300 then
         local message
-        if decOK and type(decoded) == "table" then
-            message = decoded.error or decoded.message
-        end
-        if not message and raw ~= "" then
-            message = tostring(raw):sub(1, 120)
-        end
+        if decOK and type(decoded) == "table" then message = decoded.error or decoded.message end
+        if not message and raw ~= "" then message = tostring(raw):sub(1, 120) end
         return nil, tostring(message or ("HTTP " .. status))
     end
-
-    if not decOK or type(decoded) ~= "table" then
-        return nil, "Некорректный ответ"
-    end
-
+    if not decOK or type(decoded) ~= "table" then return nil, "Некорректный ответ" end
     return decoded
 end
 
 local function apiWithRetry(path, body, maxAttempts, delay)
     maxAttempts = maxAttempts or CONFIG.RETRY_MAX
     delay = delay or CONFIG.RETRY_DELAY
-
     local lastErr = nil
-
     for attempt = 1, maxAttempts do
         local result, err = api(path, body)
         if result then return result, nil, attempt end
-
         lastErr = err
         local errText = tostring(err or ""):lower()
-
         if errText:find("таймаут") or errText:find("timeout") then
-            if attempt < maxAttempts then
-                task.wait(delay)
-            end
+            if attempt < maxAttempts then task.wait(delay) end
         else
             return nil, err, attempt
         end
     end
-
     return nil, lastErr, maxAttempts
 end
 
@@ -302,28 +256,21 @@ local function makeToast(parentFrame)
         BackgroundTransparency = 1,
         ZIndex = 200,
     }, parentFrame)
-
     create("UIListLayout", {
         Padding = UDim.new(0, 6),
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         VerticalAlignment = Enum.VerticalAlignment.Bottom,
         SortOrder = Enum.SortOrder.LayoutOrder,
     }, container)
-
     create("UIPadding", {
         PaddingBottom = UDim.new(0, 12),
         PaddingLeft = UDim.new(0, 16),
         PaddingRight = UDim.new(0, 16),
     }, container)
-
     local n = 0
     return function(text, kind)
         n = n + 1
-        local col = kind == "ok" and C.green
-                or kind == "err" and C.red
-                or kind == "warn" and C.yellow
-                or C.accent
-
+        local col = kind == "ok" and C.green or kind == "err" and C.red or kind == "warn" and C.yellow or C.accent
         local t = create("Frame", {
             Size = UDim2.new(1, 0, 0, 0),
             BackgroundColor3 = C.surface2,
@@ -332,11 +279,7 @@ local function makeToast(parentFrame)
             LayoutOrder = n,
         }, container)
         corner(t, 10)
-        create("Frame", {
-            Size = UDim2.new(0, 3, 1, 0),
-            BackgroundColor3 = col,
-            BorderSizePixel = 0,
-        }, t)
+        create("Frame", { Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = col, BorderSizePixel = 0 }, t)
         create("TextLabel", {
             Position = UDim2.new(0, 12, 0, 0),
             Size = UDim2.new(1, -20, 1, 0),
@@ -348,11 +291,9 @@ local function makeToast(parentFrame)
             TextWrapped = true,
             TextXAlignment = Enum.TextXAlignment.Left,
         }, t)
-
         TweenService:Create(t, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = UDim2.new(1, 0, 0, 38),
         }):Play()
-
         task.delay(3.2, function()
             if t.Parent then
                 TweenService:Create(t, TweenInfo.new(0.2), {
@@ -399,9 +340,7 @@ local function authFit()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local vp = cam.ViewportSize
-    local w = math.min(320, vp.X - 24)
-    local h = math.min(400, vp.Y - 60)
-    authMain.Size = UDim2.fromOffset(w, h)
+    authMain.Size = UDim2.fromOffset(math.min(320, vp.X - 24), math.min(400, vp.Y - 60))
 end
 authFit()
 if workspace.CurrentCamera then
@@ -447,9 +386,7 @@ task.spawn(function()
     local hue = 0
     while authGui.Parent do
         hue = (hue + 0.008) % 1
-        if authTitle.Parent then
-            authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1)
-        end
+        if authTitle.Parent then authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1) end
         task.wait(0.05)
     end
 end)
@@ -526,14 +463,10 @@ local authPasteBtn = create("TextButton", {
 corner(authPasteBtn, 9)
 
 authKeyBox.Focused:Connect(function()
-    TweenService:Create(authInputStroke, TweenInfo.new(0.15), {
-        Color = C.accent, Transparency = 0,
-    }):Play()
+    TweenService:Create(authInputStroke, TweenInfo.new(0.15), { Color = C.accent, Transparency = 0 }):Play()
 end)
 authKeyBox.FocusLost:Connect(function()
-    TweenService:Create(authInputStroke, TweenInfo.new(0.15), {
-        Color = C.border, Transparency = 0.1,
-    }):Play()
+    TweenService:Create(authInputStroke, TweenInfo.new(0.15), { Color = C.border, Transparency = 0.1 }):Play()
 end)
 
 local authActBtn = create("TextButton", {
@@ -578,15 +511,10 @@ local authStatus = create("TextLabel", {
 
 local function setStatus(text, kind)
     authStatus.Text = tostring(text)
-    if kind == "ok" then
-        authStatus.TextColor3 = C.green
-    elseif kind == "err" then
-        authStatus.TextColor3 = C.red
-    elseif kind == "warn" then
-        authStatus.TextColor3 = C.yellow
-    else
-        authStatus.TextColor3 = C.muted
-    end
+    if kind == "ok" then authStatus.TextColor3 = C.green
+    elseif kind == "err" then authStatus.TextColor3 = C.red
+    elseif kind == "warn" then authStatus.TextColor3 = C.yellow
+    else authStatus.TextColor3 = C.muted end
 end
 
 local authToast = makeToast(authGui)
@@ -605,7 +533,6 @@ end
 
 authPasteBtn.MouseButton1Click:Connect(function()
     if STATE.busy then return end
-
     local value = nil
     if type(getclipboard) == "function" then
         local ok, v = pcall(getclipboard)
@@ -615,7 +542,6 @@ authPasteBtn.MouseButton1Click:Connect(function()
         local ok, v = pcall(getClipboard)
         if ok and type(v) == "string" and v ~= "" then value = v end
     end
-
     if value and value ~= "" then
         value = value:gsub("%s+", "")
         authKeyBox.Text = value
@@ -628,102 +554,69 @@ authPasteBtn.MouseButton1Click:Connect(function()
 end)
 
 local tgCooldown = false
-
 authTgBtn.MouseButton1Click:Connect(function()
     if tgCooldown then return end
     tgCooldown = true
-
     local copied = false
-    if type(setclipboard) == "function" then
-        copied = pcall(setclipboard, CONFIG.TG_LINK)
-    elseif type(toclipboard) == "function" then
-        copied = pcall(toclipboard, CONFIG.TG_LINK)
-    end
-
+    if type(setclipboard) == "function" then copied = pcall(setclipboard, CONFIG.TG_LINK)
+    elseif type(toclipboard) == "function" then copied = pcall(toclipboard, CONFIG.TG_LINK) end
     if copied then
-        authToast("Ссылка скопирована! Вставьте в браузер", "ok")
+        authToast("Ссылка скопирована", "ok")
         setStatus("Ссылка в буфере", "ok")
     else
         authToast("Скопируйте вручную", "warn")
         setStatus("Ссылка: " .. CONFIG.TG_LINK, "warn")
     end
-
-    task.delay(2.5, function()
-        tgCooldown = false
-    end)
+    task.delay(2.5, function() tgCooldown = false end)
 end)
 
 local onAuthSuccess
 
 local function activateKey(rawKey)
     local key = tostring(rawKey or ""):gsub("%s+", "")
-
     if key == "" then
         setStatus("Введите ключ доступа", "warn")
         authToast("Ключ пустой", "warn")
         return
     end
-
     if STATE.busy then return end
     setBusy(true)
     setStatus("Активация ключа...", nil)
-
     task.spawn(function()
         if type(STATE.deviceId) ~= "string" or STATE.deviceId == "" then
             STATE.deviceId = generateDeviceId()
         end
-
         local body = { key = key, install_hash = STATE.deviceId }
-
         local result, err, attempts = apiWithRetry("/activate", body, CONFIG.RETRY_MAX, CONFIG.RETRY_DELAY)
-
-        if attempts > 1 and result then
-            setStatus("Попытка " .. attempts .. " успешна", "ok")
-        end
-
         if not result then
             setBusy(false)
             local msg = tostring(err or "неизвестная ошибка")
             local low = msg:lower()
-
             if low:find("invalid license") then
                 setStatus("❌ Неверный ключ", "err")
-                authToast("Неверный ключ", "err")
             elseif low:find("bound to another") then
-                setStatus("❌ Ключ привязан к другому устройству", "err")
-                authToast("Ключ занят другим устройством", "err")
+                setStatus("❌ Ключ занят другим устройством", "err")
             elseif low:find("expired") then
                 setStatus("❌ Ключ истёк", "err")
-                authToast("Ключ истёк", "err")
-            elseif low:find("таймаут") or low:find("timeout") then
-                setStatus("❌ Сервер не отвечает. Попробуй позже.", "err")
-                authToast("Сервер не отвечает", "err")
             else
                 setStatus("❌ " .. msg, "err")
-                authToast(msg, "err")
             end
+            authToast(msg, "err")
             return
         end
-
         if type(result.token) ~= "string" or result.token == "" then
             setBusy(false)
             setStatus("❌ Сервер не выдал токен", "err")
-            authToast("Пустой ответ", "err")
             return
         end
-
         setBusy(false)
         onAuthSuccess(result.token)
     end)
 end
 
 local function verifySavedToken(token)
-    if type(token) ~= "string" or token == "" then
-        return false, "no_token"
-    end
-
+    if type(token) ~= "string" or token == "" then return false, "no_token" end
     local result, err = api("/verify", { token = token })
-
     if not result then
         local errText = tostring(err or ""):lower()
         if errText:find("expired") then
@@ -732,11 +625,7 @@ local function verifySavedToken(token)
         end
         return false, "request_failed"
     end
-
-    if result.valid ~= true then
-        return false, "invalid"
-    end
-
+    if result.valid ~= true then return false, "invalid" end
     return true, "ok"
 end
 
@@ -746,25 +635,16 @@ authActBtn.MouseButton1Click:Connect(function()
 end)
 
 authKeyBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed and not STATE.busy then
-        activateKey(authKeyBox.Text)
-    end
+    if enterPressed and not STATE.busy then activateKey(authKeyBox.Text) end
 end)
 
 task.spawn(function()
     task.wait(0.3)
-
     local saved = loadToken()
-    if not saved then
-        setStatus("Введите ключ доступа", nil)
-        return
-    end
-
+    if not saved then setStatus("Введите ключ доступа", nil) return end
     setStatus("Проверка сессии...", nil)
     setBusy(true)
-
     local valid, reason = verifySavedToken(saved)
-
     if valid then
         setBusy(false)
         onAuthSuccess(saved)
@@ -772,7 +652,6 @@ task.spawn(function()
         setBusy(false)
         if reason == "expired" then
             setStatus("⏱ Ключ истёк", "warn")
-            authToast("Нужен новый ключ", "warn")
         elseif reason == "invalid" then
             clearToken()
             setStatus("Сессия недействительна", "warn")
@@ -796,14 +675,11 @@ local mainGui = create("ScreenGui", {
 })
 safeParent(mainGui)
 
-local WIN_W = CONFIG.WINDOW_W
-local WIN_H = CONFIG.WINDOW_H
-
 local main = create("Frame", {
     Name = "MainWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(WIN_W, WIN_H),
+    Size = UDim2.fromOffset(CONFIG.WINDOW_W, CONFIG.WINDOW_H),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
     ClipsDescendants = true,
@@ -815,9 +691,7 @@ local function fitMain()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local vp = cam.ViewportSize
-    local w = math.min(WIN_W, vp.X - 20)
-    local h = math.min(WIN_H, vp.Y - 60)
-    main.Size = UDim2.fromOffset(w, h)
+    main.Size = UDim2.fromOffset(math.min(CONFIG.WINDOW_W, vp.X - 20), math.min(CONFIG.WINDOW_H, vp.Y - 60))
 end
 fitMain()
 if workspace.CurrentCamera then
@@ -877,9 +751,7 @@ task.spawn(function()
     local hue = 0
     while mainGui.Parent do
         hue = (hue + 0.008) % 1
-        if titleLabel.Parent then
-            titleLabel.TextColor3 = Color3.fromHSV(hue, 0.65, 1)
-        end
+        if titleLabel.Parent then titleLabel.TextColor3 = Color3.fromHSV(hue, 0.65, 1) end
         task.wait(0.05)
     end
 end)
@@ -916,7 +788,6 @@ local navBar = create("Frame", {
     Size = UDim2.new(1, -16, 0, 34),
     BackgroundTransparency = 1,
 }, main)
-
 create("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -957,33 +828,22 @@ local function createPage(name)
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         Visible = false,
     }, content)
-
     create("UIPadding", {
         PaddingTop = UDim.new(0, 4),
         PaddingBottom = UDim.new(0, 12),
         PaddingLeft = UDim.new(0, 2),
         PaddingRight = UDim.new(0, 4),
     }, page)
-
-    create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 6),
-    }, page)
-
+    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }, page)
     pages[name] = page
     return page
 end
 
 local activeTab = "HOME"
-
 local function selectTab(name)
     if not pages[name] then return end
     activeTab = name
-
-    for tabName, page in pairs(pages) do
-        page.Visible = tabName == name
-    end
-
+    for tabName, page in pairs(pages) do page.Visible = tabName == name end
     for tabId, btn in pairs(navButtons) do
         local sel = tabId == name
         btn.BackgroundColor3 = sel and C.accent or C.button
@@ -1005,18 +865,12 @@ local function makeNavButton(id, label, order)
         LayoutOrder = order,
     }, navBar)
     corner(b, 8)
-
-    b.MouseButton1Click:Connect(function()
-        selectTab(id)
-    end)
-
+    b.MouseButton1Click:Connect(function() selectTab(id) end)
     navButtons[id] = b
     return b
 end
 
-for i, tab in ipairs(TABS) do
-    makeNavButton(tab.id, tab.name, i)
-end
+for i, tab in ipairs(TABS) do makeNavButton(tab.id, tab.name, i) end
 
 local homePage     = createPage("HOME")
 local movePage     = createPage("MOVE")
@@ -1046,7 +900,6 @@ local function infoCard(parent, heading, body)
         BorderSizePixel = 0,
     }, parent)
     corner(frame, 10)
-
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 8),
         Size = UDim2.new(1, -20, 0, 16),
@@ -1057,7 +910,6 @@ local function infoCard(parent, heading, body)
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, frame)
-
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 26),
         Size = UDim2.new(1, -20, 0, 28),
@@ -1070,7 +922,6 @@ local function infoCard(parent, heading, body)
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
     }, frame)
-
     return frame
 end
 
@@ -1081,7 +932,6 @@ local function soonCard(parent)
         BorderSizePixel = 0,
     }, parent)
     corner(frame, 12)
-
     create("TextLabel", {
         Position = UDim2.new(0, 0, 0, 30),
         Size = UDim2.new(1, 0, 0, 30),
@@ -1092,7 +942,6 @@ local function soonCard(parent)
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Center,
     }, frame)
-
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 68),
         Size = UDim2.new(1, -20, 0, 20),
@@ -1103,25 +952,12 @@ local function soonCard(parent)
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Center,
     }, frame)
-
-    create("TextLabel", {
-        Position = UDim2.new(0, 10, 0, 90),
-        Size = UDim2.new(1, -20, 0, 16),
-        BackgroundTransparency = 1,
-        Text = "Функционал в разработке",
-        TextColor3 = C.muted,
-        TextSize = 9,
-        Font = Enum.Font.Gotham,
-        TextXAlignment = Enum.TextXAlignment.Center,
-    }, frame)
-
     return frame
 end
 
 -- ============ UI: TOGGLE ============
 local function AddToggle(parentPage, title, description, defaultState, callback)
     local toggled = defaultState or false
-
     local ToggleContainer = create("Frame", {
         Size = UDim2.new(1, 0, 0, 50),
         BackgroundColor3 = C.surface,
@@ -1129,7 +965,6 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
     }, parentPage)
     corner(ToggleContainer, 12)
     stroke(ToggleContainer, C.border, 1, 0.3)
-
     create("TextLabel", {
         Size = UDim2.new(1, -70, 0, 18),
         Position = UDim2.new(0, 15, 0, 8),
@@ -1140,7 +975,6 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, ToggleContainer)
-
     create("TextLabel", {
         Size = UDim2.new(1, -70, 0, 15),
         Position = UDim2.new(0, 15, 0, 26),
@@ -1151,7 +985,6 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, ToggleContainer)
-
     local SwitchBg = create("Frame", {
         Size = UDim2.new(0, 42, 0, 22),
         Position = UDim2.new(1, -54, 0.5, -11),
@@ -1159,7 +992,6 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
         BorderSizePixel = 0,
     }, ToggleContainer)
     corner(SwitchBg, 11)
-
     local SwitchKnob = create("Frame", {
         Size = UDim2.fromOffset(16, 16),
         Position = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
@@ -1167,36 +999,26 @@ local function AddToggle(parentPage, title, description, defaultState, callback)
         BorderSizePixel = 0,
     }, SwitchBg)
     corner(SwitchKnob, 8)
-
     local ClickBtn = create("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
     }, ToggleContainer)
-
     local function Update(state, noCallback)
         toggled = state
         local targetColor = toggled and C.accent or C.button
         local targetPos = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-        TweenService:Create(SwitchBg, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-        TweenService:Create(SwitchKnob, TweenInfo.new(0.2), {Position = targetPos}):Play()
+        TweenService:Create(SwitchBg, TweenInfo.new(0.2), { BackgroundColor3 = targetColor }):Play()
+        TweenService:Create(SwitchKnob, TweenInfo.new(0.2), { Position = targetPos }):Play()
         if not noCallback and callback then pcall(function() callback(toggled) end) end
     end
-
-    ClickBtn.MouseButton1Click:Connect(function()
-        Update(not toggled)
-    end)
-
-    return {
-        Set = function(state) Update(state) end,
-        Get = function() return toggled end
-    }
+    ClickBtn.MouseButton1Click:Connect(function() Update(not toggled) end)
+    return { Set = function(state) Update(state) end, Get = function() return toggled end }
 end
 
 -- ============ UI: SLIDER ============
 local function AddSlider(parentPage, title, min, max, default, callback)
     local value = default or min
-
     local SliderContainer = create("Frame", {
         Size = UDim2.new(1, 0, 0, 60),
         BackgroundColor3 = C.surface,
@@ -1204,7 +1026,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
     }, parentPage)
     corner(SliderContainer, 12)
     stroke(SliderContainer, C.border, 1, 0.3)
-
     create("TextLabel", {
         Size = UDim2.new(1, -70, 0, 18),
         Position = UDim2.new(0, 15, 0, 10),
@@ -1215,7 +1036,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, SliderContainer)
-
     local ValueLabel = create("TextLabel", {
         Size = UDim2.new(0, 50, 0, 18),
         Position = UDim2.new(1, -65, 0, 10),
@@ -1226,7 +1046,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Right,
     }, SliderContainer)
-
     local SliderTrack = create("Frame", {
         Size = UDim2.new(1, -30, 0, 6),
         Position = UDim2.new(0, 15, 0, 40),
@@ -1234,14 +1053,12 @@ local function AddSlider(parentPage, title, min, max, default, callback)
         BorderSizePixel = 0,
     }, SliderContainer)
     corner(SliderTrack, 3)
-
     local SliderFill = create("Frame", {
         Size = UDim2.new(math.clamp((value - min) / (max - min), 0, 1), 0, 1, 0),
         BackgroundColor3 = C.accent,
         BorderSizePixel = 0,
     }, SliderTrack)
     corner(SliderFill, 3)
-
     local SliderKnob = create("Frame", {
         Size = UDim2.fromOffset(12, 12),
         AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1250,9 +1067,7 @@ local function AddSlider(parentPage, title, min, max, default, callback)
         BorderSizePixel = 0,
     }, SliderTrack)
     corner(SliderKnob, 6)
-
     local sliding = false
-
     local function UpdateSlider(input)
         local posX = input.Position.X - SliderTrack.AbsolutePosition.X
         local pct = math.clamp(posX / SliderTrack.AbsoluteSize.X, 0, 1)
@@ -1262,7 +1077,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
         ValueLabel.Text = tostring(value)
         if callback then pcall(function() callback(value) end) end
     end
-
     SliderTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             sliding = true
@@ -1279,7 +1093,6 @@ local function AddSlider(parentPage, title, min, max, default, callback)
             sliding = false
         end
     end)
-
     return {
         Set = function(val)
             value = math.clamp(val, min, max)
@@ -1302,7 +1115,6 @@ local function AddButton(parentPage, title, description, callback)
     }, parentPage)
     corner(ButtonContainer, 12)
     stroke(ButtonContainer, C.border, 1, 0.3)
-
     create("TextLabel", {
         Size = UDim2.new(1, -30, 0, 18),
         Position = UDim2.new(0, 15, 0, 8),
@@ -1313,7 +1125,6 @@ local function AddButton(parentPage, title, description, callback)
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, ButtonContainer)
-
     create("TextLabel", {
         Size = UDim2.new(1, -30, 0, 15),
         Position = UDim2.new(0, 15, 0, 26),
@@ -1324,29 +1135,24 @@ local function AddButton(parentPage, title, description, callback)
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, ButtonContainer)
-
     local ClickBtn = create("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
         Text = "",
     }, ButtonContainer)
-
     ClickBtn.MouseEnter:Connect(function()
-        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), {BackgroundColor3 = C.surface2}):Play()
+        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), { BackgroundColor3 = C.surface2 }):Play()
     end)
     ClickBtn.MouseLeave:Connect(function()
-        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), {BackgroundColor3 = C.surface}):Play()
+        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), { BackgroundColor3 = C.surface }):Play()
     end)
-    ClickBtn.MouseButton1Click:Connect(function()
-        if callback then pcall(callback) end
-    end)
+    ClickBtn.MouseButton1Click:Connect(function() if callback then pcall(callback) end end)
 end
 
 -- ============ UI: MULTI DROPDOWN ============
 local function AddMultiDropdown(parentPage, title, options, selectedMap, callback)
     selectedMap = selectedMap or {}
     local isExpanded = false
-
     local DropdownContainer = create("Frame", {
         Size = UDim2.new(1, 0, 0, 48),
         BackgroundColor3 = C.surface,
@@ -1355,7 +1161,6 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
     }, parentPage)
     corner(DropdownContainer, 12)
     stroke(DropdownContainer, C.border, 1, 0.3)
-
     create("TextLabel", {
         Size = UDim2.new(0, 150, 0, 48),
         Position = UDim2.new(0, 15, 0, 0),
@@ -1366,15 +1171,11 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
         TextSize = 13,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, DropdownContainer)
-
     local function CountSelected()
         local c = 0
-        for _, opt in ipairs(options) do
-            if selectedMap[opt] == true then c = c + 1 end
-        end
+        for _, opt in ipairs(options) do if selectedMap[opt] == true then c = c + 1 end end
         return c
     end
-
     local SelectedBtn = create("TextButton", {
         Size = UDim2.new(0, 160, 0, 28),
         Position = UDim2.new(1, -175, 0, 10),
@@ -1385,7 +1186,6 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
         TextSize = 12,
     }, DropdownContainer)
     corner(SelectedBtn, 6)
-
     local ListHolder = create("ScrollingFrame", {
         Size = UDim2.new(1, -30, 0, 0),
         Position = UDim2.new(0, 15, 0, 48),
@@ -1396,14 +1196,8 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         CanvasSize = UDim2.new(0, 0, 0, 0),
     }, DropdownContainer)
-
-    create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 4),
-    }, ListHolder)
-
+    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) }, ListHolder)
     local optionButtons = {}
-
     local function UpdateButtonVisual(opt, btn)
         if selectedMap[opt] == true then
             btn.BackgroundColor3 = C.accent
@@ -1413,7 +1207,6 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
             btn.TextColor3 = C.muted
         end
     end
-
     local function RefreshOptions(newOptions)
         for _, child in ipairs(ListHolder:GetChildren()) do
             if child:IsA("TextButton") then child:Destroy() end
@@ -1439,26 +1232,22 @@ local function AddMultiDropdown(parentPage, title, options, selectedMap, callbac
         end
     end
     RefreshOptions(options)
-
     SelectedBtn.MouseButton1Click:Connect(function()
         isExpanded = not isExpanded
         if isExpanded then
             local listHeight = math.clamp(#options * 32, 32, 140)
             ListHolder.Size = UDim2.new(1, -30, 0, listHeight)
-            TweenService:Create(DropdownContainer, TweenInfo.new(0.25), {Size = UDim2.new(1, 0, 0, 52 + listHeight)}):Play()
+            TweenService:Create(DropdownContainer, TweenInfo.new(0.25), { Size = UDim2.new(1, 0, 0, 52 + listHeight) }):Play()
         else
-            TweenService:Create(DropdownContainer, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 48)}):Play()
+            TweenService:Create(DropdownContainer, TweenInfo.new(0.2), { Size = UDim2.new(1, 0, 0, 48) }):Play()
             ListHolder.Size = UDim2.new(1, -30, 0, 0)
         end
     end)
-
     return {
         Get = function() return selectedMap end,
         SetMap = function(newMap)
             selectedMap = newMap
-            for opt, btn in pairs(optionButtons) do
-                UpdateButtonVisual(opt, btn)
-            end
+            for opt, btn in pairs(optionButtons) do UpdateButtonVisual(opt, btn) end
             SelectedBtn.Text = tostring(CountSelected()) .. " / " .. tostring(#options) .. "  ▼"
             if callback then pcall(function() callback(selectedMap) end) end
         end
@@ -1467,59 +1256,34 @@ end
 
 -- ============ HOME ============
 section(homePage, "ГЛАВНАЯ")
-infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
-infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
-infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа.")
-infoCard(homePage, "ИГРЫ", "Вкладка GAMES — список игр с авто-скриптами. Сейчас: Steal An Egg.")
+infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки.")
+infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён.")
+infoCard(homePage, "ИГРЫ", "Вкладка GAMES — список игр с авто-скриптами.")
 
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
 
 local walkSpeedEnabled = false
 local walkSpeedValue = 200
-
 _G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
 
--- ============================================================
--- SPEEDHACK: микро-телепортации через CFrame
--- ============================================================
-local SPEEDHACK = {
-    stepLimit    = 30,
-    smoothFactor = 0.35,
-    raycast      = false,
-}
+local SPEEDHACK = { stepLimit = 30, smoothFactor = 0.35, raycast = false }
 local smoothedDir = Vector3.zero
 local SPEED_BIND_NAME = "RH_HUB_SPEEDHACK"
 
 local function getCharacter()
     local char = LocalPlayer.Character
     if not char then return nil, nil, nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    return char, hrp, hum
+    return char, char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
 end
 
 local function safeMove(hrp, char, dir, totalDistance)
     if dir.Magnitude == 0 or totalDistance <= 0 then return end
     dir = dir.Unit
-
-    local params = nil
-    if SPEEDHACK.raycast then
-        params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = { char }
-    end
-
     local remaining = totalDistance
     while remaining > 0 do
         local step = math.min(remaining, SPEEDHACK.stepLimit)
         remaining -= step
-
-        if params then
-            local hit = workspace:Raycast(hrp.Position, dir * step, params)
-            if hit then break end
-        end
-
         local nextPos = hrp.Position + dir * step
         hrp.CFrame = CFrame.new(nextPos) * (hrp.CFrame - hrp.CFrame.Position)
     end
@@ -1528,51 +1292,29 @@ end
 local function speedhackStep(dt)
     if not walkSpeedEnabled then return end
     if _G.RH_HUB_FARM_ACTIVE and _G.RH_HUB_FARM_ACTIVE() then return end
-
     local char, hrp, hum = getCharacter()
     if not char or not hrp or not hum then return end
-
-    hrp.AssemblyLinearVelocity  = Vector3.zero
+    hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
-
-    if hum.WalkSpeed ~= 16 then
-        hum.WalkSpeed = 16
-    end
-
+    if hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
     local dir = hum.MoveDirection
     dir = Vector3.new(dir.X, 0, dir.Z)
-
-    if dir.Magnitude < 0.01 then
-        smoothedDir = Vector3.zero
-        return
-    end
-
+    if dir.Magnitude < 0.01 then smoothedDir = Vector3.zero return end
     dir = dir.Unit
     smoothedDir = smoothedDir:Lerp(dir, SPEEDHACK.smoothFactor)
-
-    if smoothedDir.Magnitude < 0.05 then
-        smoothedDir = Vector3.zero
-        return
-    end
-
-    local distance = walkSpeedValue * dt
-    safeMove(hrp, char, smoothedDir, distance)
+    if smoothedDir.Magnitude < 0.05 then smoothedDir = Vector3.zero return end
+    safeMove(hrp, char, smoothedDir, walkSpeedValue * dt)
 end
 
 RunService:BindToRenderStep(SPEED_BIND_NAME, Enum.RenderPriority.Character.Value + 1, speedhackStep)
+LocalPlayer.CharacterAdded:Connect(function() smoothedDir = Vector3.zero end)
 
-LocalPlayer.CharacterAdded:Connect(function()
-    smoothedDir = Vector3.zero
-end)
-
--- ===== UI: TOGGLE WALKSPEED =====
 local walkSpeedToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
     BackgroundColor3 = C.surface,
     BorderSizePixel = 0,
 }, movePage)
 corner(walkSpeedToggleWrap, 10)
-
 create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 0),
     Size = UDim2.new(1, -80, 1, 0),
@@ -1583,7 +1325,6 @@ create("TextLabel", {
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, walkSpeedToggleWrap)
-
 local walkSpeedToggleTrack = create("Frame", {
     Position = UDim2.new(1, -62, 0.5, -12),
     Size = UDim2.new(0, 46, 0, 24),
@@ -1591,7 +1332,6 @@ local walkSpeedToggleTrack = create("Frame", {
     BorderSizePixel = 0,
 }, walkSpeedToggleWrap)
 corner(walkSpeedToggleTrack, 12)
-
 local walkSpeedToggleKnob = create("Frame", {
     Position = UDim2.new(0, 2, 0, 2),
     Size = UDim2.new(0, 20, 0, 20),
@@ -1599,14 +1339,12 @@ local walkSpeedToggleKnob = create("Frame", {
     BorderSizePixel = 0,
 }, walkSpeedToggleTrack)
 corner(walkSpeedToggleKnob, 10)
-
 local walkSpeedToggleBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 1, 0),
     BackgroundTransparency = 1,
     Text = "",
 }, walkSpeedToggleWrap)
 
--- ===== UI: SLIDER =====
 local sliderWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 56),
     BackgroundColor3 = C.surface,
@@ -1614,7 +1352,6 @@ local sliderWrap = create("Frame", {
     Visible = false,
 }, movePage)
 corner(sliderWrap, 10)
-
 local sliderLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 6),
     Size = UDim2.new(1, -24, 0, 16),
@@ -1625,7 +1362,6 @@ local sliderLabel = create("TextLabel", {
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, sliderWrap)
-
 local sliderTrack = create("Frame", {
     Position = UDim2.new(0, 12, 0, 32),
     Size = UDim2.new(1, -24, 0, 8),
@@ -1633,18 +1369,13 @@ local sliderTrack = create("Frame", {
     BorderSizePixel = 0,
 }, sliderWrap)
 corner(sliderTrack, 4)
-
-local function speedAlpha(v)
-    return (v - 16) / (1000 - 16)
-end
-
+local function speedAlpha(v) return (v - 16) / (1000 - 16) end
 local sliderFill = create("Frame", {
     Size = UDim2.new(speedAlpha(walkSpeedValue), 0, 1, 0),
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
 }, sliderTrack)
 corner(sliderFill, 4)
-
 local sliderKnob = create("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(speedAlpha(walkSpeedValue), 0, 0.5, 0),
@@ -1656,29 +1387,25 @@ corner(sliderKnob, 9)
 
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
-
     TweenService:Create(walkSpeedToggleTrack, TweenInfo.new(0.2), {
         BackgroundColor3 = walkSpeedEnabled and C.accent or C.button,
     }):Play()
     TweenService:Create(walkSpeedToggleKnob, TweenInfo.new(0.2), {
         Position = walkSpeedEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
     }):Play()
-
     sliderWrap.Visible = walkSpeedEnabled
     smoothedDir = Vector3.zero
-
     if not walkSpeedEnabled then
         local _, hrp, hum = getCharacter()
         if hum then hum.WalkSpeed = 16 end
         if hrp then
-            hrp.AssemblyLinearVelocity  = Vector3.zero
+            hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
         end
     end
 end)
 
 local sliderDragging = false
-
 local function updateSliderFromX(x)
     local left = sliderTrack.AbsolutePosition.X
     local width = math.max(1, sliderTrack.AbsoluteSize.X)
@@ -1686,14 +1413,11 @@ local function updateSliderFromX(x)
     local value = math.floor((16 + alpha * (1000 - 16)) / 10 + 0.5) * 10
     value = math.clamp(value, 16, 1000)
     walkSpeedValue = value
-
     sliderLabel.Text = "Скорость: " .. walkSpeedValue
-
     local newAlpha = speedAlpha(walkSpeedValue)
     TweenService:Create(sliderFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
     TweenService:Create(sliderKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
 end
-
 sliderTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         sliderDragging = true
@@ -1717,17 +1441,15 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ VISUAL ============
+-- ============ VISUAL / TP ============
 section(visualPage, "ВИЗУАЛИЗАЦИЯ")
 soonCard(visualPage)
-
--- ============ TELEPORT ============
 section(tpPage, "ТЕЛЕПОРТ")
 soonCard(tpPage)
 
 -- ============ SETTINGS ============
 section(settingsPage, "НАСТРОЙКИ")
-infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена.")
+infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс токена.")
 
 local logoutBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 38),
@@ -1746,19 +1468,13 @@ logoutBtn.MouseButton1Click:Connect(function()
     clearToken()
     STATE.authed = false
     STATE.token = nil
-
-    if mainGui and mainGui.Parent then
-        pcall(function() mainGui:Destroy() end)
-    end
-
+    if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
     local ok, err = pcall(function()
         loadstring(game:HttpGet(
             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
         ))()
     end)
-    if not ok then
-        warn("[RH-HUB] Перезапуск не удался: " .. tostring(err))
-    end
+    if not ok then warn("[RH-HUB] Перезапуск не удался: " .. tostring(err)) end
 end)
 
 -- ============ ABOUT ============
@@ -1770,35 +1486,77 @@ infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024
 -- ============ GAMES ============
 section(gamesPage, "ИГРЫ  •  СПИСОК")
 
--- Загрузка AutoFarm
+-- ============ Загрузка AutoFarm с патчем зоны ============
 local AutoFarm = nil
 task.spawn(function()
     local url = CONFIG.AUTOFARM_URL .. "?v=4&t=" .. os.time()
     local ok, src = pcall(function() return game:HttpGet(url) end)
-    if ok and type(src) == "string" and #src > 100 then
-        local loadOK, result = pcall(function() return loadstring(src)() end)
-        if loadOK and type(result) == "table" and result.State then
-            AutoFarm = result
-            print("[RH-HUB] AutoFarm loaded successfully")
-        else
-            warn("[RH-HUB] AutoFarm: ошибка внутри модуля: " .. tostring(result))
-        end
-    else
+
+    if not ok or type(src) ~= "string" or #src < 100 then
         warn("[RH-HUB] AutoFarm: не удалось скачать autofarm.lua")
+        return
+    end
+
+    print("[RH-HUB] AutoFarm: скачан, размер " .. #src .. " байт")
+
+    -- === ПАТЧ: замена определения зоны на X-позицию ===
+    local patchTarget = "local J=Dk(t,H,B)"
+    local patchReplace = [[local J
+                local __px = H.X
+                if __px >= 5200 then J = "Light Dark"
+                elseif __px >= 4750 then J = "Titan Temple"
+                elseif __px >= 4000 then J = "Cherry Blossom"
+                elseif __px >= 3350 then J = "Cosmic"
+                elseif __px >= 2780 then J = "Prehistoric"
+                elseif __px >= 2250 then J = "Abyss Ocean"
+                elseif __px >= 1850 then J = "Volcano"
+                elseif __px >= 1450 then J = "Snow"
+                elseif __px >= 1150 then J = "Jungle"
+                elseif __px >= 920 then J = "Desert"
+                elseif __px >= 720 then J = "Lake"
+                else J = "Forest" end]]
+
+    local escaped = patchTarget:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+    local patched, count = src:gsub(escaped, patchReplace, 1)
+
+    if count == 0 then
+        warn("[RH-HUB] AutoFarm: патч зоны НЕ применён (строка 'local J=Dk(t,H,B)' не найдена)")
+    else
+        print("[RH-HUB] AutoFarm: патч зоны применён (" .. count .. " совпад.)")
+        src = patched
+    end
+
+    -- === ПАТЧ 2: принудительный дефолт зон — только Forest ===
+    local zonePatchTarget = 'local r={[ "Light Dark" ]= true ,[ "Titan Temple" ]= true ,[ "Cherry Blossom" ]= true ;'
+    local zonePatchReplace = 'local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;'
+    local src2, count2 = src:gsub(
+        zonePatchTarget:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"),
+        zonePatchReplace,
+        1
+    )
+    if count2 > 0 then
+        print("[RH-HUB] AutoFarm: патч дефолт-зон применён")
+        src = src2
+    end
+
+    local loadOK, result = pcall(function() return loadstring(src)() end)
+    if loadOK and type(result) == "table" and result.State then
+        AutoFarm = result
+        print("[RH-HUB] AutoFarm loaded successfully")
+    else
+        warn("[RH-HUB] AutoFarm: ошибка внутри модуля: " .. tostring(result))
     end
 end)
 
--- Ждём загрузки модуля и строим UI карточки
+-- Ждём загрузки модуля
 task.spawn(function()
-    -- Ждём до 8 секунд пока модуль загрузится
     local waited = 0
-    while not AutoFarm and waited < 8 do
+    while not AutoFarm and waited < 10 do
         task.wait(0.25)
         waited = waited + 0.25
     end
 
     if not AutoFarm then
-        -- Заглушка если модуль не загрузился
         local warnCard = create("Frame", {
             Size = UDim2.new(1, 0, 0, 100),
             BackgroundColor3 = C.surface,
@@ -1806,7 +1564,6 @@ task.spawn(function()
         }, gamesPage)
         corner(warnCard, 12)
         stroke(warnCard, C.yellow, 1, 0.3)
-
         create("TextLabel", {
             Position = UDim2.new(0, 15, 0, 12),
             Size = UDim2.new(1, -30, 0, 20),
@@ -1817,13 +1574,12 @@ task.spawn(function()
             TextSize = 12,
             TextXAlignment = Enum.TextXAlignment.Left,
         }, warnCard)
-
         create("TextLabel", {
             Position = UDim2.new(0, 15, 0, 36),
             Size = UDim2.new(1, -30, 0, 55),
             BackgroundTransparency = 1,
             Font = Enum.Font.Gotham,
-            Text = "Проверь консоль Delta на ошибки. Убедись что autofarm.lua доступен в репо по ссылке " .. CONFIG.AUTOFARM_URL,
+            Text = "Проверь консоль Delta. URL: " .. CONFIG.AUTOFARM_URL,
             TextColor3 = C.muted,
             TextSize = 10,
             TextWrapped = true,
@@ -1902,10 +1658,7 @@ task.spawn(function()
         Visible = false,
     }, stealWrap)
 
-    create("UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Padding = UDim.new(0, 8),
-    }, stealBody)
+    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }, stealBody)
     create("UIPadding", {
         PaddingTop = UDim.new(0, 6),
         PaddingBottom = UDim.new(0, 6),
@@ -1945,36 +1698,32 @@ task.spawn(function()
     }, statusCard)
 
     -- Контролы
-    AddToggle(stealBody, "Auto Steal (Tween)", "Плавный полёт к яйцу вдоль Z=-360", h.pureTweenFarm == true, function(state)
+    AddToggle(stealBody, "Auto Steal (Tween)", "Плавный полёт к яйцу", h.pureTweenFarm == true, function(state)
         AutoFarm.SetFarmMode(state and "TWEEN" or "NONE")
     end)
-
-    AddToggle(stealBody, "Auto Steal (Teleport)", "Warp-snipe через PivotTo", h.autoFarmLoop == true, function(state)
+    AddToggle(stealBody, "Auto Steal (Teleport)", "Warp-snipe", h.autoFarmLoop == true, function(state)
         AutoFarm.SetFarmMode(state and "WARP" or "NONE")
     end)
-
-    AddToggle(stealBody, "Auto Return", "Возврат на X=525 после кражи", h.autoGlide ~= false, function(state)
+    AddToggle(stealBody, "Auto Return", "Возврат на X=525", h.autoGlide ~= false, function(state)
         h.autoGlide = state
     end)
-
-    AddToggle(stealBody, "Auto Place (Every 5)", "Установка яиц каждые 5 краж", h.autoPlaceEvery5 == true, function(state)
+    AddToggle(stealBody, "Auto Place (Every 5)", "Установка каждые 5 краж", h.autoPlaceEvery5 == true, function(state)
         h.autoPlaceEvery5 = state
         if not state then h.batchStealCount = 0 end
     end)
-
-    AddToggle(stealBody, "Auto Hatch", "Авто-вылупление готовых яиц", h.autoHatch ~= false, function(state)
+    AddToggle(stealBody, "Auto Hatch", "Авто-вылупление", h.autoHatch ~= false, function(state)
         h.autoHatch = state
     end)
 
-AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор яйца и сразу домой, без ожидания босса", h.fastPickup ~= false, function(state)
-    h.fastPickup = state
-    AutoFarm.SaveEggSelectConfig(h)
-end)
+    AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор и сразу домой, без ожидания босса", h.fastPickup ~= false, function(state)
+        h.fastPickup = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
 
-AddToggle(stealBody, "Ignore Rarity Filter", "Красть ВСЕ яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
-    h.ignoreRarity = state
-    AutoFarm.SaveEggSelectConfig(h)
-end)
+    AddToggle(stealBody, "Ignore Rarity Filter", "Красть ВСЕ яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
+        h.ignoreRarity = state
+        AutoFarm.SaveEggSelectConfig(h)
+    end)
 
     AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
         task.spawn(function()
@@ -1982,17 +1731,15 @@ end)
         end)
     end)
 
-    AddToggle(stealBody, "Auto Treadmill", "Бег на дорожке, когда нет целей", h.autoTreadmill ~= false, function(state)
+    AddToggle(stealBody, "Auto Treadmill", "Бег на дорожке", h.autoTreadmill ~= false, function(state)
         h.autoTreadmill = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
-    AddToggle(stealBody, "Auto Upgrade Treadmill", "Авто-апгрейд дорожки", h.autoUpgradeTreadmill ~= false, function(state)
+    AddToggle(stealBody, "Auto Upgrade Treadmill", "Апгрейд дорожки", h.autoUpgradeTreadmill ~= false, function(state)
         h.autoUpgradeTreadmill = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
-    AddToggle(stealBody, "Auto Buy & Equip Trails", "Покупка лучшего доступного трейла", h.autoBuyTrails ~= false, function(state)
+    AddToggle(stealBody, "Auto Buy & Equip Trails", "Покупка трейлов", h.autoBuyTrails ~= false, function(state)
         h.autoBuyTrails = state
         AutoFarm.SaveEggSelectConfig(h)
     end)
@@ -2001,15 +1748,15 @@ end)
         h.selectedZones = selectedMap
         AutoFarm.SaveEggSelectConfig(h)
     end)
-
     AddMultiDropdown(stealBody, "Target Rarities", AutoFarm.RarityList, h.selectedRarities, function(selectedMap)
         h.selectedRarities = selectedMap
         AutoFarm.SaveEggSelectConfig(h)
     end)
 
-    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret / Eternal / Divine из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
-        h.alwaysCollectSecretPlus = state
-        AutoFarm.SaveEggSelectConfig(h)
+    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine, из любой зоны", h .alwaysCollectSecretPlus ~= false,1 function(state)
+        h),
+.alwaysCollectSecretPlus = state   
+        AutoFarm.SaveEgg TextSelectConfig(h)
     end)
 
     AddSlider(stealBody, "Flight Cruise Speed", 100, 1000, h.glideSpeed or 600, function(val)
@@ -2047,7 +1794,6 @@ end)
         if stealExpanded then refreshStealHeight() end
     end)
 
-    -- Live статус
     task.spawn(function()
         while gamesPage and gamesPage.Parent do
             if statusDesc and statusDesc.Parent then
@@ -2063,7 +1809,6 @@ end)
         end
     end)
 
-    -- Флаг активности
     _G.RH_HUB_FARM_ACTIVE = function()
         return h.pureTweenFarm or h.autoFarmLoop or h.teleporting
             or h.glidingToTarget or h.securingEgg or h.delivering
@@ -2075,30 +1820,24 @@ end)
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
 
 header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = true
         dragMain.input = input
         dragMain.startPointer = input.Position
         dragMain.startPos = main.Position
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if not dragMain.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-
+    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     local d = input.Position - dragMain.startPointer
     main.Position = UDim2.new(
         dragMain.startPos.X.Scale, dragMain.startPos.X.Offset + d.X,
         dragMain.startPos.Y.Scale, dragMain.startPos.Y.Offset + d.Y
     )
 end)
-
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = false
         dragMain.input = nil
     end
@@ -2136,12 +1875,8 @@ local fpsFrames, fpsElapsed = 0, 0
 
 local function readPing()
     local ping = nil
-    pcall(function()
-        ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue()
-    end)
-    if typeof(ping) == "number" then
-        return math.max(0, math.floor(ping + 0.5))
-    end
+    pcall(function() ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue() end)
+    if typeof(ping) == "number" then return math.max(0, math.floor(ping + 0.5)) end
     return nil
 end
 
@@ -2151,38 +1886,26 @@ RunService.RenderStepped:Connect(function(dt)
     if fpsElapsed >= 0.5 then
         local currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
         local ping = readPing()
-        overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s",
-            currentFPS,
-            ping and tostring(ping) or "--"
-        )
+        overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s", currentFPS, ping and tostring(ping) or "--")
         fpsFrames, fpsElapsed = 0, 0
     end
 end)
 
-local dragOverlay = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local dragOverlay = { active = false, startPointer = nil, startPos = nil, moved = false }
 local OVERLAY_THRESHOLD = 6
-
 overlayFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragOverlay.active = true
-        dragOverlay.input = input
         dragOverlay.startPointer = input.Position
         dragOverlay.startPos = Vector2.new(overlayFrame.Position.X.Offset, overlayFrame.Position.Y.Offset)
         dragOverlay.moved = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if not dragOverlay.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-
+    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     local d = input.Position - dragOverlay.startPointer
-    if math.abs(d.X) > OVERLAY_THRESHOLD or math.abs(d.Y) > OVERLAY_THRESHOLD then
-        dragOverlay.moved = true
-    end
-
+    if math.abs(d.X) > OVERLAY_THRESHOLD or math.abs(d.Y) > OVERLAY_THRESHOLD then dragOverlay.moved = true end
     if dragOverlay.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
@@ -2191,10 +1914,8 @@ UserInputService.InputChanged:Connect(function(input)
         overlayFrame.Position = UDim2.fromOffset(x, y)
     end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragOverlay.active = false
     end
 end)
@@ -2218,8 +1939,7 @@ local circleButton = create("TextButton", {
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
     Text = "HUB",
-    TextColor3 = Color3.new(1, 1, 1),
-    TextSize = 13,
+    TextColor3 = Color3.new(1, 1Size = 13,
     Font = Enum.Font.GothamBlack,
     AutoButtonColor = false,
 }, circleGui)
@@ -2244,30 +1964,21 @@ local function startCirclePulse()
     end)
 end
 
-local dragCircle = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local dragCircle = { active = false, startPointer = nil, startPos = nil, moved = false }
 local CIRCLE_THRESHOLD = 6
-
 circleButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = true
-        dragCircle.input = input
         dragCircle.startPointer = input.Position
         dragCircle.startPos = Vector2.new(circleButton.Position.X.Offset, circleButton.Position.Y.Offset)
         dragCircle.moved = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if not dragCircle.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch
-    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-
+    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
     local d = input.Position - dragCircle.startPointer
-    if math.abs(d.X) > CIRCLE_THRESHOLD or math.abs(d.Y) > CIRCLE_THRESHOLD then
-        dragCircle.moved = true
-    end
-
+    if math.abs(d.X) > CIRCLE_THRESHOLD or math.abs(d.Y) > CIRCLE_THRESHOLD then dragCircle.moved = true end
     if dragCircle.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
@@ -2276,13 +1987,10 @@ UserInputService.InputChanged:Connect(function(input)
         circleButton.Position = UDim2.fromOffset(x, y)
     end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
     if not dragCircle.active then return end
-    if input.UserInputType == Enum.UserInputType.Touch
-    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = false
-
         if not dragCircle.moved then
             circleGui.Enabled = false
             mainGui.Enabled = true
@@ -2294,43 +2002,30 @@ end)
 -- ============ MODES ============
 local function setMode(newMode)
     if STATE.mode == newMode then return end
-
     mainGui.Enabled = false
     overlayGui.Enabled = false
     circleGui.Enabled = false
-
-    if newMode == "window" then
-        mainGui.Enabled = true
-    elseif newMode == "overlay" then
-        overlayGui.Enabled = true
+    if newMode == "window" then mainGui.Enabled = true
+    elseif newMode == "overlay" then overlayGui.Enabled = true
     elseif newMode == "circle" then
         circleGui.Enabled = true
         startCirclePulse()
     end
-
     STATE.mode = newMode
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
-    if STATE.mode == "window" then
-        setMode("overlay")
-    elseif STATE.mode == "overlay" then
-        setMode("window")
-    end
+    if STATE.mode == "window" then setMode("overlay")
+    elseif STATE.mode == "overlay" then setMode("window") end
 end)
-
 circleBtn.MouseButton1Click:Connect(function()
-    if STATE.mode == "window" then
-        setMode("circle")
-    end
+    if STATE.mode == "window" then setMode("circle") end
 end)
 
 local lastOverlayTap = 0
 overlayFrame.MouseButton1Click:Connect(function()
     local now = os.clock()
-    if now - lastOverlayTap < 0.6 then
-        setMode("window")
-    end
+    if now - lastOverlayTap < 0.6 then setMode("window") end
     lastOverlayTap = now
 end)
 
@@ -2340,12 +2035,10 @@ local function formatRemaining(sec)
     sec = tonumber(sec)
     if not sec then return "--" end
     if sec <= 0 then return "истек" end
-
     local d = math.floor(sec / 86400)
     local h = math.floor((sec % 86400) / 3600)
     local m = math.floor((sec % 3600) / 60)
     local s = math.floor(sec % 60)
-
     if d > 0 then return string.format("%dд %dч", d, h) end
     if h > 0 then return string.format("%dч %dм", h, m) end
     if m > 0 then return string.format("%dм %dс", m, s) end
@@ -2354,33 +2047,22 @@ end
 
 local function updateTimerLabel(remaining)
     if not timerLabel then return end
-
     timerLabel.Text = "⏱ " .. formatRemaining(remaining)
-
-    if remaining == nil then
-        timerLabel.TextColor3 = C.muted
-    elseif remaining <= 60 then
-        timerLabel.TextColor3 = C.red
-    elseif remaining <= 300 then
-        timerLabel.TextColor3 = C.yellow
-    else
-        timerLabel.TextColor3 = C.green
-    end
+    if remaining == nil then timerLabel.TextColor3 = C.muted
+    elseif remaining <= 60 then timerLabel.TextColor3 = C.red
+    elseif remaining <= 300 then timerLabel.TextColor3 = C.yellow
+    else timerLabel.TextColor3 = C.green end
 end
 
 -- ============ AUTH CALLBACK ============
 onAuthSuccess = function(token)
     STATE.authed = true
     STATE.token = token
-
     if token then saveToken(token) end
-
     setStatus("Успешная авторизация!", "ok")
     authToast("Добро пожаловать!", "ok")
-
     task.spawn(function()
         task.wait(0.7)
-
         if authMain and authMain.Parent then
             local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1,
@@ -2389,23 +2071,15 @@ onAuthSuccess = function(token)
             tw:Play()
             tw.Completed:Wait()
         end
-
-        if authGui and authGui.Parent then
-            pcall(function() authGui:Destroy() end)
-        end
-
+        if authGui and authGui.Parent then pcall(function() authGui:Destroy() end) end
         mainGui.Enabled = true
         STATE.mode = "window"
-
         task.spawn(function()
             local result = api("/verify", { token = token })
             if result and result.valid == true and result.remaining_seconds then
                 updateTimerLabel(tonumber(result.remaining_seconds))
-            else
-                updateTimerLabel(nil)
-            end
+            else updateTimerLabel(nil) end
         end)
-
         print("[RH-HUB] Меню открыто.")
     end)
 end
@@ -2413,7 +2087,6 @@ end
 -- ============ HEARTBEAT ============
 task.spawn(function()
     task.wait(2)
-
     local localRemaining = nil
     local heartbeatActive = true
 
@@ -2422,16 +2095,13 @@ task.spawn(function()
             if STATE.authed and localRemaining and localRemaining > 0 then
                 localRemaining = localRemaining - 1
                 updateTimerLabel(localRemaining)
-
                 if localRemaining <= 0 then
                     clearToken()
                     STATE.authed = false
                     STATE.token = nil
-
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
-
                     pcall(function()
                         loadstring(game:HttpGet(
                             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
@@ -2448,33 +2118,26 @@ task.spawn(function()
     while heartbeatActive do
         if STATE.authed and STATE.token then
             local result, err = api("/verify", { token = STATE.token })
-
             if result and result.valid == true then
                 localRemaining = tonumber(result.remaining_seconds)
                 updateTimerLabel(localRemaining)
             else
                 local errText = tostring(err or ""):lower()
                 local shouldKick = false
-
                 if not result then
                     if errText:find("expired") or errText:find("invalid") or errText:find("403") then
                         shouldKick = true
                     end
                 else
-                    if result.valid ~= true then
-                        shouldKick = true
-                    end
+                    if result.valid ~= true then shouldKick = true end
                 end
-
                 if shouldKick then
                     clearToken()
                     STATE.authed = false
                     STATE.token = nil
-
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
-
                     pcall(function()
                         loadstring(game:HttpGet(
                             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
@@ -2485,7 +2148,6 @@ task.spawn(function()
                 end
             end
         end
-
         task.wait(5)
     end
 end)
@@ -2504,5 +2166,4 @@ print("----------------------------------------")
 print("RH-HUB INITIALIZED")
 print("Version: " .. CONFIG.VERSION)
 print("UserId: " .. tostring(LocalPlayer.UserId))
-print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
