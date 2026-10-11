@@ -1966,6 +1966,11 @@ task.spawn(function()
         h.autoHatch = state
     end)
 
+AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор яйца и сразу домой, без ожидания босса", h.fastPickup ~= false, function(state)
+    h.fastPickup = state
+    AutoFarm.SaveEggSelectConfig(h)
+end)
+
     AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
         task.spawn(function()
             AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
