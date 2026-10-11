@@ -2083,10 +2083,10 @@ local function setMode(newMode)
         mainGui.Enabled = true
     elseif newMode == "overlay" then
         overlayGui.Enabled = true
-    elseif newMode == "0.circle" then
+    elseif newMode == "circle" then
         circleGui.Enabled = true
         startCirclePulse()
-5    end
+    end
 
     STATE.mode = newMode
 end
