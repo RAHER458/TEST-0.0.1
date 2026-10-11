@@ -781,8 +781,6 @@ task.spawn(function()
     end
 end)
 
--- [КОНЕЦ ЧАСТИ 1]
-
 -- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ ============
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
 
@@ -1132,15 +1130,90 @@ local walkSpeedValue = 200
 _G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
 
 -- ============================================================
--- SPEEDHACK: микро-телепортации через CFrame
--- Humanoid НЕ удаляется, WalkSpeed = 16
+-- SPEEDHACK: стабильные микро-телепортации через CFrame
+-- Humanoid остаётся, WalkSpeed = 16, физика гасится каждый кадр
 -- ============================================================
 local SPEEDHACK = {
-    stepLimit    = 15,
+    stepLimit    = 30,
     smoothFactor = 0.35,
     raycast      = false,
 }
 local smoothedDir = Vector3.zero
+local SPEED_BIND_NAME = "RH_HUB_SPEEDHACK"
+
+local function getCharacter()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil, nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return char, hrp, hum
+end
+
+local function safeMove(hrp, char, dir, totalDistance)
+    if dir.Magnitude == 0 or totalDistance <= 0 then return end
+    dir = dir.Unit
+
+    local params = nil
+    if SPEEDHACK.raycast then
+        params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = { char }
+    end
+
+    local remaining = totalDistance
+    while remaining > 0 do
+        local step = math.min(remaining, SPEEDHACK.stepLimit)
+        remaining -= step
+
+        if params then
+            local hit = workspace:Raycast(hrp.Position, dir * step, params)
+            if hit then break end
+        end
+
+        local nextPos = hrp.Position + dir * step
+        hrp.CFrame = CFrame.new(nextPos) * (hrp.CFrame - hrp.CFrame.Position)
+    end
+end
+
+local function speedhackStep(dt)
+    if not walkSpeedEnabled then return end
+
+    local char, hrp, hum = getCharacter()
+    if not char or not hrp or not hum then return end
+
+    -- ГЛАВНОЕ: гасим физику, чтобы Humanoid не тянул назад
+    hrp.AssemblyLinearVelocity  = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+
+    if hum.WalkSpeed ~= 16 then
+        hum.WalkSpeed = 16
+    end
+
+    local dir = hum.MoveDirection
+    dir = Vector3.new(dir.X, 0, dir.Z)
+
+    if dir.Magnitude < 0.01 then
+        smoothedDir = Vector3.zero
+        return
+    end
+
+    dir = dir.Unit
+    smoothedDir = smoothedDir:Lerp(dir, SPEEDHACK.smoothFactor)
+
+    if smoothedDir.Magnitude < 0.05 then
+        smoothedDir = Vector3.zero
+        return
+    end
+
+    local distance = walkSpeedValue * dt
+    safeMove(hrp, char, smoothedDir, distance)
+end
+
+RunService:BindToRenderStep(SPEED_BIND_NAME, Enum.RenderPriority.Character.Value + 1, speedhackStep)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    smoothedDir = Vector3.zero
+end)
 
 -- ===== UI: TOGGLE WALKSPEED =====
 local walkSpeedToggleWrap = create("Frame", {
@@ -1231,77 +1304,6 @@ local sliderKnob = create("Frame", {
 }, sliderTrack)
 corner(sliderKnob, 9)
 
--- ===== ЯДРО SPEEDHACK =====
-local function getCharacter()
-    local char = LocalPlayer.Character
-    if not char then return nil, nil, nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    return char, hrp, hum
-end
-
-local function safeMove(hrp, char, dir, totalDistance)
-    if dir.Magnitude == 0 or totalDistance <= 0 then return end
-    dir = dir.Unit
-
-    local params = nil
-    if SPEEDHACK.raycast then
-        params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = { char }
-    end
-
-    local remaining = totalDistance
-    while remaining > 0 do
-        local step = math.min(remaining, SPEEDHACK.stepLimit)
-        remaining -= step
-
-        if params then
-            local hit = workspace:Raycast(hrp.Position, dir * step, params)
-            if hit then break end
-        end
-
-        local nextPos = hrp.Position + dir * step
-        hrp.CFrame = CFrame.new(nextPos) * (hrp.CFrame - hrp.CFrame.Position)
-    end
-end
-
-RunService.RenderStepped:Connect(function(dt)
-    if not walkSpeedEnabled then return end
-
-    local char, hrp, hum = getCharacter()
-    if not char or not hrp or not hum then return end
-
-    -- Держим WalkSpeed нейтральным
-    if hum.WalkSpeed ~= 16 then
-        hum.WalkSpeed = 16
-    end
-
-    -- Направление от джойстика/клавиш — работает везде
-    local dir = hum.MoveDirection
-    dir = Vector3.new(dir.X, 0, dir.Z)
-
-    if dir.Magnitude < 0.01 then
-        smoothedDir = Vector3.zero
-        return
-    end
-
-    dir = dir.Unit
-    smoothedDir = smoothedDir:Lerp(dir, SPEEDHACK.smoothFactor)
-
-    if smoothedDir.Magnitude < 0.05 then
-        smoothedDir = Vector3.zero
-        return
-    end
-
-    local distance = walkSpeedValue * dt
-    safeMove(hrp, char, smoothedDir, distance)
-end)
-
-LocalPlayer.CharacterAdded:Connect(function()
-    smoothedDir = Vector3.zero
-end)
-
 -- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
@@ -1317,8 +1319,12 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     smoothedDir = Vector3.zero
 
     if not walkSpeedEnabled then
-        local _, _, hum = getCharacter()
+        local char, hrp, hum = getCharacter()
         if hum then hum.WalkSpeed = 16 end
+        if hrp then
+            hrp.AssemblyLinearVelocity  = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end
     end
 end)
 
@@ -1412,8 +1418,6 @@ section(aboutPage, "О ПРОЕКТЕ")
 infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
-
--- [КОНЕЦ ЧАСТИ 2]
 
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
