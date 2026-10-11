@@ -1773,7 +1773,7 @@ section(gamesPage, "ИГРЫ  •  СПИСОК")
 -- Загрузка AutoFarm
 local AutoFarm = nil
 task.spawn(function()
-    local url = CONFIG.AUTOFARM_URL .. "?t=" .. os.time()
+    local url = CONFIG.AUTOFARM_URL .. "?v=4&t=" .. os.time()
     local ok, src = pcall(function() return game:HttpGet(url) end)
     if ok and type(src) == "string" and #src > 100 then
         local loadOK, result = pcall(function() return loadstring(src)() end)
