@@ -781,6 +781,8 @@ task.spawn(function()
     end
 end)
 
+-- [КОНЕЦ ЧАСТИ 1]
+
 -- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ ============
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
 
@@ -1124,26 +1126,23 @@ infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH |
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
 
--- ============================================================
--- SPEEDHACK: плавные микро-телепортации через CFrame
--- Humanoid НЕ удаляется, WalkSpeed остаётся 16
--- ============================================================
+local walkSpeedEnabled = false
+local walkSpeedValue = 200
 
+_G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
+
+-- ============================================================
+-- SPEEDHACK: микро-телепортации через CFrame
+-- Humanoid НЕ удаляется, WalkSpeed = 16
+-- ============================================================
 local SPEEDHACK = {
-    enabled      = false,
-    speed        = 200,
-    minSpeed     = 16,
-    maxSpeed     = 1000,
-    stepLimit    = 40,
+    stepLimit    = 15,
     smoothFactor = 0.35,
-    raycast      = true,
+    raycast      = false,
 }
-
 local smoothedDir = Vector3.zero
 
-_G.RH_HUB_IS_WALKSPEED_ON = function() return SPEEDHACK.enabled end
-
--- ===== UI: TOGGLE =====
+-- ===== UI: TOGGLE WALKSPEED =====
 local walkSpeedToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
     BackgroundColor3 = C.surface,
@@ -1197,7 +1196,7 @@ local sliderLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 6),
     Size = UDim2.new(1, -24, 0, 16),
     BackgroundTransparency = 1,
-    Text = "Скорость: " .. SPEEDHACK.speed,
+    Text = "Скорость: " .. walkSpeedValue,
     TextColor3 = C.text,
     TextSize = 11,
     Font = Enum.Font.GothamBold,
@@ -1213,11 +1212,11 @@ local sliderTrack = create("Frame", {
 corner(sliderTrack, 4)
 
 local function speedAlpha(v)
-    return (v - SPEEDHACK.minSpeed) / (SPEEDHACK.maxSpeed - SPEEDHACK.minSpeed)
+    return (v - 16) / (1000 - 16)
 end
 
 local sliderFill = create("Frame", {
-    Size = UDim2.new(speedAlpha(SPEEDHACK.speed), 0, 1, 0),
+    Size = UDim2.new(speedAlpha(walkSpeedValue), 0, 1, 0),
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
 }, sliderTrack)
@@ -1225,7 +1224,7 @@ corner(sliderFill, 4)
 
 local sliderKnob = create("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(speedAlpha(SPEEDHACK.speed), 0, 0.5, 0),
+    Position = UDim2.new(speedAlpha(walkSpeedValue), 0, 0.5, 0),
     Size = UDim2.fromOffset(18, 18),
     BackgroundColor3 = C.text,
     BorderSizePixel = 0,
@@ -1233,28 +1232,12 @@ local sliderKnob = create("Frame", {
 corner(sliderKnob, 9)
 
 -- ===== ЯДРО SPEEDHACK =====
-
 local function getCharacter()
     local char = LocalPlayer.Character
     if not char then return nil, nil, nil end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
     return char, hrp, hum
-end
-
-local function getMoveDirection(camera)
-    local dir = Vector3.zero
-    local forward = camera.CFrame.LookVector
-    local right   = camera.CFrame.RightVector
-
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += forward end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= forward end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += right   end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= right   end
-
-    dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude > 0 then dir = dir.Unit end
-    return dir
 end
 
 local function safeMove(hrp, char, dir, totalDistance)
@@ -1284,27 +1267,34 @@ local function safeMove(hrp, char, dir, totalDistance)
 end
 
 RunService.RenderStepped:Connect(function(dt)
-    if not SPEEDHACK.enabled then return end
+    if not walkSpeedEnabled then return end
 
     local char, hrp, hum = getCharacter()
     if not char or not hrp or not hum then return end
 
+    -- Держим WalkSpeed нейтральным
     if hum.WalkSpeed ~= 16 then
         hum.WalkSpeed = 16
     end
 
-    local camera = workspace.CurrentCamera
-    if not camera then return end
+    -- Направление от джойстика/клавиш — работает везде
+    local dir = hum.MoveDirection
+    dir = Vector3.new(dir.X, 0, dir.Z)
 
-    local rawDir = getMoveDirection(camera)
-    smoothedDir = smoothedDir:Lerp(rawDir, SPEEDHACK.smoothFactor)
+    if dir.Magnitude < 0.01 then
+        smoothedDir = Vector3.zero
+        return
+    end
+
+    dir = dir.Unit
+    smoothedDir = smoothedDir:Lerp(dir, SPEEDHACK.smoothFactor)
 
     if smoothedDir.Magnitude < 0.05 then
         smoothedDir = Vector3.zero
         return
     end
 
-    local distance = math.clamp(SPEEDHACK.speed, SPEEDHACK.minSpeed, SPEEDHACK.maxSpeed) * dt
+    local distance = walkSpeedValue * dt
     safeMove(hrp, char, smoothedDir, distance)
 end)
 
@@ -1312,42 +1302,40 @@ LocalPlayer.CharacterAdded:Connect(function()
     smoothedDir = Vector3.zero
 end)
 
--- ===== ТОГГЛ =====
+-- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
-    SPEEDHACK.enabled = not SPEEDHACK.enabled
+    walkSpeedEnabled = not walkSpeedEnabled
 
     TweenService:Create(walkSpeedToggleTrack, TweenInfo.new(0.2), {
-        BackgroundColor3 = SPEEDHACK.enabled and C.accent or C.button,
+        BackgroundColor3 = walkSpeedEnabled and C.accent or C.button,
     }):Play()
     TweenService:Create(walkSpeedToggleKnob, TweenInfo.new(0.2), {
-        Position = SPEEDHACK.enabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+        Position = walkSpeedEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
     }):Play()
 
-    sliderWrap.Visible = SPEEDHACK.enabled
+    sliderWrap.Visible = walkSpeedEnabled
     smoothedDir = Vector3.zero
 
-    if not SPEEDHACK.enabled then
+    if not walkSpeedEnabled then
         local _, _, hum = getCharacter()
         if hum then hum.WalkSpeed = 16 end
     end
 end)
 
--- ===== СЛАЙДЕР =====
+-- ===== СЛАЙДЕР WALKSPEED =====
 local sliderDragging = false
 
 local function updateSliderFromX(x)
     local left = sliderTrack.AbsolutePosition.X
     local width = math.max(1, sliderTrack.AbsoluteSize.X)
     local alpha = math.clamp((x - left) / width, 0, 1)
-    local value = math.floor(
-        (SPEEDHACK.minSpeed + alpha * (SPEEDHACK.maxSpeed - SPEEDHACK.minSpeed)) / 10 + 0.5
-    ) * 10
-    value = math.clamp(value, SPEEDHACK.minSpeed, SPEEDHACK.maxSpeed)
-    SPEEDHACK.speed = value
+    local value = math.floor((16 + alpha * (1000 - 16)) / 10 + 0.5) * 10
+    value = math.clamp(value, 16, 1000)
+    walkSpeedValue = value
 
-    sliderLabel.Text = "Скорость: " .. SPEEDHACK.speed
+    sliderLabel.Text = "Скорость: " .. walkSpeedValue
 
-    local newAlpha = speedAlpha(SPEEDHACK.speed)
+    local newAlpha = speedAlpha(walkSpeedValue)
     TweenService:Create(sliderFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
     TweenService:Create(sliderKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
 end
@@ -1424,6 +1412,8 @@ section(aboutPage, "О ПРОЕКТЕ")
 infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
+
+-- [КОНЕЦ ЧАСТИ 2]
 
 -- ============ DRAG MAIN WINDOW ============
 local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
