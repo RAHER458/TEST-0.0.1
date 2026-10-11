@@ -5704,10 +5704,8 @@ local function initFarm()
                         local ok,err=pcall(function()
                             if i:IsA("RemoteFunction") then
                                 i:InvokeServer({["Uid"]=e})
-                                i:InvokeServer(e)
                             else
                                 i:FireServer({["Uid"]=e})
-                                i:FireServer(e)
                             end
                         end)
                         if not ok then
