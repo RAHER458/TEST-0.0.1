@@ -5681,6 +5681,7 @@ local function initFarm()
             local p=os.clock ()+ 3.5
             local B=0
             local lastRemoteRequest=0
+            local remoteConfirmed = false
             while not w4(e)and(os.clock ()<p and(h.alive and h.securingEgg ))do
                 if j and O4~=j then
                     t( "[GuardStrike] Cancelled by session switch in Step 1" )
@@ -5701,25 +5702,29 @@ local function initFarm()
                 if e and i and (os.clock()-lastRemoteRequest)>=0.4 then
                     lastRemoteRequest=os.clock()
                     task.spawn(function()
-                        local ok,err=pcall(function()
+                        local ok, response = pcall(function()
                             if i:IsA("RemoteFunction") then
-                                i:InvokeServer({["Uid"]=e})
+                                return i:InvokeServer({["Uid"]=e})
                             else
                                 i:FireServer({["Uid"]=e})
+                                return true
                             end
                         end)
-                        if not ok then
-                            t("[PickupDiag] Remote request error: "..tostring(err))
+                        if ok and response == true then
+                            remoteConfirmed = true
+                            H("[PickupDiag] Server CONFIRMED egg "..tostring(e))
+                        else
+                            t("[PickupDiag] Server response: "..tostring(response))
                         end
                     end)
                 end
                 y.Heartbeat :Wait()
             end
-            if not w4(e)then
+            if not remoteConfirmed and not w4(e)then
                 local _,pickupState=k4(e)
-                H(string.format("[PickupDiag] Timeout uid=%s | targetState=%s | carriedEggCount=%d | remoteFound=%s",
-                    tostring(e), tostring(pickupState), tonumber(y4()) or 0, tostring(i~=nil)))
-                t("[GuardStrike] Initial egg pickup timed out or egg was stolen")
+                H(string.format("[PickupDiag] Timeout uid=%s | targetState=%s | remoteConfirmed=%s | carriedEggCount=%d",
+                    tostring(e), tostring(pickupState), tostring(remoteConfirmed), tonumber(y4()) or 0))
+                t("[GuardStrike] No server confirmation, egg not taken")
                 if e then
                     X4[e]=os.clock()+8
                 end
@@ -5731,8 +5736,8 @@ local function initFarm()
             h.targetPosition = nil
             h.securingEgg = false
             h.holdingEggForGuard = false
-            h.statusText = "Egg secured! Returning to base..."
-            H("[AutoSteal] Egg secured; skipping guard strike and returning to base immediately.")
+            h.statusText = "Egg secured with server confirmation!"
+            H("[AutoSteal] Egg secured with server confirmation.")
             return true
 
         end
