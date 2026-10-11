@@ -448,7 +448,7 @@ create("TextLabel", {
 task.spawn(function()
     local hue = 0
     while authGui.Parent do
-        hue = (hue + 0.008)HSV % 1
+        hue = (hue + 0.008) % 1
         if authTitle.Parent then
             authTitle.TextColor3 = Color3.from(hue, 0.7, 1)
         end
