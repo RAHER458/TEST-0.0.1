@@ -1,7 +1,7 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 0.0.2-alpha
+    Version: 0.0.3-alpha
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "0.0.2-alpha",
+    VERSION     = "0.0.3-alpha",
     NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
@@ -945,7 +945,7 @@ local navButtons = {}
 
 local TABS = {
     {id = "HOME",     name = "HOME"},
-    {id = "FARM",     name = "FARM"},
+    {id = "GAMES",    name = "GAMES"},
     {id = "MOVE",     name = "MOVE"},
     {id = "VISUAL",   name = "VISUAL"},
     {id = "TELEPORT", name = "TP"},
@@ -1027,7 +1027,7 @@ for i, tab in ipairs(TABS) do
 end
 
 local homePage     = createPage("HOME")
-local farmPage     = createPage("FARM")
+local gamesPage    = createPage("GAMES")
 local movePage     = createPage("MOVE")
 local visualPage   = createPage("VISUAL")
 local tpPage       = createPage("TELEPORT")
@@ -1126,12 +1126,121 @@ local function soonCard(parent)
     return frame
 end
 
+-- ============ GAMES: КОНТЕЙНЕРЫ ============
+-- gamesMenuContainer — список игр
+-- gamesFarmContainer — UI автофарма (заполняется в initFarm)
+local gamesMenuContainer = create("Frame", {
+    Name = "GamesMenu",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Visible = true,
+}, gamesPage)
+create("UIListLayout", {
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 6),
+}, gamesMenuContainer)
+
+local gamesFarmContainer = create("ScrollingFrame", {
+    Name = "GamesFarm",
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = C.accent,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    Visible = false,
+    ClipsDescendants = true,
+}, gamesPage)
+create("UIPadding", {
+    PaddingTop = UDim.new(0, 4),
+    PaddingBottom = UDim.new(0, 12),
+    PaddingLeft = UDim.new(0, 2),
+    PaddingRight = UDim.new(0, 4),
+}, gamesFarmContainer)
+create("UIListLayout", {
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 6),
+}, gamesFarmContainer)
+
 -- ============ HOME ============
 section(homePage, "ГЛАВНАЯ")
 infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
 infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
 infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа.")
-infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
+infoCard(homePage, "ИГРЫ", "Вкладка GAMES — список игр с автофармом. Сейчас доступен Steal an Egg.")
+
+-- ============ GAMES: МЕНЮ ============
+section(gamesMenuContainer, "ДОСТУПНЫЕ ИГРЫ")
+
+local function makeGameCard(parent, title, subtitle, onClick)
+    local card = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 64),
+        BackgroundColor3 = C.surface,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+    }, parent)
+    corner(card, 12)
+    stroke(card, C.accent, 1, 0.5)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 14, 0, 10),
+        Size = UDim2.new(1, -28, 0, 20),
+        BackgroundTransparency = 1,
+        Text = title,
+        TextColor3 = C.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 14, 0, 32),
+        Size = UDim2.new(1, -28, 0, 16),
+        BackgroundTransparency = 1,
+        Text = subtitle,
+        TextColor3 = C.muted,
+        Font = Enum.Font.Gotham,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, card)
+
+    create("TextLabel", {
+        Position = UDim2.new(1, -30, 0, 0),
+        Size = UDim2.new(0, 30, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "›",
+        TextColor3 = C.accent,
+        Font = Enum.Font.GothamBold,
+        TextSize = 24,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
+    }, card)
+
+    card.MouseButton1Click:Connect(function()
+        local ok, err = pcall(onClick)
+        if not ok then warn("[RH-HUB] Game click error: " .. tostring(err)) end
+    end)
+
+    return card
+end
+
+local function showGamesMenu()
+    gamesMenuContainer.Visible = true
+    gamesFarmContainer.Visible = false
+end
+
+local function showGamesFarm()
+    gamesMenuContainer.Visible = false
+    gamesFarmContainer.Visible = true
+end
+
+makeGameCard(gamesMenuContainer, "🥚  Steal an Egg", "Автофарм яиц — 11 зон, авто-возврат, дорожка", function()
+    showGamesFarm()
+end)
+
+_G.RH_HUB_SHOW_GAMES_MENU = showGamesMenu
 
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
@@ -2344,7 +2453,54 @@ _G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
     end
 end
 
--- ============ FARM: ENGINE + UI ============
+-- ============ FARM: ENGINE + UI (внутри gamesFarmContainer) ============
+-- Таблица требований скорости по зонам (Speed из leaderstats)
+local ZONE_SPEED_REQ = {
+    ["Lake"]              = 900,
+    ["Desert"]            = 10000,
+    ["Jungle"]            = 40000,
+    ["Snow"]              = 170000,
+    ["Volcano"]           = 700000,
+    ["Abyss Ocean"]       = 2500000,
+    ["Prehistoric"]       = 18000000,
+    ["Cosmic"]            = 700000000,
+    ["Cherry Blossom"]    = 2500000000,
+    ["Titan Temple"]      = 7000000000,
+    ["Angels and Demons"] = 20000000000,
+}
+
+-- Красивый формат для отображения числа скорости
+local function formatSpeed(n)
+    n = tonumber(n) or 0
+    if n >= 1e12 then return string.format("%.0fT", n / 1e12) end
+    if n >= 1e9  then
+        local v = n / 1e9
+        if v % 1 == 0 then return string.format("%dB", v) end
+        return string.format("%.1fB", v)
+    end
+    if n >= 1e6  then
+        local v = n / 1e6
+        if v % 1 == 0 then return string.format("%dM", v) end
+        return string.format("%.1fM", v)
+    end
+    if n >= 1e3  then
+        local v = n / 1e3
+        if v % 1 == 0 then return string.format("%dK", v) end
+        return string.format("%.1fK", v)
+    end
+    return tostring(math.floor(n))
+end
+
+-- Читатель текущей Speed игрока из leaderstats
+local function getPlayerSpeed()
+    local lp = LocalPlayer
+    local ls = lp:FindFirstChild("leaderstats")
+    if not ls then return 0 end
+    local spd = ls:FindFirstChild("Speed")
+    if not spd then return 0 end
+    return tonumber(spd.Value) or 0
+end
+
 local function initFarm()
     if FarmApi then return end
 
@@ -2462,13 +2618,12 @@ local function initFarm()
         [ "Snow" ]= 500 ,[ "Jungle" ]= 400 ;
         [ "Desert" ]= 300 ,[ "Lake" ]= 200 ;
         [ "Forest" ]= 100 }
-        local M={ "Light Dark" ;
+        local M={ "Angels and Demons" ;
         "Titan Temple" ;
         "Cherry Blossom" , "Cosmic" ;
         "Prehistoric" , "Abyss Ocean" ;
         "Volcano" ;
-        "Snow" , "Jungle" , "Desert" , "Lake" ;
-        "Forest" }
+        "Snow" , "Jungle" , "Desert" , "Lake" }
         local I={[ "Light Dark" ]= 420 ,[ "LightDark" ]= 420 ;
         [ "Titan Temple" ]= 380 ,[ "Cherry Blossom" ]= 330 ,[ "Cosmic" ]= 280 ;
         [ "Prehistoric" ]= 240 ,[ "Abyss Ocean" ]= 200 ;
@@ -2483,10 +2638,11 @@ local function initFarm()
 
         local Z= "RH_HUB_FlightSpeed.txt"
         local z= "RH_HUB_FarmConfig.json"
-        local d={[ "Light Dark" ]=Color3.fromRGB ( 168 , 85 , 247 ),[ "Titan Temple" ]=Color3.fromRGB ( 245 , 158 , 11 );
+        local d={[ "Angels and Demons" ]=Color3.fromRGB ( 244 , 63 , 94 );
+        [ "Titan Temple" ]=Color3.fromRGB ( 245 , 158 , 11 );
         [ "Cherry Blossom" ]=Color3.fromRGB ( 236 , 72 , 153 );
         [ "Cosmic" ]=Color3.fromRGB ( 6 , 182 , 212 ),[ "Prehistoric" ]=Color3.fromRGB ( 16 , 185 , 129 ),[ "Abyss Ocean" ]=Color3.fromRGB ( 59 , 130 , 246 );
-        [ "Volcano" ]=Color3.fromRGB ( 239 , 68 , 68 ),[ "Snow" ]=Color3.fromRGB ( 147 , 197 , 253 ),[ "Jungle" ]=Color3.fromRGB ( 34 , 197 , 94 ),[ "Desert" ]=Color3.fromRGB ( 234 , 179 , 8 ),[ "Lake" ]=Color3.fromRGB ( 20 , 184 , 166 ),[ "Forest" ]=Color3.fromRGB ( 22 , 163 , 74 )}
+        [ "Volcano" ]=Color3.fromRGB ( 239 , 68 , 68 ),[ "Snow" ]=Color3.fromRGB ( 147 , 197 , 253 ),[ "Jungle" ]=Color3.fromRGB ( 34 , 197 , 94 ),[ "Desert" ]=Color3.fromRGB ( 234 , 179 , 8 ),[ "Lake" ]=Color3.fromRGB ( 20 , 184 , 166 )}
 
         local X={ "Divine" , "Eternal" , "Secret" ;
         "Cosmic" , "Mythic" , "Legendary" ;
@@ -2551,10 +2707,10 @@ local function initFarm()
                 end
             end
             )
-            local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;
+            local r={[ "Angels and Demons" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;
             [ "Cosmic" ]= false ,[ "Prehistoric" ]= false ,[ "Abyss Ocean" ]= false ;
             [ "Volcano" ]= false ,[ "Snow" ]= false ,[ "Jungle" ]= false ,[ "Desert" ]= false ;
-            [ "Lake" ]= false ,[ "Forest" ]= false }
+            [ "Lake" ]= false }
             local y={[ "Divine" ]= true ,[ "Eternal" ]= true ,[ "Secret" ]= true ,[ "Cosmic" ]= true ,[ "Mythic" ]= true ;
             [ "Legendary" ]= true ,[ "Epic" ]= true ,[ "Rare" ]= true ;
             [ "Uncommon" ]= true ;
@@ -2569,6 +2725,12 @@ local function initFarm()
             else
                 if type(e.selectedZones )~= "table" then
                     e.selectedZones =r
+                else
+                    local cleaned = {}
+                    for _, zn in ipairs(M) do
+                        cleaned[zn] = e.selectedZones[zn] == true
+                    end
+                    e.selectedZones = cleaned
                 end
                 if type(e.selectedRarities )~= "table" then
                     e.selectedRarities =y
@@ -3261,7 +3423,67 @@ local function initFarm()
             Z4(e)
         end
         local rk= 0
-        local yk= false E4=function(...)
+        local yk= false
+
+        -- ===== ФИКС A: сохранение исходных WalkSpeed/Jump =====
+        local savedWalkSpeed = 16
+        local savedJumpPower = 50
+        local savedJumpHeight = 7.2
+        local statsCaptureLock = false
+
+        local function isFarming()
+            return h.pureTweenFarm or h.autoFarmLoop or h.teleporting
+                or h.glidingToTarget or h.securingEgg or h.isReturning
+                or h.delivering or h.onTreadmill
+        end
+
+        local function captureOriginalStats(force)
+            if statsCaptureLock and not force then return end
+            if isFarming() and not force then return end
+
+            local ch = o.Character
+            if not ch then return end
+            local hum = ch:FindFirstChildOfClass("Humanoid")
+            if not hum then return end
+
+            local ws = hum.WalkSpeed
+            if ws and ws > 0 and ws <= 500 then
+                savedWalkSpeed = ws
+            end
+            if hum.UseJumpPower then
+                if hum.JumpPower and hum.JumpPower > 0 then
+                    savedJumpPower = hum.JumpPower
+                end
+            else
+                if hum.JumpHeight and hum.JumpHeight > 0 then
+                    savedJumpHeight = hum.JumpHeight
+                end
+            end
+
+            addDiagnosticLog("INFO", string.format("[Stats] Saved: WalkSpeed=%.1f, JumpPower=%.1f, JumpHeight=%.1f, UseJumpPower=%s",
+                savedWalkSpeed, savedJumpPower, savedJumpHeight, tostring(hum.UseJumpPower)))
+        end
+
+        task.spawn(function()
+            task.wait(0.5)
+            captureOriginalStats(true)
+        end)
+
+        o.CharacterAdded:Connect(function()
+            task.wait(1.5)
+            captureOriginalStats(true)
+        end)
+
+        task.spawn(function()
+            while h.alive do
+                if not isFarming() then
+                    captureOriginalStats(false)
+                end
+                task.wait(2)
+            end
+        end)
+
+        E4=function(...)
             local e=o:FindFirstChild( "PlayerGui" )
             if not e then
                 return false
@@ -5147,14 +5369,13 @@ local function initFarm()
             for _,zn in ipairs(M)do
                 byNorm[nz(zn)]=zn
             end
-            byNorm["lightdark"]="Light Dark"
             local an=nz(e)
             if an~="" and an~="unknown" and byNorm[an] then
                 return byNorm[an]
             end
             local x = r and tonumber(r.X) or nil
             if x then
-                if x >= 5200 then return "Light Dark"
+                if x >= 5200 then return "Angels and Demons"
                 elseif x >= 4750 then return "Titan Temple"
                 elseif x >= 4000 then return "Cherry Blossom"
                 elseif x >= 3350 then return "Cosmic"
@@ -5165,7 +5386,6 @@ local function initFarm()
                 elseif x >= 1150 then return "Jungle"
                 elseif x >= 920 then return "Desert"
                 elseif x >= 720 then return "Lake"
-                elseif x >= 530 then return "Forest"
                 end
             end
             if an~="" and an~="unknown" then
@@ -5752,8 +5972,14 @@ local function initFarm()
                     hum.PlatformStand = false
                     hum.Sit = false
                     hum.AutoRotate = true
-                    hum.WalkSpeed = 16
-                    hum.JumpPower = 50
+
+                    hum.WalkSpeed = savedWalkSpeed or 16
+                    if hum.UseJumpPower then
+                        hum.JumpPower = savedJumpPower or 50
+                    else
+                        hum.JumpHeight = savedJumpHeight or 7.2
+                    end
+
                     hum:ChangeState(Enum.HumanoidStateType.Running)
                 end)
             end
@@ -5807,9 +6033,11 @@ local function initFarm()
                 if O4==r then
                     Y4=e
                     if e== "TWEEN" then
+                        statsCaptureLock = true
                         _G._DesyncAntiRagdollActive = true
                         h.pureTweenFarm = true h.autoFarmLoop = false pcall(u4)H( "[FarmController] Pure Auto Steal (Tween) ACTIVATED exclusively." )
                     elseif e== "WARP" then
+                        statsCaptureLock = true
                         _G._DesyncAntiRagdollActive = true
                         h.autoFarmLoop = true h.pureTweenFarm = false pcall(u4)H( "[FarmController] Snipe Auto Loop (Warp) ACTIVATED exclusively." )
                     else
@@ -5817,6 +6045,7 @@ local function initFarm()
                         if not h.isBatchPlacing then
                             h.batchStealCount = 0
                         end
+                        statsCaptureLock = false
                         pcall(C4)
                         pcall(M4)
                         pcall(u4)
@@ -6354,12 +6583,29 @@ local function initFarm()
             ZoneColors = d,
             RarityColors = G,
             FullRestore = FULL_RESTORE,
+            ZoneSpeedReq = ZONE_SPEED_REQ,
             Shutdown = Shutdown
         }
     end)()
     FarmApi = Farm
     local h = Farm.State
     local toast = makeToast(main)
+
+    -- Кнопка "← Назад" в gamesFarmContainer (возврат в меню игр)
+    local backBtn = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 34),
+        BackgroundColor3 = C.surface2,
+        BorderSizePixel = 0,
+        Text = "←  НАЗАД К ИГРАМ",
+        TextColor3 = C.text,
+        TextSize = 10,
+        Font = Enum.Font.GothamBold,
+        AutoButtonColor = true,
+    }, gamesFarmContainer)
+    corner(backBtn, 8)
+    backBtn.MouseButton1Click:Connect(function()
+        if _G.RH_HUB_SHOW_GAMES_MENU then _G.RH_HUB_SHOW_GAMES_MENU() end
+    end)
 
     local function row(parent, height)
         local f = create("Frame", {
@@ -6527,6 +6773,120 @@ local function initFarm()
         return b
     end
 
+    -- Сетка зон с подписями требуемой Speed
+    local function zoneGridWithSpeed(parent, list, map, colors, speedReqs, onChange)
+        for _, name in ipairs(list) do
+            if map[name] == nil then map[name] = false end
+        end
+
+        local grid = create("Frame", {
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+        }, parent)
+        create("UIGridLayout", {
+            CellSize = UDim2.new(1 / 2, -4, 0, 52),
+            CellPadding = UDim2.fromOffset(6, 6),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+        }, grid)
+
+        local buttons = {}
+        local function paint(name)
+            local wrap = buttons[name]
+            if not wrap then return end
+            local btn = wrap.btn
+            local on = map[name] == true
+            local col = colors[name] or C.accent
+
+            local req = speedReqs[name]
+            local have = getPlayerSpeed()
+            local accessible = (req == nil) or (have >= req)
+
+            if on then
+                btn.BackgroundColor3 = col
+                local lum = 0.299 * col.R + 0.587 * col.G + 0.114 * col.B
+                btn.TextColor3 = lum > 0.62 and Color3.fromRGB(15, 15, 20) or Color3.new(1, 1, 1)
+            else
+                btn.BackgroundColor3 = C.button
+                btn.TextColor3 = C.muted
+            end
+
+            -- Красная обводка если скорость не хватает
+            if not accessible then
+                wrap.stroke.Color = C.red
+                wrap.stroke.Transparency = 0.1
+                btn.Text = (on and "✓ " or "🔒 ") .. name
+            else
+                wrap.stroke.Color = on and col or C.border
+                wrap.stroke.Transparency = on and 0.2 or 0.6
+                btn.Text = (on and "✓ " or "") .. name
+            end
+        end
+
+        for i, name in ipairs(list) do
+            local wrap = create("Frame", {
+                BackgroundColor3 = C.button,
+                BorderSizePixel = 0,
+                LayoutOrder = i,
+            }, grid)
+            corner(wrap, 8)
+
+            local strk = create("UIStroke", {
+                Color = C.border,
+                Thickness = 1,
+                Transparency = 0.6,
+            }, wrap)
+
+            local btn = create("TextButton", {
+                Position = UDim2.new(0, 0, 0, 0),
+                Size = UDim2.new(1, 0, 1, -16),
+                BackgroundTransparency = 1,
+                Text = name,
+                TextColor3 = C.muted,
+                TextSize = 10,
+                Font = Enum.Font.GothamBold,
+                AutoButtonColor = false,
+            }, wrap)
+            corner(btn, 8)
+
+            local speedLbl = create("TextLabel", {
+                Position = UDim2.new(0, 0, 1, -16),
+                Size = UDim2.new(1, 0, 0, 16),
+                BackgroundTransparency = 1,
+                Text = speedReqs[name] and ("⚡ " .. formatSpeed(speedReqs[name])) or "⚡ —",
+                TextColor3 = C.yellow,
+                TextSize = 9,
+                Font = Enum.Font.GothamBold,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                TextYAlignment = Enum.TextYAlignment.Center,
+            }, wrap)
+
+            buttons[name] = { btn = btn, stroke = strk, label = speedLbl }
+
+            btn.MouseButton1Click:Connect(function()
+                map[name] = not (map[name] == true)
+                paint(name)
+                if onChange then pcall(onChange) end
+            end)
+        end
+
+        return {
+            setAll = function(state)
+                for _, name in ipairs(list) do
+                    map[name] = state
+                    paint(name)
+                end
+                if onChange then pcall(onChange) end
+            end,
+            repaint = function()
+                for _, name in ipairs(list) do
+                    paint(name)
+                end
+            end,
+        }
+    end
+
     local function chipGrid(parent, list, map, colors, onChange)
         for _, name in ipairs(list) do
             if map[name] == nil then map[name] = false end
@@ -6625,8 +6985,8 @@ local function initFarm()
         mk("СБРОСИТЬ", 0.5, onNone)
     end
 
-    section(farmPage, "СТАТУС")
-    local statusCard = row(farmPage, 52)
+    section(gamesFarmContainer, "СТАТУС")
+    local statusCard = row(gamesFarmContainer, 52)
     stroke(statusCard, C.accent, 1, 0.5)
     local statusLbl = create("TextLabel", {
         Position = UDim2.new(0, 12, 0, 6),
@@ -6646,11 +7006,13 @@ local function initFarm()
             local okc, carried = pcall(Farm.GetTotalEggCount)
             local s = tostring(h.statusText or "Ready")
             if s:sub(1, 1) ~= "[" then s = "[" .. s .. "]" end
-            statusLbl.Text = string.format("%s • Bag: %d", s, okc and carried or 0)
+            local spd = getPlayerSpeed()
+            statusLbl.Text = string.format("%s • Bag: %d • Speed: %s", s, okc and carried or 0, formatSpeed(spd))
             task.wait(0.25)
         end
     end)
 
+    -- ============ КОНСОЛЬ ============
     local consoleToggle = create("TextButton", {
         Size = UDim2.new(1, 0, 0, 34),
         BackgroundColor3 = C.surface2,
@@ -6660,7 +7022,7 @@ local function initFarm()
         TextSize = 10,
         Font = Enum.Font.GothamBold,
         AutoButtonColor = true,
-    }, farmPage)
+    }, gamesFarmContainer)
     corner(consoleToggle, 8)
 
     local consolePanel = create("Frame", {
@@ -6669,7 +7031,7 @@ local function initFarm()
         BorderSizePixel = 0,
         Visible = false,
         ClipsDescendants = true,
-    }, farmPage)
+    }, gamesFarmContainer)
     corner(consolePanel, 10)
     stroke(consolePanel, C.accent, 1, 0.55)
 
@@ -6766,7 +7128,7 @@ local function initFarm()
         consoleToggle.Text = consoleOpen and "ЗАКРЫТЬ ИСТОРИЮ / КОНСОЛЬ" or "ОТКРЫТЬ ИСТОРИЮ / КОНСОЛЬ"
         if consoleOpen then
             renderDiagnosticLogs(true)
-            Farm.AddDiagnosticLog("INFO", "Diagnostic console opened. Logs are stored locally in this session.")
+            Farm.AddDiagnosticLog("INFO", "Diagnostic console opened.")
             renderDiagnosticLogs(true)
         end
     end)
@@ -6789,11 +7151,9 @@ local function initFarm()
             copied = pcall(set_clipboard, consoleLogLabel.Text)
         end
         if copied then
-            toast("История скопирована в буфер обмена", "ok")
-            Farm.AddDiagnosticLog("INFO", "Copy-to-clipboard succeeded.")
+            toast("История скопирована", "ok")
         else
-            toast("Executor не поддерживает копирование. Выдели текст вручную.", "warn")
-            Farm.AddDiagnosticLog("WARN", "Clipboard API unavailable; select and copy the text manually.")
+            toast("Нет доступа к буферу", "warn")
         end
         renderDiagnosticLogs(true)
     end)
@@ -6805,7 +7165,8 @@ local function initFarm()
         end
     end)
 
-    section(farmPage, "РЕЖИМ ФАРМА")
+    -- ============ РЕЖИМ ФАРМА ============
+    section(gamesFarmContainer, "РЕЖИМ ФАРМА")
     local farmMode = "NONE"
     local tweenRow, warpRow
 
@@ -6813,7 +7174,7 @@ local function initFarm()
         return countOn(h.selectedZones, Farm.ZoneList)
     end
 
-    tweenRow = toggleRow(farmPage, "Авто-кража (Tween)", "Плавный полёт к яйцу по коридору", false, function(on)
+    tweenRow = toggleRow(gamesFarmContainer, "Авто-кража (Tween)", "Плавный полёт к яйцу по коридору", false, function(on)
         if on then
             farmMode = "TWEEN"
             warpRow.set(false, true)
@@ -6826,7 +7187,7 @@ local function initFarm()
         end
     end)
 
-    warpRow = toggleRow(farmPage, "Авто-кража (Teleport)", "Мгновенный варп к яйцу", false, function(on)
+    warpRow = toggleRow(gamesFarmContainer, "Авто-кража (Teleport)", "Мгновенный варп к яйцу", false, function(on)
         if on then
             farmMode = "WARP"
             tweenRow.set(false, true)
@@ -6839,48 +7200,59 @@ local function initFarm()
         end
     end)
 
-    toggleRow(farmPage, "Авто-возврат", "После кражи лететь на безопасную линию", h.autoGlide ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Авто-возврат", "После кражи лететь на безопасную линию", h.autoGlide ~= false, function(on)
         h.autoGlide = on
     end)
 
-    local zonesSection = section(farmPage, "ЗОНЫ")
+    -- ============ ЗОНЫ С ПОДПИСЯМИ СКОРОСТИ ============
+    local zonesSection = section(gamesFarmContainer, "ЗОНЫ")
     local function refreshZoneLabel()
         local n = zonesPicked()
         zonesSection.Text = "ЗОНЫ  •  ВЫБРАНО " .. n .. " / " .. #Farm.ZoneList .. "  (берутся только они)"
     end
-    local zoneGrid = chipGrid(farmPage, Farm.ZoneList, h.selectedZones, Farm.ZoneColors, function()
+    local zoneGrid = zoneGridWithSpeed(gamesFarmContainer, Farm.ZoneList, h.selectedZones, Farm.ZoneColors, Farm.ZoneSpeedReq, function()
         Farm.SaveEggSelectConfig(h)
         refreshZoneLabel()
     end)
-    allNoneRow(farmPage, function() zoneGrid.setAll(true) end, function() zoneGrid.setAll(false) end)
+    allNoneRow(gamesFarmContainer, function() zoneGrid.setAll(true) end, function() zoneGrid.setAll(false) end)
     refreshZoneLabel()
 
-    local rarSection = section(farmPage, "РЕДКОСТЬ")
+    -- Автоперекраска зон каждые 3 сек (обновляет блокировку 🔒 при изменении Speed)
+    task.spawn(function()
+        while mainGui.Parent and h.alive do
+            pcall(function() zoneGrid.repaint() end)
+            task.wait(3)
+        end
+    end)
+
+    -- ============ РЕДКОСТЬ ============
+    local rarSection = section(gamesFarmContainer, "РЕДКОСТЬ")
     local function refreshRarLabel()
         rarSection.Text = "РЕДКОСТЬ  •  ВЫБРАНО " .. countOn(h.selectedRarities, Farm.RarityList) .. " / " .. #Farm.RarityList
     end
-    local rarGrid = chipGrid(farmPage, Farm.RarityList, h.selectedRarities, Farm.RarityColors, function()
+    local rarGrid = chipGrid(gamesFarmContainer, Farm.RarityList, h.selectedRarities, Farm.RarityColors, function()
         Farm.SaveEggSelectConfig(h)
         refreshRarLabel()
     end)
-    allNoneRow(farmPage, function() rarGrid.setAll(true) end, function() rarGrid.setAll(false) end)
+    allNoneRow(gamesFarmContainer, function() rarGrid.setAll(true) end, function() rarGrid.setAll(false) end)
     refreshRarLabel()
 
-    section(farmPage, "ЯЙЦА И БАЗА")
-    toggleRow(farmPage, "Авто-размещение (каждые 5)", "Каждые 5 краж лететь домой и ставить яйца", h.autoPlaceEvery5 == true, function(on)
+    -- ============ ЯЙЦА И БАЗА ============
+    section(gamesFarmContainer, "ЯЙЦА И БАЗА")
+    toggleRow(gamesFarmContainer, "Авто-размещение (каждые 5)", "Каждые 5 краж лететь домой и ставить яйца", h.autoPlaceEvery5 == true, function(on)
         h.autoPlaceEvery5 = on
         if not on then h.batchStealCount = 0 end
     end)
-    toggleRow(farmPage, "Авто-вылупление", "Вылупляет готовые яйца откуда угодно", h.autoHatch ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Авто-вылупление", "Вылупляет готовые яйца откуда угодно", h.autoHatch ~= false, function(on)
         h.autoHatch = on
     end)
-    buttonRow(farmPage, "ПОСТАВИТЬ ЯЙЦА СЕЙЧАС", function()
+    buttonRow(gamesFarmContainer, "ПОСТАВИТЬ ЯЙЦА СЕЙЧАС", function()
         toast("Ставлю яйца...", "ok")
         task.spawn(function()
             Farm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
         end)
     end)
-    toggleRow(farmPage, "Авто-беговая дорожка", "Бежать на дорожке, пока нет целей", h.autoTreadmill ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Авто-беговая дорожка", "Бежать на дорожке, пока нет целей", h.autoTreadmill ~= false, function(on)
         h.autoTreadmill = on
         Farm.SaveEggSelectConfig(h)
         if not on then
@@ -6891,27 +7263,28 @@ local function initFarm()
             toast("Слез с дорожки, физика восстановлена", "ok")
         end
     end)
-    toggleRow(farmPage, "Авто-апгрейд дорожки", "Улучшать уровень, когда хватает денег", h.autoUpgradeTreadmill ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Авто-апгрейд дорожки", "Улучшать уровень, когда хватает денег", h.autoUpgradeTreadmill ~= false, function(on)
         h.autoUpgradeTreadmill = on
         Farm.SaveEggSelectConfig(h)
     end)
-    toggleRow(farmPage, "Авто-трейлы", "Покупать и надевать лучший трейл", h.autoBuyTrails ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Авто-трейлы", "Покупать и надевать лучший трейл", h.autoBuyTrails ~= false, function(on)
         h.autoBuyTrails = on
         Farm.SaveEggSelectConfig(h)
     end)
-    toggleRow(farmPage, "Скрывать «Not enough money»", "Прячет красное уведомление игры", h.hideNotEnoughMoney ~= false, function(on)
+    toggleRow(gamesFarmContainer, "Скрывать «Not enough money»", "Прячет красное уведомление игры", h.hideNotEnoughMoney ~= false, function(on)
         h.hideNotEnoughMoney = on
         Farm.SaveEggSelectConfig(h)
     end)
 
-    section(farmPage, "ПОЛЁТ И БЕЗОПАСНОСТЬ")
-    sliderRow(farmPage, "Скорость полёта", 100, 1000, 25, h.glideSpeed or 600,
+    -- ============ ПОЛЁТ / БЕЗОПАСНОСТЬ ============
+    section(gamesFarmContainer, "ПОЛЁТ И БЕЗОПАСНОСТЬ")
+    sliderRow(gamesFarmContainer, "Скорость полёта", 100, 1000, 25, h.glideSpeed or 600,
         function(v) h.glideSpeed = v end,
         function(v) Farm.SaveSpeed(v) end)
-    toggleRow(farmPage, "Desync Godmode", "Неуязвимость к ловушкам карты", h.godmode == true, function(on)
+    toggleRow(gamesFarmContainer, "Desync Godmode", "Неуязвимость к ловушкам карты", h.godmode == true, function(on)
         Farm.SetDesyncGodmode(on)
     end)
-    buttonRow(farmPage, "ОСВОБОДИТЬСЯ / СЛЕЗТЬ С ДОРОЖКИ", function()
+    buttonRow(gamesFarmContainer, "ОСВОБОДИТЬСЯ / СЛЕЗТЬ С ДОРОЖКИ", function()
         Farm.ResetFarmStates()
         Farm.DoffTreadmillState()
         Farm.MountTreadmillOff()
