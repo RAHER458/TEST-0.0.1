@@ -450,7 +450,7 @@ task.spawn(function()
     while authGui.Parent do
         hue = (hue + 0.008) % 1
         if authTitle.Parent then
-            authTitle.TextColor3 = Color3.from(hue, 0.7, 1)
+            authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1)
         end
         task.wait(0.05)
     end
@@ -783,7 +783,7 @@ task.spawn(function()
         end
     end
 end)
--- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ (до всего остального) ============
+-- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ ============
 _G.RH_HUB_IS_WALKSPEED_ON = function() return false end
 _G.RH_HUB_IS_RUSH_ON = function() return false end
 _G.RH_HUB_RUSH_ACTIVE = function() return false end
@@ -1580,7 +1580,6 @@ local function updateChildStates()
     rushEditWrap.Visible = walkSpeedEnabled and rushModeEnabled
 end
 
--- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
 
@@ -1611,7 +1610,6 @@ walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     updateSpeedState()
 end)
 
--- ===== СЛАЙДЕР WALKSPEED =====
 local sliderDragging = false
 
 local function updateSliderFromX(x)
@@ -1654,7 +1652,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ===== ТОГГЛ STEALTH =====
 stealthToggleBtn.MouseButton1Click:Connect(function()
     if not walkSpeedEnabled then return end
 
@@ -1670,7 +1667,6 @@ stealthToggleBtn.MouseButton1Click:Connect(function()
     updateSpeedState()
 end)
 
--- ===== ТОГГЛ RUSH =====
 rushToggleBtn.MouseButton1Click:Connect(function()
     if not walkSpeedEnabled then return end
 
@@ -1688,7 +1684,6 @@ rushToggleBtn.MouseButton1Click:Connect(function()
     _G.RH_HUB_SET_RUSH_VISIBLE(rushModeEnabled)
 end)
 
--- ===== СЛАЙДЕР RUSH SPEED =====
 local rushSpeedDragging = false
 
 local function updateRushSpeedFromX(x)
@@ -1731,7 +1726,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ===== СЛАЙДЕР RUSH HEIGHT =====
 local rushHeightDragging = false
 
 local function updateRushHeightFromX(x)
@@ -1774,7 +1768,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ===== EDIT BUTTON =====
 local rushEditActive = false
 
 rushEditBtn.MouseButton1Click:Connect(function()
@@ -1877,7 +1870,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ OVERLAY (RH | FPS | PING) ============
+-- ============ OVERLAY ============
 local overlayGui = create("ScreenGui", {
     Name = "RH_HUB_OVERLAY",
     ResetOnSpawn = false,
@@ -2351,7 +2344,7 @@ _G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
     end
 end
 
--- ============ FARM: ENGINE + UI (запускается после авторизации) ============
+-- ============ FARM: ENGINE + UI ============
 local function initFarm()
     if FarmApi then return end
 
@@ -3120,8 +3113,9 @@ local function initFarm()
         end
         if typeof(hookmetamethod)== "function" and not _G._DesyncAntiRagdollHooked then
             _G._DesyncAntiRagdollHooked = true
+            _G._DesyncAntiRagdollActive = true
             local e e=hookmetamethod(game, "__newindex" ,safeNewCClosure(function(r,y,u,...)
-                if not executorCheckCaller()and typeof(r)== "Instance" then
+                if _G._DesyncAntiRagdollActive and not executorCheckCaller()and typeof(r)== "Instance" then
                     if r:IsA( "Motor6D" )and(y== "Enabled" and u== false )then
                         return nil
                     end
@@ -5713,6 +5707,74 @@ local function initFarm()
                 return true
             end
         end
+        local function FULL_RESTORE()
+            h.onTreadmill = false
+            h.teleporting = false
+            h.glidingToTarget = false
+            h.securingEgg = false
+            h.isReturning = false
+            h.delivering = false
+            h.holdingEggForGuard = false
+            h.isHatching = false
+            h.isBatchPlacing = false
+            h.currentTargetModel = nil
+            h.targetPosition = nil
+
+            _G._DesyncAntiRagdollActive = false
+
+            local char = o.Character
+            if not char then return end
+
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+
+            if hrp then
+                pcall(function()
+                    hrp.Anchored = false
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end)
+            end
+
+            if hum then
+                pcall(function()
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                    hum:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+
+                    hum.PlatformStand = false
+                    hum.Sit = false
+                    hum.AutoRotate = true
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
+                end)
+            end
+
+            pcall(function()
+                for _, d in ipairs(char:GetDescendants()) do
+                    if d:IsA("WeldConstraint") and d.Name:match("^RigidJointWeld_") then
+                        d:Destroy()
+                    end
+                end
+            end)
+
+            pcall(function()
+                local animate = char:FindFirstChild("Animate")
+                if animate and animate:IsA("LocalScript") then
+                    animate.Disabled = false
+                end
+            end)
+
+            H("[FarmController] FULL_RESTORE: игрок восстановлен (анимации, состояния, физика).")
+        end
         T4=function(e,...)
             if Y4==e then
                 return
@@ -5745,14 +5807,20 @@ local function initFarm()
                 if O4==r then
                     Y4=e
                     if e== "TWEEN" then
+                        _G._DesyncAntiRagdollActive = true
                         h.pureTweenFarm = true h.autoFarmLoop = false pcall(u4)H( "[FarmController] Pure Auto Steal (Tween) ACTIVATED exclusively." )
                     elseif e== "WARP" then
+                        _G._DesyncAntiRagdollActive = true
                         h.autoFarmLoop = true h.pureTweenFarm = false pcall(u4)H( "[FarmController] Snipe Auto Loop (Warp) ACTIVATED exclusively." )
                     else
                         h.pureTweenFarm = false h.autoFarmLoop = false
                         if not h.isBatchPlacing then
                             h.batchStealCount = 0
                         end
+                        pcall(C4)
+                        pcall(M4)
+                        pcall(u4)
+                        pcall(FULL_RESTORE)
                         H( "[FarmController] All farms DEACTIVATED. Bot idle." )
                     end
                 end
@@ -6285,6 +6353,7 @@ local function initFarm()
             RarityList = X,
             ZoneColors = d,
             RarityColors = G,
+            FullRestore = FULL_RESTORE,
             Shutdown = Shutdown
         }
     end)()
@@ -6582,7 +6651,6 @@ local function initFarm()
         end
     end)
 
-    -- ---------- ДИАГНОСТИЧЕСКАЯ КОНСОЛЬ (полноценный скролл) ----------
     local consoleToggle = create("TextButton", {
         Size = UDim2.new(1, 0, 0, 34),
         BackgroundColor3 = C.surface2,
@@ -6815,6 +6883,13 @@ local function initFarm()
     toggleRow(farmPage, "Авто-беговая дорожка", "Бежать на дорожке, пока нет целей", h.autoTreadmill ~= false, function(on)
         h.autoTreadmill = on
         Farm.SaveEggSelectConfig(h)
+        if not on then
+            pcall(Farm.ResetFarmStates)
+            pcall(Farm.DoffTreadmillState)
+            pcall(Farm.MountTreadmillOff)
+            if Farm.FullRestore then pcall(Farm.FullRestore) end
+            toast("Слез с дорожки, физика восстановлена", "ok")
+        end
     end)
     toggleRow(farmPage, "Авто-апгрейд дорожки", "Улучшать уровень, когда хватает денег", h.autoUpgradeTreadmill ~= false, function(on)
         h.autoUpgradeTreadmill = on
@@ -6840,7 +6915,8 @@ local function initFarm()
         Farm.ResetFarmStates()
         Farm.DoffTreadmillState()
         Farm.MountTreadmillOff()
-        toast("Unstuck выполнен", "ok")
+        if Farm.FullRestore then pcall(Farm.FullRestore) end
+        toast("Unstuck выполнен, физика восстановлена", "ok")
     end)
 end
 
