@@ -1938,7 +1938,8 @@ local circleButton = create("TextButton", {
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
     Text = "HUB",
-    TextColor3 = Color3.new(1, 1Size = 13,
+    TextColor3 = Color3.new(1, 1, 1),
+TextSize = 13,
     Font = Enum.Font.GothamBlack,
     AutoButtonColor = false,
 }, circleGui)
