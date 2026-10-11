@@ -180,7 +180,7 @@ local function T(...)
         end
     end
     )
-    local r={[ "Light Dark" ]= true ,[ "Titan Temple" ]= true ,[ "Cherry Blossom" ]= true ;
+    local r={[ "Light Dark" ]= false ,[ "Titan Temple" ]= false ,[ "Cherry Blossom" ]= false ;
     [ "Cosmic" ]= false ;
     [ "Prehistoric" ]= false ,[ "Abyss Ocean" ]= false ;
     [ "Volcano" ]= false ,[ "Snow" ]= false ;
@@ -1984,7 +1984,20 @@ N4=function(...)
                     t=r.PhysicalModel :GetAttribute( "AreaId" )or r.PhysicalModel :GetAttribute( "Area" )
                 end
                 local B=string.format ( "%s %s %s %s" ,tostring(e or "" ),tostring(r.Uid or "" ),tostring(r.Name or "" ),(r.PhysicalModel and r.PhysicalModel.Name )or "" )
-                local J=Dk(t,H,B)
+                local J
+local __px = H.X
+if __px >= 5200 then J = "Light Dark"
+elseif __px >= 4750 then J = "Titan Temple"
+elseif __px >= 4000 then J = "Cherry Blossom"
+elseif __px >= 3350 then J = "Cosmic"
+elseif __px >= 2780 then J = "Prehistoric"
+elseif __px >= 2250 then J = "Abyss Ocean"
+elseif __px >= 1850 then J = "Volcano"
+elseif __px >= 1450 then J = "Snow"
+elseif __px >= 1150 then J = "Jungle"
+elseif __px >= 920 then J = "Desert"
+elseif __px >= 720 then J = "Lake"
+else J = "Forest" end
                 local K,c=k(r,e,o,y)
                 local v=(K>= 4 or c== "Secret" or c== "Eternal" or c== "Divine" )
                 local i=(h.selectedZones and h.selectedZones [J]== true )
