@@ -1971,6 +1971,11 @@ AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор яйца и ср�
     AutoFarm.SaveEggSelectConfig(h)
 end)
 
+AddToggle(stealBody, "Ignore Rarity Filter", "Красть ВСЕ яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
+    h.ignoreRarity = state
+    AutoFarm.SaveEggSelectConfig(h)
+end)
+
     AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить все яйца", function()
         task.spawn(function()
             AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
