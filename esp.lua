@@ -1753,10 +1753,9 @@ task.spawn(function()
         AutoFarm.SaveEggSelectConfig(h)
     end)
 
-    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine, из любой зоны", h .alwaysCollectSecretPlus ~= false,1 function(state)
-        h),
-.alwaysCollectSecretPlus = state   
-        AutoFarm.SaveEgg TextSelectConfig(h)
+    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine, из любой зоны", h.alwaysCollectSecretPlus ~= false, function(state)
+        h.alwaysCollectSecretPlus = state
+        AutoFarm.SaveEggSelectConfig(h)
     end)
 
     AddSlider(stealBody, "Flight Cruise Speed", 100, 1000, h.glideSpeed or 600, function(val)
