@@ -5524,64 +5524,6 @@ local function initFarm()
             H("[AutoSteal] Egg secured; skipping guard strike and returning to base immediately.")
             return true
 
-            -- Legacy guard-strike flow retained below but unreachable by design.
-            h.statusText = "[2/4] Requesting Guard Strike..." H( "[GuardStrike] Step 2: Requesting strike without the long wait..." )
-            if P then
-                task.spawn(function()
-                    pcall(function()
-                        if P:IsA("RemoteFunction") then
-                            P:InvokeServer()
-                        else
-                            P:FireServer()
-                        end
-                    end)
-                end)
-            end
-            k:PivotTo(u*CFrame.new(0, 0.4, 0))
-            V4(s, 14)
-            task.wait(0.15)
-            h.statusText = "[3/4] Re-grabbing Egg..." H( "[GuardStrike] Step 3: Re-grabbing egg immediately..." )
-            local v=os.clock ()+ 3
-            while not w4()and(os.clock ()<v and(h.alive and h.securingEgg ))do
-                if j and O4~=j then
-                    t( "[GuardStrike] Cancelled by session switch in Step 3" )
-                    break
-                end
-                if not h.pureTweenFarm and(not h.autoFarmLoop and not h.teleporting )then
-                    break
-                end
-                k:PivotTo(u*CFrame.new ( 0 , 0.4 , 0 ))d4(w,s)
-                if e and i then
-                    task.spawn (function(...) pcall(function(...)
-                            if i:IsA( "RemoteFunction" )then
-                                i:InvokeServer({[ "Uid" ]=e})i:InvokeServer(e)
-                            else
-                                i:FireServer({[ "Uid" ]=e})i:FireServer(e)
-                            end
-                        end
-                        )
-                    end
-                    )
-                end
-                y.Heartbeat :Wait()
-            end
-            local R=j4(e)
-            if not R then
-                task.wait ( 0.12 )R=j4(e)
-            end
-            h.currentTargetModel =nil h.targetPosition =nil h.securingEgg = false h.holdingEggForGuard = false
-            if j and O4~=j then
-                return false
-            end
-            if R then
-                pcall(u4)H( "[GuardStrike] Egg successfully secured after guard strike! Stashed in backpack." )h.statusText = "Egg Secured! Tweening along Z=-360..."
-            else
-                t( "[-] Failed to re-grab egg after guard strike (stolen or despawned)" )h.statusText = "[-] Failed to re-grab egg"
-                if e then
-                    X4[e]=os.clock ()+ 2
-                end
-            end
-            return R
         end
         l4=function(e,u,...)
             if h.teleporting or h.glidingToTarget or h.delivering or h.securingEgg then
@@ -6871,4 +6813,4 @@ print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
 
 -- [КОНЕЦ ЧАСТИ 3]
--- [[ КОНЕЦ ФАЙЛА ]] 
+-- [[ КОНЕЦ ФАЙЛА ]]
