@@ -1,7 +1,8 @@
 --[[
     RH-HUB
     Standalone Roblox Multi-Tool Hub
-    Version: 0.0.4-alpha
+    Version: 0.0.2-alpha
+    Platform: Roblox / Delta Executor / iOS
 ]]
 
 repeat task.wait() until game:IsLoaded()
@@ -15,7 +16,8 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION     = "0.0.4-alpha",
+    VERSION     = "0.0.2-alpha",
+    NAME        = "RH-HUB",
     API_BASE    = "https://raherauth.raher458.workers.dev",
     TOKEN_FILE  = "RH_HUB_TOKEN.dat",
     DEVICE_FILE = "RH_HUB_DEVICE.dat",
@@ -25,13 +27,13 @@ local CONFIG = {
     WINDOW_H    = 440,
     RETRY_MAX   = 3,
     RETRY_DELAY = 1.5,
-    AUTOFARM_URL = "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/autofarm.lua",
 }
 
 local C = {
     bg      = Color3.fromRGB(11, 12, 18),
     surface = Color3.fromRGB(20, 23, 32),
     surface2= Color3.fromRGB(28, 32, 45),
+    surface3= Color3.fromRGB(36, 41, 55),
     button  = Color3.fromRGB(36, 41, 55),
     input   = Color3.fromRGB(24, 27, 36),
     border  = Color3.fromRGB(58, 64, 88),
@@ -46,20 +48,26 @@ local C = {
 
 pcall(function()
     local core = game:GetService("CoreGui")
-    for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
+    for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE", "RH_HUB_RUSH"}) do
         local old = core:FindFirstChild(name)
         if old then old:Destroy() end
     end
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE"}) do
-            local old = pg:FindFirstChild(name)
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if playerGui then
+        for _, name in ipairs({"RH_HUB_GUI", "RH_HUB_AUTH_GUI", "RH_HUB_OVERLAY", "RH_HUB_CIRCLE", "RH_HUB_RUSH"}) do
+            local old = playerGui:FindFirstChild(name)
             if old then old:Destroy() end
         end
     end
 end)
 
-local STATE = { authed = false, token = nil, deviceId = nil, busy = false, mode = "window" }
+local STATE = {
+    authed   = false,
+    token    = nil,
+    deviceId = nil,
+    busy     = false,
+    mode     = "window",
+}
 
 local function create(class, props, parent)
     local obj = Instance.new(class)
@@ -80,53 +88,103 @@ local function stroke(parent, color, thickness, transparency)
     }, parent)
 end
 
-local function safeParent(g)
-    local ok = pcall(function() g.Parent = game:GetService("CoreGui") end)
-    if not ok or not g.Parent then g.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+local function safeParent(guiObj)
+    local ok = pcall(function() guiObj.Parent = game:GetService("CoreGui") end)
+    if not ok or not guiObj.Parent then
+        guiObj.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
 end
 
 local function hasFileAPI()
-    return type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function"
+    return type(readfile) == "function"
+       and type(writefile) == "function"
+       and type(isfile) == "function"
 end
 
-local function generateDeviceId() return "RH-" .. HttpService:GenerateGUID(false) end
+local savedCfg = {
+    rushBtnPos = { x = -70, y = -140 },
+}
+
+local function loadConfig()
+    if not hasFileAPI() then return end
+    local ok, result = pcall(function()
+        if isfile(CONFIG.CONFIG_FILE) then
+            local raw = readfile(CONFIG.CONFIG_FILE)
+            if type(raw) == "string" and raw ~= "" then
+                local dec = HttpService:JSONDecode(raw)
+                if type(dec) == "table" then return dec end
+            end
+        end
+        return nil
+    end)
+    if ok and type(result) == "table" then
+        for k, v in pairs(result) do savedCfg[k] = v end
+    end
+end
+
+local function saveConfig()
+    if not hasFileAPI() then return end
+    pcall(function()
+        local raw = HttpService:JSONEncode(savedCfg)
+        writefile(CONFIG.CONFIG_FILE, raw)
+    end)
+end
+
+loadConfig()
+
+-- ============ DEVICE ID ============
+local function generateDeviceId()
+    return "RH-" .. HttpService:GenerateGUID(false)
+end
 
 local function loadDeviceId()
     if hasFileAPI() then
-        local ok, r = pcall(function()
+        local ok, result = pcall(function()
             if isfile(CONFIG.DEVICE_FILE) then
-                local v = readfile(CONFIG.DEVICE_FILE)
-                if type(v) == "string" and #v >= 16 then return tostring(v):gsub("%s+", "") end
+                local val = readfile(CONFIG.DEVICE_FILE)
+                if type(val) == "string" and #val >= 16 then
+                    return tostring(val):gsub("%s+", "")
+                end
             end
-            local v = generateDeviceId()
-            writefile(CONFIG.DEVICE_FILE, v)
-            return v
+            local val = generateDeviceId()
+            writefile(CONFIG.DEVICE_FILE, val)
+            return val
         end)
-        if ok and type(r) == "string" then return r end
+        if ok and type(result) == "string" then return result end
     end
     return generateDeviceId()
 end
 
 STATE.deviceId = loadDeviceId()
 
-local function saveToken(t) if hasFileAPI() then pcall(writefile, CONFIG.TOKEN_FILE, tostring(t)) end end
+local function saveToken(token)
+    if hasFileAPI() then
+        pcall(writefile, CONFIG.TOKEN_FILE, tostring(token))
+    end
+end
 
 local function loadToken()
     if not hasFileAPI() then return nil end
-    local ok, r = pcall(function()
+    local ok, result = pcall(function()
         if isfile(CONFIG.TOKEN_FILE) then
-            local v = readfile(CONFIG.TOKEN_FILE)
-            if type(v) == "string" and #v >= 16 then return tostring(v):gsub("%s+", "") end
+            local val = readfile(CONFIG.TOKEN_FILE)
+            if type(val) == "string" and #val >= 16 then
+                return tostring(val):gsub("%s+", "")
+            end
         end
         return nil
     end)
-    if ok then return r end
+    if ok then return result end
     return nil
 end
 
 local function clearToken()
     if hasFileAPI() and type(delfile) == "function" then
-        pcall(function() if isfile(CONFIG.TOKEN_FILE) then delfile(CONFIG.TOKEN_FILE) end end)
+        pcall(function()
+            if isfile(CONFIG.TOKEN_FILE) then
+                delfile(CONFIG.TOKEN_FILE)
+            end
+        end)
     end
 end
 
@@ -139,60 +197,102 @@ end
 
 local function api(path, body)
     local req = getRequestFn()
-    if not req then return nil, "No HTTP" end
-    local payload
-    local encOK, encErr = pcall(function() payload = HttpService:JSONEncode(body or {}) end)
-    if not encOK then return nil, "JSON: " .. tostring(encErr) end
+    if not req then return nil, "Executor не поддерживает HTTP-запросы" end
 
-    local response, requestDone = nil, false
+    local payload
+    local encOK, encErr = pcall(function()
+        payload = HttpService:JSONEncode(body or {})
+    end)
+    if not encOK then return nil, "Ошибка JSON: " .. tostring(encErr) end
+
+    local response = nil
+    local requestDone = false
+
     task.spawn(function()
         local callOK, res = pcall(function()
             return req({
                 Url = CONFIG.API_BASE .. path,
                 Method = "POST",
-                Headers = { ["Content-Type"] = "application/json", ["Accept"] = "application/json" },
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Accept"] = "application/json",
+                },
                 Body = payload,
             })
         end)
-        if callOK then response = res else response = { __error = tostring(res) } end
+
+        if callOK then
+            response = res
+        else
+            response = { __error = tostring(res) }
+        end
         requestDone = true
     end)
 
-    local t0 = os.clock()
-    while not requestDone and os.clock() - t0 < 15 do task.wait(0.1) end
-    if not requestDone then return nil, "Timeout" end
-    if not response or type(response) ~= "table" then return nil, "No response" end
-    if response.__error then return nil, response.__error end
+    local startTime = os.clock()
+    while not requestDone and os.clock() - startTime < 15 do
+        task.wait(0.1)
+    end
+
+    if not requestDone then
+        return nil, "Таймаут запроса (сервер не отвечает)"
+    end
+
+    if not response or type(response) ~= "table" then
+        return nil, "Не удалось выполнить запрос"
+    end
+
+    if response.__error then
+        return nil, response.__error
+    end
 
     local status = tonumber(response.StatusCode or response.Status or 0) or 0
     local raw = response.Body or response.body or ""
-    local decOK, decoded = pcall(function() return HttpService:JSONDecode(raw) end)
+
+    local decOK, decoded = pcall(function()
+        return HttpService:JSONDecode(raw)
+    end)
 
     if status < 200 or status >= 300 then
         local message
-        if decOK and type(decoded) == "table" then message = decoded.error or decoded.message end
-        if not message and raw ~= "" then message = tostring(raw):sub(1, 120) end
+        if decOK and type(decoded) == "table" then
+            message = decoded.error or decoded.message
+        end
+        if not message and raw ~= "" then
+            message = tostring(raw):sub(1, 120)
+        end
         return nil, tostring(message or ("HTTP " .. status))
     end
-    if not decOK or type(decoded) ~= "table" then return nil, "Bad response" end
+
+    if not decOK or type(decoded) ~= "table" then
+        return nil, "Некорректный ответ"
+    end
+
     return decoded
 end
 
 local function apiWithRetry(path, body, maxAttempts, delay)
     maxAttempts = maxAttempts or CONFIG.RETRY_MAX
     delay = delay or CONFIG.RETRY_DELAY
+
     local lastErr = nil
+
     for attempt = 1, maxAttempts do
         local result, err = api(path, body)
         if result then return result, nil, attempt end
+
         lastErr = err
         local errText = tostring(err or ""):lower()
-        if errText:find("timeout") or errText:find("таймаут") then
-            if attempt < maxAttempts then task.wait(delay) end
+
+        if errText:find("таймаут") or errText:find("timeout") then
+            if attempt < maxAttempts then
+                task.wait(delay)
+            end
         else
             return nil, err, attempt
         end
     end
+
     return nil, lastErr, maxAttempts
 end
 
@@ -203,21 +303,28 @@ local function makeToast(parentFrame)
         BackgroundTransparency = 1,
         ZIndex = 200,
     }, parentFrame)
+
     create("UIListLayout", {
         Padding = UDim.new(0, 6),
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         VerticalAlignment = Enum.VerticalAlignment.Bottom,
         SortOrder = Enum.SortOrder.LayoutOrder,
     }, container)
+
     create("UIPadding", {
         PaddingBottom = UDim.new(0, 12),
         PaddingLeft = UDim.new(0, 16),
         PaddingRight = UDim.new(0, 16),
     }, container)
+
     local n = 0
     return function(text, kind)
         n = n + 1
-        local col = kind == "ok" and C.green or kind == "err" and C.red or kind == "warn" and C.yellow or C.accent
+        local col = kind == "ok" and C.green
+                or kind == "err" and C.red
+                or kind == "warn" and C.yellow
+                or C.accent
+
         local t = create("Frame", {
             Size = UDim2.new(1, 0, 0, 0),
             BackgroundColor3 = C.surface2,
@@ -226,7 +333,11 @@ local function makeToast(parentFrame)
             LayoutOrder = n,
         }, container)
         corner(t, 10)
-        create("Frame", { Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = col, BorderSizePixel = 0 }, t)
+        create("Frame", {
+            Size = UDim2.new(0, 3, 1, 0),
+            BackgroundColor3 = col,
+            BorderSizePixel = 0,
+        }, t)
         create("TextLabel", {
             Position = UDim2.new(0, 12, 0, 0),
             Size = UDim2.new(1, -20, 1, 0),
@@ -238,9 +349,11 @@ local function makeToast(parentFrame)
             TextWrapped = true,
             TextXAlignment = Enum.TextXAlignment.Left,
         }, t)
+
         TweenService:Create(t, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Size = UDim2.new(1, 0, 0, 38),
         }):Play()
+
         task.delay(3.2, function()
             if t.Parent then
                 TweenService:Create(t, TweenInfo.new(0.2), {
@@ -254,7 +367,6 @@ local function makeToast(parentFrame)
     end
 end
 
--- AUTH GUI
 local authGui = create("ScreenGui", {
     Name = "RH_HUB_AUTH_GUI",
     ResetOnSpawn = false,
@@ -264,7 +376,7 @@ local authGui = create("ScreenGui", {
 })
 safeParent(authGui)
 
-create("Frame", {
+local authBg = create("Frame", {
     Size = UDim2.fromScale(1, 1),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
@@ -287,7 +399,9 @@ local function authFit()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local vp = cam.ViewportSize
-    authMain.Size = UDim2.fromOffset(math.min(320, vp.X - 24), math.min(400, vp.Y - 60))
+    local w = math.min(320, vp.X - 24)
+    local h = math.min(400, vp.Y - 60)
+    authMain.Size = UDim2.fromOffset(w, h)
 end
 authFit()
 if workspace.CurrentCamera then
@@ -333,7 +447,9 @@ task.spawn(function()
     local hue = 0
     while authGui.Parent do
         hue = (hue + 0.008) % 1
-        if authTitle.Parent then authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1) end
+        if authTitle.Parent then
+            authTitle.TextColor3 = Color3.fromHSV(hue, 0.7, 1)
+        end
         task.wait(0.05)
     end
 end)
@@ -410,10 +526,14 @@ local authPasteBtn = create("TextButton", {
 corner(authPasteBtn, 9)
 
 authKeyBox.Focused:Connect(function()
-    TweenService:Create(authInputStroke, TweenInfo.new(0.15), { Color = C.accent, Transparency = 0 }):Play()
+    TweenService:Create(authInputStroke, TweenInfo.new(0.15), {
+        Color = C.accent, Transparency = 0,
+    }):Play()
 end)
 authKeyBox.FocusLost:Connect(function()
-    TweenService:Create(authInputStroke, TweenInfo.new(0.15), { Color = C.border, Transparency = 0.1 }):Play()
+    TweenService:Create(authInputStroke, TweenInfo.new(0.15), {
+        Color = C.border, Transparency = 0.1,
+    }):Play()
 end)
 
 local authActBtn = create("TextButton", {
@@ -458,10 +578,15 @@ local authStatus = create("TextLabel", {
 
 local function setStatus(text, kind)
     authStatus.Text = tostring(text)
-    if kind == "ok" then authStatus.TextColor3 = C.green
-    elseif kind == "err" then authStatus.TextColor3 = C.red
-    elseif kind == "warn" then authStatus.TextColor3 = C.yellow
-    else authStatus.TextColor3 = C.muted end
+    if kind == "ok" then
+        authStatus.TextColor3 = C.green
+    elseif kind == "err" then
+        authStatus.TextColor3 = C.red
+    elseif kind == "warn" then
+        authStatus.TextColor3 = C.yellow
+    else
+        authStatus.TextColor3 = C.muted
+    end
 end
 
 local authToast = makeToast(authGui)
@@ -480,6 +605,7 @@ end
 
 authPasteBtn.MouseButton1Click:Connect(function()
     if STATE.busy then return end
+
     local value = nil
     if type(getclipboard) == "function" then
         local ok, v = pcall(getclipboard)
@@ -489,6 +615,7 @@ authPasteBtn.MouseButton1Click:Connect(function()
         local ok, v = pcall(getClipboard)
         if ok and type(v) == "string" and v ~= "" then value = v end
     end
+
     if value and value ~= "" then
         value = value:gsub("%s+", "")
         authKeyBox.Text = value
@@ -501,64 +628,102 @@ authPasteBtn.MouseButton1Click:Connect(function()
 end)
 
 local tgCooldown = false
+
 authTgBtn.MouseButton1Click:Connect(function()
     if tgCooldown then return end
     tgCooldown = true
+
     local copied = false
-    if type(setclipboard) == "function" then copied = pcall(setclipboard, CONFIG.TG_LINK)
-    elseif type(toclipboard) == "function" then copied = pcall(toclipboard, CONFIG.TG_LINK) end
+    if type(setclipboard) == "function" then
+        copied = pcall(setclipboard, CONFIG.TG_LINK)
+    elseif type(toclipboard) == "function" then
+        copied = pcall(toclipboard, CONFIG.TG_LINK)
+    end
+
     if copied then
-        authToast("Ссылка скопирована", "ok")
+        authToast("Ссылка скопирована! Вставьте в браузер", "ok")
         setStatus("Ссылка в буфере", "ok")
     else
         authToast("Скопируйте вручную", "warn")
         setStatus("Ссылка: " .. CONFIG.TG_LINK, "warn")
     end
-    task.delay(2.5, function() tgCooldown = false end)
+
+    task.delay(2.5, function()
+        tgCooldown = false
+    end)
 end)
 
 local onAuthSuccess
 
 local function activateKey(rawKey)
     local key = tostring(rawKey or ""):gsub("%s+", "")
+
     if key == "" then
         setStatus("Введите ключ доступа", "warn")
         authToast("Ключ пустой", "warn")
         return
     end
+
     if STATE.busy then return end
     setBusy(true)
     setStatus("Активация ключа...", nil)
+
     task.spawn(function()
         if type(STATE.deviceId) ~= "string" or STATE.deviceId == "" then
             STATE.deviceId = generateDeviceId()
         end
+
         local body = { key = key, install_hash = STATE.deviceId }
+
         local result, err, attempts = apiWithRetry("/activate", body, CONFIG.RETRY_MAX, CONFIG.RETRY_DELAY)
+
+        if attempts > 1 and result then
+            setStatus("Попытка " .. attempts .. " успешна", "ok")
+        end
+
         if not result then
             setBusy(false)
             local msg = tostring(err or "неизвестная ошибка")
             local low = msg:lower()
-            if low:find("invalid license") then setStatus("❌ Неверный ключ", "err")
-            elseif low:find("bound to another") then setStatus("❌ Ключ занят", "err")
-            elseif low:find("expired") then setStatus("❌ Ключ истёк", "err")
-            else setStatus("❌ " .. msg, "err") end
-            authToast(msg, "err")
+
+            if low:find("invalid license") then
+                setStatus("❌ Неверный ключ", "err")
+                authToast("Неверный ключ", "err")
+            elseif low:find("bound to another") then
+                setStatus("❌ Ключ привязан к другому устройству", "err")
+                authToast("Ключ занят другим устройством", "err")
+            elseif low:find("expired") then
+                setStatus("❌ Ключ истёк", "err")
+                authToast("Ключ истёк", "err")
+            elseif low:find("таймаут") or low:find("timeout") then
+                setStatus("❌ Сервер не отвечает. Попробуй позже.", "err")
+                authToast("Сервер не отвечает", "err")
+            else
+                setStatus("❌ " .. msg, "err")
+                authToast(msg, "err")
+            end
             return
         end
+
         if type(result.token) ~= "string" or result.token == "" then
             setBusy(false)
             setStatus("❌ Сервер не выдал токен", "err")
+            authToast("Пустой ответ", "err")
             return
         end
+
         setBusy(false)
         onAuthSuccess(result.token)
     end)
 end
 
 local function verifySavedToken(token)
-    if type(token) ~= "string" or token == "" then return false, "no_token" end
+    if type(token) ~= "string" or token == "" then
+        return false, "no_token"
+    end
+
     local result, err = api("/verify", { token = token })
+
     if not result then
         local errText = tostring(err or ""):lower()
         if errText:find("expired") then
@@ -567,7 +732,11 @@ local function verifySavedToken(token)
         end
         return false, "request_failed"
     end
-    if result.valid ~= true then return false, "invalid" end
+
+    if result.valid ~= true then
+        return false, "invalid"
+    end
+
     return true, "ok"
 end
 
@@ -577,33 +746,58 @@ authActBtn.MouseButton1Click:Connect(function()
 end)
 
 authKeyBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed and not STATE.busy then activateKey(authKeyBox.Text) end
+    if enterPressed and not STATE.busy then
+        activateKey(authKeyBox.Text)
+    end
 end)
 
 task.spawn(function()
     task.wait(0.3)
+
     local saved = loadToken()
-    if not saved then setStatus("Введите ключ доступа", nil) return end
+    if not saved then
+        setStatus("Введите ключ доступа", nil)
+        return
+    end
+
     setStatus("Проверка сессии...", nil)
     setBusy(true)
+
     local valid, reason = verifySavedToken(saved)
+
     if valid then
         setBusy(false)
         onAuthSuccess(saved)
     else
         setBusy(false)
-        if reason == "expired" then setStatus("⏱ Ключ истёк", "warn")
+        if reason == "expired" then
+            setStatus("⏱ Ключ истёк", "warn")
+            authToast("Нужен новый ключ", "warn")
         elseif reason == "invalid" then
             clearToken()
             setStatus("Сессия недействительна", "warn")
-        else setStatus("Введите ключ доступа", nil) end
+        else
+            setStatus("Введите ключ доступа", nil)
+        end
     end
 end)
 
-_G.RH_HUB_IS_WALKSPEED_ON = function() return false end
-_G.RH_HUB_FARM_ACTIVE = function() return false end
+-- [КОНЕЦ ЧАСТИ 1]
 
--- MAIN GUI
+-- ============ ГЛОБАЛЬНЫЕ ЭКСПОРТЫ (до всего остального) ============
+-- Будут переопределены в MOVE-секции, но объявлены сейчас,
+-- чтобы Часть 3 не падала при вызове
+_G.RH_HUB_IS_WALKSPEED_ON = function() return false end
+_G.RH_HUB_IS_RUSH_ON = function() return false end
+_G.RH_HUB_RUSH_ACTIVE = function() return false end
+_G.RH_HUB_SET_RUSH_VISIBLE = function(v) end
+_G.RH_HUB_SET_RUSH_SPEED = function(v) end
+_G.RH_HUB_SET_RUSH_HEIGHT = function(v) end
+_G.RH_HUB_ENTER_RUSH_EDIT = function(v) end
+_G.RH_HUB_RUSH_SPEED = 200
+_G.RH_HUB_RUSH_HEIGHT = 5
+
+-- ============ MAIN GUI ============
 local mainGui = create("ScreenGui", {
     Name = "RH_HUB_GUI",
     ResetOnSpawn = false,
@@ -613,11 +807,14 @@ local mainGui = create("ScreenGui", {
 })
 safeParent(mainGui)
 
+local WIN_W = CONFIG.WINDOW_W
+local WIN_H = CONFIG.WINDOW_H
+
 local main = create("Frame", {
     Name = "MainWindow",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(CONFIG.WINDOW_W, CONFIG.WINDOW_H),
+    Size = UDim2.fromOffset(WIN_W, WIN_H),
     BackgroundColor3 = C.bg,
     BorderSizePixel = 0,
     ClipsDescendants = true,
@@ -629,13 +826,16 @@ local function fitMain()
     local cam = workspace.CurrentCamera
     if not cam then return end
     local vp = cam.ViewportSize
-    main.Size = UDim2.fromOffset(math.min(CONFIG.WINDOW_W, vp.X - 20), math.min(CONFIG.WINDOW_H, vp.Y - 60))
+    local w = math.min(WIN_W, vp.X - 20)
+    local h = math.min(WIN_H, vp.Y - 60)
+    main.Size = UDim2.fromOffset(w, h)
 end
 fitMain()
 if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain)
 end
 
+-- ============ HEADER ============
 local header = create("Frame", {
     Name = "Header",
     Size = UDim2.new(1, 0, 0, 46),
@@ -688,7 +888,9 @@ task.spawn(function()
     local hue = 0
     while mainGui.Parent do
         hue = (hue + 0.008) % 1
-        if titleLabel.Parent then titleLabel.TextColor3 = Color3.fromHSV(hue, 0.65, 1) end
+        if titleLabel.Parent then
+            titleLabel.TextColor3 = Color3.fromHSV(hue, 0.65, 1)
+        end
         task.wait(0.05)
     end
 end)
@@ -719,11 +921,13 @@ local circleBtn = create("TextButton", {
 }, header)
 corner(circleBtn, 8)
 
+-- ============ NAV TABS ============
 local navBar = create("Frame", {
     Position = UDim2.new(0, 8, 0, 52),
     Size = UDim2.new(1, -16, 0, 34),
     BackgroundTransparency = 1,
 }, main)
+
 create("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
     HorizontalAlignment = Enum.HorizontalAlignment.Center,
@@ -744,8 +948,8 @@ local navButtons = {}
 
 local TABS = {
     {id = "HOME",     name = "HOME"},
+    {id = "FARM",     name = "FARM"},
     {id = "MOVE",     name = "MOVE"},
-    {id = "GAMES",    name = "GAMES"},
     {id = "VISUAL",   name = "VISUAL"},
     {id = "TELEPORT", name = "TP"},
     {id = "SETTINGS", name = "SET"},
@@ -764,22 +968,33 @@ local function createPage(name)
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         Visible = false,
     }, content)
+
     create("UIPadding", {
         PaddingTop = UDim.new(0, 4),
         PaddingBottom = UDim.new(0, 12),
         PaddingLeft = UDim.new(0, 2),
         PaddingRight = UDim.new(0, 4),
     }, page)
-    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }, page)
+
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+    }, page)
+
     pages[name] = page
     return page
 end
 
 local activeTab = "HOME"
+
 local function selectTab(name)
     if not pages[name] then return end
     activeTab = name
-    for tabName, page in pairs(pages) do page.Visible = tabName == name end
+
+    for tabName, page in pairs(pages) do
+        page.Visible = tabName == name
+    end
+
     for tabId, btn in pairs(navButtons) do
         local sel = tabId == name
         btn.BackgroundColor3 = sel and C.accent or C.button
@@ -790,7 +1005,7 @@ end
 local function makeNavButton(id, label, order)
     local b = create("TextButton", {
         Name = id,
-        Size = UDim2.new(1/7, -3, 1, 0),
+        Size = UDim2.new(1/#TABS, -3, 1, 0),
         BackgroundColor3 = C.button,
         BorderSizePixel = 0,
         Text = label,
@@ -801,16 +1016,22 @@ local function makeNavButton(id, label, order)
         LayoutOrder = order,
     }, navBar)
     corner(b, 8)
-    b.MouseButton1Click:Connect(function() selectTab(id) end)
+
+    b.MouseButton1Click:Connect(function()
+        selectTab(id)
+    end)
+
     navButtons[id] = b
     return b
 end
 
-for i, tab in ipairs(TABS) do makeNavButton(tab.id, tab.name, i) end
+for i, tab in ipairs(TABS) do
+    makeNavButton(tab.id, tab.name, i)
+end
 
 local homePage     = createPage("HOME")
+local farmPage     = createPage("FARM")
 local movePage     = createPage("MOVE")
-local gamesPage    = createPage("GAMES")
 local visualPage   = createPage("VISUAL")
 local tpPage       = createPage("TELEPORT")
 local settingsPage = createPage("SETTINGS")
@@ -836,6 +1057,7 @@ local function infoCard(parent, heading, body)
         BorderSizePixel = 0,
     }, parent)
     corner(frame, 10)
+
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 8),
         Size = UDim2.new(1, -20, 0, 16),
@@ -846,6 +1068,7 @@ local function infoCard(parent, heading, body)
         TextSize = 11,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, frame)
+
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 26),
         Size = UDim2.new(1, -20, 0, 28),
@@ -858,6 +1081,7 @@ local function infoCard(parent, heading, body)
         TextXAlignment = Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Top,
     }, frame)
+
     return frame
 end
 
@@ -868,6 +1092,7 @@ local function soonCard(parent)
         BorderSizePixel = 0,
     }, parent)
     corner(frame, 12)
+
     create("TextLabel", {
         Position = UDim2.new(0, 0, 0, 30),
         Size = UDim2.new(1, 0, 0, 30),
@@ -878,6 +1103,7 @@ local function soonCard(parent)
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Center,
     }, frame)
+
     create("TextLabel", {
         Position = UDim2.new(0, 10, 0, 68),
         Size = UDim2.new(1, -20, 0, 20),
@@ -888,365 +1114,271 @@ local function soonCard(parent)
         Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Center,
     }, frame)
+
+    create("TextLabel", {
+        Position = UDim2.new(0, 10, 0, 90),
+        Size = UDim2.new(1, -20, 0, 16),
+        BackgroundTransparency = 1,
+        Text = "Функционал в разработке",
+        TextColor3 = C.muted,
+        TextSize = 9,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Center,
+    }, frame)
+
     return frame
 end
 
-local function AddToggle(parentPage, title, description, defaultState, callback)
-    local toggled = defaultState or false
-    local ToggleContainer = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 50),
-        BackgroundColor3 = C.surface,
-        BorderSizePixel = 0,
-    }, parentPage)
-    corner(ToggleContainer, 12)
-    stroke(ToggleContainer, C.border, 1, 0.3)
-    create("TextLabel", {
-        Size = UDim2.new(1, -70, 0, 18),
-        Position = UDim2.new(0, 15, 0, 8),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = title,
-        TextColor3 = C.text,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, ToggleContainer)
-    create("TextLabel", {
-        Size = UDim2.new(1, -70, 0, 15),
-        Position = UDim2.new(0, 15, 0, 26),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.Gotham,
-        Text = description or "",
-        TextColor3 = C.muted,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, ToggleContainer)
-    local SwitchBg = create("Frame", {
-        Size = UDim2.new(0, 42, 0, 22),
-        Position = UDim2.new(1, -54, 0.5, -11),
-        BackgroundColor3 = toggled and C.accent or C.button,
-        BorderSizePixel = 0,
-    }, ToggleContainer)
-    corner(SwitchBg, 11)
-    local SwitchKnob = create("Frame", {
-        Size = UDim2.fromOffset(16, 16),
-        Position = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BorderSizePixel = 0,
-    }, SwitchBg)
-    corner(SwitchKnob, 8)
-    local ClickBtn = create("TextButton", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "",
-    }, ToggleContainer)
-    local function Update(state, noCallback)
-        toggled = state
-        local targetColor = toggled and C.accent or C.button
-        local targetPos = toggled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-        TweenService:Create(SwitchBg, TweenInfo.new(0.2), { BackgroundColor3 = targetColor }):Play()
-        TweenService:Create(SwitchKnob, TweenInfo.new(0.2), { Position = targetPos }):Play()
-        if not noCallback and callback then pcall(function() callback(toggled) end) end
-    end
-    ClickBtn.MouseButton1Click:Connect(function() Update(not toggled) end)
-    return { Set = function(state) Update(state) end, Get = function() return toggled end }
-end
+-- ============ AUTOFARM: FILTER / STATE TEST SCAFFOLD ============
+-- Safe integration scaffold: selection, validation and state diagnostics only.
+-- No game-object scanning, movement, collection, or remote calls are performed here.
 
-local function AddSlider(parentPage, title, min, max, default, callback)
-    local value = default or min
-    local SliderContainer = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 60),
-        BackgroundColor3 = C.surface,
-        BorderSizePixel = 0,
-    }, parentPage)
-    corner(SliderContainer, 12)
-    stroke(SliderContainer, C.border, 1, 0.3)
-    create("TextLabel", {
-        Size = UDim2.new(1, -70, 0, 18),
-        Position = UDim2.new(0, 15, 0, 10),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = title,
-        TextColor3 = C.text,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, SliderContainer)
-    local ValueLabel = create("TextLabel", {
-        Size = UDim2.new(0, 50, 0, 18),
-        Position = UDim2.new(1, -65, 0, 10),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamMedium,
-        Text = tostring(value),
-        TextColor3 = C.accent,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Right,
-    }, SliderContainer)
-    local SliderTrack = create("Frame", {
-        Size = UDim2.new(1, -30, 0, 6),
-        Position = UDim2.new(0, 15, 0, 40),
-        BackgroundColor3 = C.button,
-        BorderSizePixel = 0,
-    }, SliderContainer)
-    corner(SliderTrack, 3)
-    local SliderFill = create("Frame", {
-        Size = UDim2.new(math.clamp((value - min) / (max - min), 0, 1), 0, 1, 0),
-        BackgroundColor3 = C.accent,
-        BorderSizePixel = 0,
-    }, SliderTrack)
-    corner(SliderFill, 3)
-    local SliderKnob = create("Frame", {
-        Size = UDim2.fromOffset(12, 12),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(SliderFill.Size.X.Scale, 0, 0.5, 0),
-        BackgroundColor3 = Color3.new(1, 1, 1),
-        BorderSizePixel = 0,
-    }, SliderTrack)
-    corner(SliderKnob, 6)
-    local sliding = false
-    local function UpdateSlider(input)
-        local posX = input.Position.X - SliderTrack.AbsolutePosition.X
-        local pct = math.clamp(posX / SliderTrack.AbsoluteSize.X, 0, 1)
-        value = math.floor(min + (max - min) * pct)
-        SliderFill.Size = UDim2.new(pct, 0, 1, 0)
-        SliderKnob.Position = UDim2.new(pct, 0, 0.5, 0)
-        ValueLabel.Text = tostring(value)
-        if callback then pcall(function() callback(value) end) end
-    end
-    SliderTrack.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            sliding = true
-            UpdateSlider(input)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            UpdateSlider(input)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            sliding = false
-        end
-    end)
-    return {
-        Set = function(val)
-            value = math.clamp(val, min, max)
-            local pct = (value - min) / (max - min)
-            SliderFill.Size = UDim2.new(pct, 0, 1, 0)
-            SliderKnob.Position = UDim2.new(pct, 0, 0.5, 0)
-            ValueLabel.Text = tostring(value)
-            if callback then pcall(function() callback(value) end) end
-        end,
-        Get = function() return value end
+local FarmConfig = {
+    SelectedZones = { Forest = true },
+    SelectedRarities = { Rare = true },
+}
+
+local FARM_ZONES = {
+    "Forest", "Lake", "Desert", "Jungle", "Snow", "Volcano",
+    "Abyss Ocean", "Prehistoric", "Cosmic", "Cherry Blossom",
+    "Titan Temple", "Light Dark",
+}
+local FARM_RARITIES = {
+    "Common", "Uncommon", "Rare", "Epic", "Legendary",
+    "Mythic", "Cosmic", "Secret", "Eternal", "Divine",
+}
+
+local FarmState = {
+    state = "STOPPED",
+    revision = 0,
+    lastMessage = "Готово к тестированию фильтров",
+    history = {},
+}
+
+local function farmLog(event, details)
+    FarmState.history[#FarmState.history + 1] = {
+        event = tostring(event),
+        details = tostring(details or ""),
+        timestamp = os.time(),
     }
+    while #FarmState.history > 80 do
+        table.remove(FarmState.history, 1)
+    end
+    FarmState.lastMessage = tostring(event) .. (details and (": " .. tostring(details)) or "")
 end
 
-local function AddButton(parentPage, title, description, callback)
-    local ButtonContainer = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 50),
+local function resolveFarmZone(value)
+    if type(value) ~= "string" then return nil, "UNKNOWN_ZONE" end
+    for _, zone in ipairs(FARM_ZONES) do
+        if zone == value then return zone end
+    end
+    return nil, "UNKNOWN_ZONE"
+end
+
+local function resolveFarmRarity(value)
+    if type(value) ~= "string" then return nil, "UNKNOWN_RARITY" end
+    local lower = string.lower(value)
+    for _, rarity in ipairs(FARM_RARITIES) do
+        if string.lower(rarity) == lower then return rarity end
+    end
+    return nil, "UNKNOWN_RARITY"
+end
+
+local function validateFarmCandidate(item)
+    if type(item) ~= "table" then return false, "INVALID_ITEM" end
+    local zone, zoneErr = resolveFarmZone(item.Zone)
+    if not zone then return false, zoneErr end
+    local rarity, rarityErr = resolveFarmRarity(item.Rarity)
+    if not rarity then return false, rarityErr end
+    if FarmConfig.SelectedZones[zone] ~= true then return false, "ZONE_NOT_SELECTED" end
+    if FarmConfig.SelectedRarities[rarity] ~= true then return false, "RARITY_NOT_SELECTED" end
+    return true, zone .. " / " .. rarity
+end
+
+section(farmPage, "AUTOFARM • ФИЛЬТРЫ")
+infoCard(farmPage, "РЕЖИМ РАЗРАБОТКИ", "Сейчас доступны выбор зон/редкостей и тестирование правил. Автоматический сбор не запускается этим блоком.")
+
+local function addFarmToggle(parent, label, selected, onChanged)
+    local row = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 34),
         BackgroundColor3 = C.surface,
         BorderSizePixel = 0,
-    }, parentPage)
-    corner(ButtonContainer, 12)
-    stroke(ButtonContainer, C.border, 1, 0.3)
+    }, parent)
+    corner(row, 8)
     create("TextLabel", {
-        Size = UDim2.new(1, -30, 0, 18),
-        Position = UDim2.new(0, 15, 0, 8),
+        Position = UDim2.new(0, 10, 0, 0),
+        Size = UDim2.new(1, -60, 1, 0),
         BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = title,
+        Text = label,
         TextColor3 = C.text,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, ButtonContainer)
-    create("TextLabel", {
-        Size = UDim2.new(1, -30, 0, 15),
-        Position = UDim2.new(0, 15, 0, 26),
-        BackgroundTransparency = 1,
         Font = Enum.Font.Gotham,
-        Text = description or "",
-        TextColor3 = C.muted,
-        TextSize = 11,
+        TextSize = 10,
         TextXAlignment = Enum.TextXAlignment.Left,
-    }, ButtonContainer)
-    local ClickBtn = create("TextButton", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "",
-    }, ButtonContainer)
-    ClickBtn.MouseEnter:Connect(function()
-        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), { BackgroundColor3 = C.surface2 }):Play()
+    }, row)
+    local button = create("TextButton", {
+        Position = UDim2.new(1, -46, 0.5, -11),
+        Size = UDim2.fromOffset(36, 22),
+        BackgroundColor3 = selected and C.accent or C.button,
+        BorderSizePixel = 0,
+        Text = selected and "ON" or "OFF",
+        TextColor3 = C.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 9,
+        AutoButtonColor = true,
+    }, row)
+    corner(button, 7)
+    local value = selected == true
+    button.MouseButton1Click:Connect(function()
+        value = not value
+        button.Text = value and "ON" or "OFF"
+        button.BackgroundColor3 = value and C.accent or C.button
+        onChanged(value)
+        FarmState.revision = FarmState.revision + 1
+        farmLog("FILTER_CHANGED", label .. "=" .. tostring(value))
     end)
-    ClickBtn.MouseLeave:Connect(function()
-        TweenService:Create(ButtonContainer, TweenInfo.new(0.2), { BackgroundColor3 = C.surface }):Play()
-    end)
-    ClickBtn.MouseButton1Click:Connect(function() if callback then pcall(callback) end end)
+    return row
 end
 
-local function AddMultiDropdown(parentPage, title, options, selectedMap, callback)
-    selectedMap = selectedMap or {}
-    local isExpanded = false
-    local DropdownContainer = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 48),
-        BackgroundColor3 = C.surface,
-        BorderSizePixel = 0,
-        ClipsDescendants = true,
-    }, parentPage)
-    corner(DropdownContainer, 12)
-    stroke(DropdownContainer, C.border, 1, 0.3)
-    create("TextLabel", {
-        Size = UDim2.new(0, 150, 0, 48),
-        Position = UDim2.new(0, 15, 0, 0),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = title,
-        TextColor3 = C.text,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, DropdownContainer)
-    local function CountSelected()
-        local c = 0
-        for _, opt in ipairs(options) do if selectedMap[opt] == true then c = c + 1 end end
-        return c
-    end
-    local SelectedBtn = create("TextButton", {
-        Size = UDim2.new(0, 160, 0, 28),
-        Position = UDim2.new(1, -175, 0, 10),
-        BackgroundColor3 = C.surface2,
-        Font = Enum.Font.GothamMedium,
-        Text = tostring(CountSelected()) .. " / " .. tostring(#options) .. "  ▼",
-        TextColor3 = C.text,
-        TextSize = 12,
-    }, DropdownContainer)
-    corner(SelectedBtn, 6)
-    local ListHolder = create("ScrollingFrame", {
-        Size = UDim2.new(1, -30, 0, 0),
-        Position = UDim2.new(0, 15, 0, 48),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 2,
-        ScrollBarImageColor3 = C.border,
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-    }, DropdownContainer)
-    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) }, ListHolder)
-    local optionButtons = {}
-    local function UpdateButtonVisual(opt, btn)
-        if selectedMap[opt] == true then
-            btn.BackgroundColor3 = C.accent
-            btn.TextColor3 = Color3.new(1, 1, 1)
-        else
-            btn.BackgroundColor3 = C.surface
-            btn.TextColor3 = C.muted
-        end
-    end
-    local function RefreshOptions(newOptions)
-        for _, child in ipairs(ListHolder:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
-        end
-        optionButtons = {}
-        for _, opt in ipairs(newOptions) do
-            local OptBtn = create("TextButton", {
-                Size = UDim2.new(1, 0, 0, 28),
-                BorderSizePixel = 0,
-                Font = Enum.Font.Gotham,
-                Text = tostring(opt),
-                TextSize = 12,
-            }, ListHolder)
-            corner(OptBtn, 4)
-            optionButtons[opt] = OptBtn
-            UpdateButtonVisual(opt, OptBtn)
-            OptBtn.MouseButton1Click:Connect(function()
-                selectedMap[opt] = not (selectedMap[opt] == true)
-                UpdateButtonVisual(opt, OptBtn)
-                SelectedBtn.Text = tostring(CountSelected()) .. " / " .. tostring(#newOptions) .. "  ▼"
-                if callback then pcall(function() callback(selectedMap) end) end
-            end)
-        end
-    end
-    RefreshOptions(options)
-    SelectedBtn.MouseButton1Click:Connect(function()
-        isExpanded = not isExpanded
-        if isExpanded then
-            local listHeight = math.clamp(#options * 32, 32, 140)
-            ListHolder.Size = UDim2.new(1, -30, 0, listHeight)
-            TweenService:Create(DropdownContainer, TweenInfo.new(0.25), { Size = UDim2.new(1, 0, 0, 52 + listHeight) }):Play()
-        else
-            TweenService:Create(DropdownContainer, TweenInfo.new(0.2), { Size = UDim2.new(1, 0, 0, 48) }):Play()
-            ListHolder.Size = UDim2.new(1, -30, 0, 0)
-        end
+section(farmPage, "ЗОНЫ — выбери только нужные")
+for _, zoneName in ipairs(FARM_ZONES) do
+    local initial = FarmConfig.SelectedZones[zoneName] == true
+    addFarmToggle(farmPage, zoneName, initial, function(enabled)
+        FarmConfig.SelectedZones[zoneName] = enabled and true or nil
     end)
-    return {
-        Get = function() return selectedMap end,
-        SetMap = function(newMap)
-            selectedMap = newMap
-            for opt, btn in pairs(optionButtons) do UpdateButtonVisual(opt, btn) end
-            SelectedBtn.Text = tostring(CountSelected()) .. " / " .. tostring(#options) .. "  ▼"
-            if callback then pcall(function() callback(selectedMap) end) end
-        end
-    }
 end
+
+section(farmPage, "РЕДКОСТИ — никаких исключений")
+for _, rarityName in ipairs(FARM_RARITIES) do
+    local initial = FarmConfig.SelectedRarities[rarityName] == true
+    addFarmToggle(farmPage, rarityName, initial, function(enabled)
+        FarmConfig.SelectedRarities[rarityName] = enabled and true or nil
+    end)
+end
+
+section(farmPage, "ПРОВЕРКА ПРАВИЛ")
+local farmStatus = create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 44),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Text = "Состояние: STOPPED\nВыбери фильтры и запусти тест.",
+    TextColor3 = C.muted,
+    Font = Enum.Font.Gotham,
+    TextSize = 10,
+    TextWrapped = true,
+}, farmPage)
+corner(farmStatus, 8)
+
+local function makeFarmActionButton(label, color)
+    local b = create("TextButton", {
+        Size = UDim2.new(1, 0, 0, 34),
+        BackgroundColor3 = color or C.button,
+        BorderSizePixel = 0,
+        Text = label,
+        TextColor3 = C.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 10,
+        AutoButtonColor = true,
+    }, farmPage)
+    corner(b, 8)
+    return b
+end
+
+local testFarmButton = makeFarmActionButton("ПРОВЕРИТЬ ТЕСТОВЫЕ КАНДИДАТЫ", C.accent)
+local clearFarmLogButton = makeFarmActionButton("ОЧИСТИТЬ ЖУРНАЛ", C.button)
+local farmLogLabel = create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 90),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Text = "Журнал: пусто",
+    TextColor3 = C.muted,
+    Font = Enum.Font.Code,
+    TextSize = 9,
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+}, farmPage)
+corner(farmLogLabel, 8)
+
+local function refreshFarmLog()
+    local lines = {}
+    local first = math.max(1, #FarmState.history - 5)
+    for i = first, #FarmState.history do
+        local entry = FarmState.history[i]
+        lines[#lines + 1] = entry.event .. " " .. entry.details
+    end
+    farmLogLabel.Text = (#lines > 0) and table.concat(lines, "\n") or "Журнал: пусто"
+end
+
+testFarmButton.MouseButton1Click:Connect(function()
+    local mocks = {
+        { Zone = "Forest", Rarity = "Rare" },
+        { Zone = "Forest", Rarity = "Secret" },
+        { Zone = "Desert", Rarity = "Rare" },
+        { Zone = "Unknown", Rarity = "Rare" },
+        { Zone = "Forest", Rarity = "Unknown" },
+    }
+    local accepted, rejected = 0, 0
+    for _, candidate in ipairs(mocks) do
+        local ok, reason = validateFarmCandidate(candidate)
+        if ok then
+            accepted = accepted + 1
+            farmLog("TEST_ACCEPT", reason)
+        else
+            rejected = rejected + 1
+            farmLog("TEST_REJECT", tostring(candidate.Zone) .. "/" .. tostring(candidate.Rarity) .. " => " .. reason)
+        end
+    end
+    FarmState.state = "STOPPED"
+    farmStatus.Text = "Состояние: STOPPED\nТест завершён: принято " .. accepted .. ", отклонено " .. rejected .. "."
+    farmLog("TEST_COMPLETE", "accepted=" .. accepted .. ", rejected=" .. rejected)
+    refreshFarmLog()
+end)
+
+clearFarmLogButton.MouseButton1Click:Connect(function()
+    FarmState.history = {}
+    FarmState.lastMessage = "Журнал очищен"
+    refreshFarmLog()
+end)
+
+farmLog("INIT", "Filter/test scaffold loaded")
 
 -- ============ HOME ============
 section(homePage, "ГЛАВНАЯ")
-infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки.")
-infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён.")
-infoCard(homePage, "ИГРЫ", "Вкладка GAMES — список игр с авто-скриптами.")
+infoCard(homePage, "RH-HUB  •  МУЛЬТИ-ИНСТРУМЕНТ", "Добро пожаловать. Используй вкладки для перехода к функциям.")
+infoCard(homePage, "АВТОРИЗАЦИЯ ПРОЙДЕНА", "Твой токен сохранён. При следующем запуске вход автоматический.")
+infoCard(homePage, "ТАЙМЕР КЛЮЧА", "Справа вверху видно оставшееся время действия ключа.")
+infoCard(homePage, "РЕЖИМ ОВЕРЛЕЯ", "«—» — оверлей RH | FPS | PING. «⌄» — свёрнуть в кружок HUB.")
 
 -- ============ MOVE ============
 section(movePage, "ДВИЖЕНИЕ И СКОРОСТЬ")
 
 local walkSpeedEnabled = false
-local walkSpeedValue = 200
+local stealthEnabled = false
+local walkSpeedValue = 100
+local rushModeEnabled = false
+local rushSpeedValue = 200
+local rushHeightValue = 5
+
+-- Экспорты (реальные, перезаписывают заглушки сверху)
 _G.RH_HUB_IS_WALKSPEED_ON = function() return walkSpeedEnabled end
+_G.RH_HUB_IS_RUSH_ON = function() return rushModeEnabled end
+_G.RH_HUB_RUSH_SPEED = rushSpeedValue
+_G.RH_HUB_RUSH_HEIGHT = rushHeightValue
 
-local SPEEDHACK = { stepLimit = 30, smoothFactor = 0.35, raycast = false }
-local smoothedDir = Vector3.zero
-local SPEED_BIND_NAME = "RH_HUB_SPEEDHACK"
+local currentHumanoid = nil
+local currentHRP = nil
+local currentLinearVelocity = nil
+local currentBodyVelocity = nil
+local currentAttachment = nil
 
-local function getCharacter()
-    local char = LocalPlayer.Character
-    if not char then return nil, nil, nil end
-    return char, char:FindFirstChild("HumanoidRootPart"), char:FindFirstChildOfClass("Humanoid")
-end
-
-local function safeMove(hrp, char, dir, totalDistance)
-    if dir.Magnitude == 0 or totalDistance <= 0 then return end
-    dir = dir.Unit
-    local remaining = totalDistance
-    while remaining > 0 do
-        local step = math.min(remaining, SPEEDHACK.stepLimit)
-        remaining -= step
-        local nextPos = hrp.Position + dir * step
-        hrp.CFrame = CFrame.new(nextPos) * (hrp.CFrame - hrp.CFrame.Position)
-    end
-end
-
-local function speedhackStep(dt)
-    if not walkSpeedEnabled then return end
-    if _G.RH_HUB_FARM_ACTIVE and _G.RH_HUB_FARM_ACTIVE() then return end
-    local char, hrp, hum = getCharacter()
-    if not char or not hrp or not hum then return end
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-    if hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
-    local dir = hum.MoveDirection
-    dir = Vector3.new(dir.X, 0, dir.Z)
-    if dir.Magnitude < 0.01 then smoothedDir = Vector3.zero return end
-    dir = dir.Unit
-    smoothedDir = smoothedDir:Lerp(dir, SPEEDHACK.smoothFactor)
-    if smoothedDir.Magnitude < 0.05 then smoothedDir = Vector3.zero return end
-    safeMove(hrp, char, smoothedDir, walkSpeedValue * dt)
-end
-
-RunService:BindToRenderStep(SPEED_BIND_NAME, Enum.RenderPriority.Character.Value + 1, speedhackStep)
-LocalPlayer.CharacterAdded:Connect(function() smoothedDir = Vector3.zero end)
-
+-- ===== UI: TOGGLE WALKSPEED =====
 local walkSpeedToggleWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 44),
     BackgroundColor3 = C.surface,
     BorderSizePixel = 0,
 }, movePage)
 corner(walkSpeedToggleWrap, 10)
+
 create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 0),
     Size = UDim2.new(1, -80, 1, 0),
@@ -1257,6 +1389,7 @@ create("TextLabel", {
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, walkSpeedToggleWrap)
+
 local walkSpeedToggleTrack = create("Frame", {
     Position = UDim2.new(1, -62, 0.5, -12),
     Size = UDim2.new(0, 46, 0, 24),
@@ -1264,6 +1397,7 @@ local walkSpeedToggleTrack = create("Frame", {
     BorderSizePixel = 0,
 }, walkSpeedToggleWrap)
 corner(walkSpeedToggleTrack, 12)
+
 local walkSpeedToggleKnob = create("Frame", {
     Position = UDim2.new(0, 2, 0, 2),
     Size = UDim2.new(0, 20, 0, 20),
@@ -1271,12 +1405,14 @@ local walkSpeedToggleKnob = create("Frame", {
     BorderSizePixel = 0,
 }, walkSpeedToggleTrack)
 corner(walkSpeedToggleKnob, 10)
+
 local walkSpeedToggleBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 1, 0),
     BackgroundTransparency = 1,
     Text = "",
 }, walkSpeedToggleWrap)
 
+-- ===== UI: SLIDER WALKSPEED =====
 local sliderWrap = create("Frame", {
     Size = UDim2.new(1, 0, 0, 56),
     BackgroundColor3 = C.surface,
@@ -1284,6 +1420,7 @@ local sliderWrap = create("Frame", {
     Visible = false,
 }, movePage)
 corner(sliderWrap, 10)
+
 local sliderLabel = create("TextLabel", {
     Position = UDim2.new(0, 12, 0, 6),
     Size = UDim2.new(1, -24, 0, 16),
@@ -1294,6 +1431,7 @@ local sliderLabel = create("TextLabel", {
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, sliderWrap)
+
 local sliderTrack = create("Frame", {
     Position = UDim2.new(0, 12, 0, 32),
     Size = UDim2.new(1, -24, 0, 8),
@@ -1301,55 +1439,415 @@ local sliderTrack = create("Frame", {
     BorderSizePixel = 0,
 }, sliderWrap)
 corner(sliderTrack, 4)
-local function speedAlpha(v) return (v - 16) / (1000 - 16) end
+
 local sliderFill = create("Frame", {
-    Size = UDim2.new(speedAlpha(walkSpeedValue), 0, 1, 0),
+    Size = UDim2.new((walkSpeedValue - 16) / (500 - 16), 0, 1, 0),
     BackgroundColor3 = C.accent,
     BorderSizePixel = 0,
 }, sliderTrack)
 corner(sliderFill, 4)
+
 local sliderKnob = create("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(speedAlpha(walkSpeedValue), 0, 0.5, 0),
+    Position = UDim2.new((walkSpeedValue - 16) / (500 - 16), 0, 0.5, 0),
     Size = UDim2.fromOffset(18, 18),
     BackgroundColor3 = C.text,
     BorderSizePixel = 0,
 }, sliderTrack)
 corner(sliderKnob, 9)
 
+-- ===== UI: STEALTH TOGGLE =====
+local stealthToggleWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+}, movePage)
+corner(stealthToggleWrap, 10)
+local stealthToggleStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, stealthToggleWrap)
+
+local stealthToggleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 8),
+    Size = UDim2.new(1, -80, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "Stealth Mode (beta) 🔒",
+    TextColor3 = C.muted,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, stealthToggleWrap)
+
+local stealthToggleHint = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 26),
+    Size = UDim2.new(1, -80, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "Включи ускорение, чтобы разблокировать",
+    TextColor3 = C.muted,
+    TextSize = 8,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, stealthToggleWrap)
+
+local stealthToggleTrack = create("Frame", {
+    Position = UDim2.new(1, -62, 0.5, -12),
+    Size = UDim2.new(0, 46, 0, 24),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, stealthToggleWrap)
+corner(stealthToggleTrack, 12)
+
+local stealthToggleKnob = create("Frame", {
+    Position = UDim2.new(0, 2, 0, 2),
+    Size = UDim2.new(0, 20, 0, 20),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, stealthToggleTrack)
+corner(stealthToggleKnob, 10)
+
+local stealthToggleBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+}, stealthToggleWrap)
+
+-- ===== UI: RUSH TOGGLE =====
+local rushToggleWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = C.surface,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+}, movePage)
+corner(rushToggleWrap, 10)
+local rushToggleStroke = create("UIStroke", {
+    Color = C.border,
+    Thickness = 1,
+    Transparency = 0.4,
+}, rushToggleWrap)
+
+local rushToggleLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 8),
+    Size = UDim2.new(1, -80, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Teleport Rush 🔒",
+    TextColor3 = C.muted,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushToggleWrap)
+
+local rushToggleHint = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 26),
+    Size = UDim2.new(1, -80, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "Включи ускорение, чтобы разблокировать",
+    TextColor3 = C.muted,
+    TextSize = 8,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushToggleWrap)
+
+local rushToggleTrack = create("Frame", {
+    Position = UDim2.new(1, -62, 0.5, -12),
+    Size = UDim2.new(0, 46, 0, 24),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushToggleWrap)
+corner(rushToggleTrack, 12)
+
+local rushToggleKnob = create("Frame", {
+    Position = UDim2.new(0, 2, 0, 2),
+    Size = UDim2.new(0, 20, 0, 20),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushToggleTrack)
+corner(rushToggleKnob, 10)
+
+local rushToggleBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+}, rushToggleWrap)
+
+-- ===== UI: RUSH SETTINGS =====
+local rushSettingsWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 110),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Visible = false,
+}, movePage)
+corner(rushSettingsWrap, 10)
+
+local rushSpeedLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 6),
+    Size = UDim2.new(1, -24, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Скорость: " .. rushSpeedValue,
+    TextColor3 = C.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushSettingsWrap)
+
+local rushSpeedTrack = create("Frame", {
+    Position = UDim2.new(0, 12, 0, 28),
+    Size = UDim2.new(1, -24, 0, 8),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushSettingsWrap)
+corner(rushSpeedTrack, 4)
+
+local rushSpeedFill = create("Frame", {
+    Size = UDim2.new(rushSpeedValue / 500, 0, 1, 0),
+    BackgroundColor3 = C.pink,
+    BorderSizePixel = 0,
+}, rushSpeedTrack)
+corner(rushSpeedFill, 4)
+
+local rushSpeedKnob = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(rushSpeedValue / 500, 0, 0.5, 0),
+    Size = UDim2.fromOffset(18, 18),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushSpeedTrack)
+corner(rushSpeedKnob, 9)
+
+local rushHeightLabel = create("TextLabel", {
+    Position = UDim2.new(0, 12, 0, 54),
+    Size = UDim2.new(1, -24, 0, 16),
+    BackgroundTransparency = 1,
+    Text = "⚡ Высота: " .. rushHeightValue .. " стадов",
+    TextColor3 = C.text,
+    TextSize = 11,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, rushSettingsWrap)
+
+local rushHeightTrack = create("Frame", {
+    Position = UDim2.new(0, 12, 0, 76),
+    Size = UDim2.new(1, -24, 0, 8),
+    BackgroundColor3 = C.button,
+    BorderSizePixel = 0,
+}, rushSettingsWrap)
+corner(rushHeightTrack, 4)
+
+local rushHeightFill = create("Frame", {
+    Size = UDim2.new(rushHeightValue / 10, 0, 1, 0),
+    BackgroundColor3 = C.accent,
+    BorderSizePixel = 0,
+}, rushHeightTrack)
+corner(rushHeightFill, 4)
+
+local rushHeightKnob = create("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(rushHeightValue / 10, 0, 0.5, 0),
+    Size = UDim2.fromOffset(18, 18),
+    BackgroundColor3 = C.text,
+    BorderSizePixel = 0,
+}, rushHeightTrack)
+corner(rushHeightKnob, 9)
+
+-- ===== UI: EDIT BUTTON =====
+local rushEditWrap = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 38),
+    BackgroundColor3 = C.surface,
+    BorderSizePixel = 0,
+    Visible = false,
+}, movePage)
+corner(rushEditWrap, 10)
+
+local rushEditBtn = create("TextButton", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Text = "📐  РЕДАКТИРОВАТЬ ПОЗИЦИЮ ⚡",
+    TextColor3 = C.text,
+    TextSize = 10,
+    Font = Enum.Font.GothamBold,
+}, rushEditWrap)
+
+-- ===== ЛОГИКА WALKSPEED =====
+local function applyWalkSpeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    currentHumanoid = char:FindFirstChildOfClass("Humanoid")
+    currentHRP = char:FindFirstChild("HumanoidRootPart")
+end
+
+local function cleanupStealthObjects()
+    if currentLinearVelocity then pcall(function() currentLinearVelocity:Destroy() end) end
+    if currentBodyVelocity then pcall(function() currentBodyVelocity:Destroy() end) end
+    if currentAttachment then pcall(function() currentAttachment:Destroy() end) end
+    currentLinearVelocity = nil
+    currentBodyVelocity = nil
+    currentAttachment = nil
+end
+
+local function updateSpeedState()
+    applyWalkSpeed()
+    if not currentHumanoid then return end
+
+    if walkSpeedEnabled and not stealthEnabled then
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = walkSpeedValue
+    elseif walkSpeedEnabled and stealthEnabled then
+        currentHumanoid.WalkSpeed = 16
+
+        if not currentHRP then return end
+
+        if not currentLinearVelocity and not currentBodyVelocity then
+            local ok = pcall(function()
+                currentAttachment = Instance.new("Attachment")
+                currentAttachment.Parent = currentHRP
+
+                currentLinearVelocity = Instance.new("LinearVelocity")
+                currentLinearVelocity.Attachment0 = currentAttachment
+                currentLinearVelocity.MaxForce = math.huge
+                currentLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+                currentLinearVelocity.Parent = currentHRP
+            end)
+
+            if not ok or not currentLinearVelocity then
+                cleanupStealthObjects()
+                pcall(function()
+                    currentBodyVelocity = Instance.new("BodyVelocity")
+                    currentBodyVelocity.MaxForce = Vector3.new(math.huge, 0, math.huge)
+                    currentBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+                    currentBodyVelocity.Parent = currentHRP
+                end)
+            end
+        end
+    else
+        cleanupStealthObjects()
+        currentHumanoid.WalkSpeed = 16
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not walkSpeedEnabled then return end
+    if _G.RH_HUB_RUSH_ACTIVE and _G.RH_HUB_RUSH_ACTIVE() then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then return end
+
+    if stealthEnabled then
+        humanoid.WalkSpeed = 16
+
+        local moveDir = humanoid.MoveDirection
+        local velocity = moveDir.Magnitude > 0
+            and moveDir.Unit * walkSpeedValue
+            or Vector3.new(0, 0, 0)
+
+        if currentLinearVelocity and currentLinearVelocity.Parent then
+            currentLinearVelocity.VectorVelocity = velocity
+        elseif currentBodyVelocity and currentBodyVelocity.Parent then
+            currentBodyVelocity.Velocity = velocity
+        end
+    else
+        humanoid.WalkSpeed = walkSpeedValue
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    applyWalkSpeed()
+    if walkSpeedEnabled then
+        cleanupStealthObjects()
+        updateSpeedState()
+    end
+end)
+
+local function updateChildStates()
+    if walkSpeedEnabled then
+        stealthToggleWrap.BackgroundTransparency = 0
+        stealthToggleStroke.Transparency = 0.2
+        stealthToggleLabel.TextColor3 = C.text
+        stealthToggleLabel.Text = "Stealth Mode (beta)"
+        stealthToggleHint.Text = "Сервер не видит изменение скорости"
+    else
+        stealthToggleWrap.BackgroundTransparency = 0.5
+        stealthToggleStroke.Transparency = 0.5
+        stealthToggleLabel.TextColor3 = C.muted
+        stealthToggleLabel.Text = "Stealth Mode (beta) 🔒"
+        stealthToggleHint.Text = "Включи ускорение, чтобы разблокировать"
+    end
+
+    if walkSpeedEnabled then
+        rushToggleWrap.BackgroundTransparency = 0
+        rushToggleStroke.Transparency = 0.2
+        rushToggleLabel.TextColor3 = C.text
+        rushToggleLabel.Text = "⚡ Teleport Rush"
+        rushToggleHint.Text = "Зажми ⚡ на экране для рывка"
+    else
+        rushToggleWrap.BackgroundTransparency = 0.5
+        rushToggleStroke.Transparency = 0.5
+        rushToggleLabel.TextColor3 = C.muted
+        rushToggleLabel.Text = "⚡ Teleport Rush 🔒"
+        rushToggleHint.Text = "Включи ускорение, чтобы разблокировать"
+    end
+
+    rushSettingsWrap.Visible = walkSpeedEnabled and rushModeEnabled
+    rushEditWrap.Visible = walkSpeedEnabled and rushModeEnabled
+end
+
+-- ===== ТОГГЛ WALKSPEED =====
 walkSpeedToggleBtn.MouseButton1Click:Connect(function()
     walkSpeedEnabled = not walkSpeedEnabled
+
     TweenService:Create(walkSpeedToggleTrack, TweenInfo.new(0.2), {
         BackgroundColor3 = walkSpeedEnabled and C.accent or C.button,
     }):Play()
     TweenService:Create(walkSpeedToggleKnob, TweenInfo.new(0.2), {
         Position = walkSpeedEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
     }):Play()
+
     sliderWrap.Visible = walkSpeedEnabled
-    smoothedDir = Vector3.zero
+
     if not walkSpeedEnabled then
-        local _, hrp, hum = getCharacter()
-        if hum then hum.WalkSpeed = 16 end
-        if hrp then
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
+        if stealthEnabled then
+            stealthEnabled = false
+            TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
+            TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), { Position = UDim2.new(0, 2, 0, 2) }):Play()
+        end
+        if rushModeEnabled then
+            rushModeEnabled = false
+            TweenService:Create(rushToggleTrack, TweenInfo.new(0.2), { BackgroundColor3 = C.button }):Play()
+            TweenService:Create(rushToggleKnob, TweenInfo.new(0.2), { Position = UDim2.new(0, 2, 0, 2) }):Play()
+            _G.RH_HUB_SET_RUSH_VISIBLE(false)
         end
     end
+
+    updateChildStates()
+    updateSpeedState()
 end)
 
+-- ===== СЛАЙДЕР WALKSPEED =====
 local sliderDragging = false
+
 local function updateSliderFromX(x)
     local left = sliderTrack.AbsolutePosition.X
     local width = math.max(1, sliderTrack.AbsoluteSize.X)
     local alpha = math.clamp((x - left) / width, 0, 1)
-    local value = math.floor((16 + alpha * (1000 - 16)) / 10 + 0.5) * 10
-    value = math.clamp(value, 16, 1000)
+    local value = math.floor((16 + alpha * (500 - 16)) / 5 + 0.5) * 5
+    value = math.clamp(value, 16, 500)
     walkSpeedValue = value
+
     sliderLabel.Text = "Скорость: " .. walkSpeedValue
-    local newAlpha = speedAlpha(walkSpeedValue)
+
+    local newAlpha = (walkSpeedValue - 16) / (500 - 16)
     TweenService:Create(sliderFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
     TweenService:Create(sliderKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
+
+    updateSpeedState()
 end
+
 sliderTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         sliderDragging = true
@@ -1373,15 +1871,156 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ VISUAL / TP ============
+-- ===== ТОГГЛ STEALTH =====
+stealthToggleBtn.MouseButton1Click:Connect(function()
+    if not walkSpeedEnabled then return end
+
+    stealthEnabled = not stealthEnabled
+
+    TweenService:Create(stealthToggleTrack, TweenInfo.new(0.2), {
+        BackgroundColor3 = stealthEnabled and C.accent or C.button,
+    }):Play()
+    TweenService:Create(stealthToggleKnob, TweenInfo.new(0.2), {
+        Position = stealthEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+    }):Play()
+
+    updateSpeedState()
+end)
+
+-- ===== ТОГГЛ RUSH =====
+rushToggleBtn.MouseButton1Click:Connect(function()
+    if not walkSpeedEnabled then return end
+
+    rushModeEnabled = not rushModeEnabled
+
+    TweenService:Create(rushToggleTrack, TweenInfo.new(0.2), {
+        BackgroundColor3 = rushModeEnabled and C.accent or C.button,
+    }):Play()
+    TweenService:Create(rushToggleKnob, TweenInfo.new(0.2), {
+        Position = rushModeEnabled and UDim2.new(1, -22, 0, 2) or UDim2.new(0, 2, 0, 2),
+    }):Play()
+
+    updateChildStates()
+
+    _G.RH_HUB_SET_RUSH_VISIBLE(rushModeEnabled)
+end)
+
+-- ===== СЛАЙДЕР RUSH SPEED =====
+local rushSpeedDragging = false
+
+local function updateRushSpeedFromX(x)
+    local left = rushSpeedTrack.AbsolutePosition.X
+    local width = math.max(1, rushSpeedTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor(alpha * 500 / 5 + 0.5) * 5
+    value = math.clamp(value, 0, 500)
+    rushSpeedValue = value
+
+    rushSpeedLabel.Text = "⚡ Скорость: " .. rushSpeedValue
+
+    local newAlpha = rushSpeedValue / 500
+    TweenService:Create(rushSpeedFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
+    TweenService:Create(rushSpeedKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
+
+    _G.RH_HUB_SET_RUSH_SPEED(rushSpeedValue)
+end
+
+rushSpeedTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = true
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+rushSpeedKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = true
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if rushSpeedDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateRushSpeedFromX(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushSpeedDragging = false
+    end
+end)
+
+-- ===== СЛАЙДЕР RUSH HEIGHT =====
+local rushHeightDragging = false
+
+local function updateRushHeightFromX(x)
+    local left = rushHeightTrack.AbsolutePosition.X
+    local width = math.max(1, rushHeightTrack.AbsoluteSize.X)
+    local alpha = math.clamp((x - left) / width, 0, 1)
+    local value = math.floor(alpha * 10 + 0.5)
+    value = math.clamp(value, 0, 10)
+    rushHeightValue = value
+
+    rushHeightLabel.Text = "⚡ Высота: " .. rushHeightValue .. " стадов"
+
+    local newAlpha = rushHeightValue / 10
+    TweenService:Create(rushHeightFill, TweenInfo.new(0.08), { Size = UDim2.new(newAlpha, 0, 1, 0) }):Play()
+    TweenService:Create(rushHeightKnob, TweenInfo.new(0.08), { Position = UDim2.new(newAlpha, 0, 0.5, 0) }):Play()
+
+    _G.RH_HUB_SET_RUSH_HEIGHT(rushHeightValue)
+end
+
+rushHeightTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = true
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+rushHeightKnob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = true
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if rushHeightDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        updateRushHeightFromX(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushHeightDragging = false
+    end
+end)
+
+-- ===== EDIT BUTTON =====
+local rushEditActive = false
+
+rushEditBtn.MouseButton1Click:Connect(function()
+    if not rushEditActive then
+        rushEditActive = true
+        rushEditBtn.Text = "✓  СОХРАНИТЬ ПОЗИЦИЮ ⚡"
+        rushEditBtn.TextColor3 = C.green
+        _G.RH_HUB_ENTER_RUSH_EDIT(true)
+    else
+        rushEditActive = false
+        rushEditBtn.Text = "📐  РЕДАКТИРОВАТЬ ПОЗИЦИЮ ⚡"
+        rushEditBtn.TextColor3 = C.text
+        _G.RH_HUB_ENTER_RUSH_EDIT(false)
+    end
+end)
+
+updateChildStates()
+
+-- ============ VISUAL ============
 section(visualPage, "ВИЗУАЛИЗАЦИЯ")
 soonCard(visualPage)
+
+-- ============ TELEPORT ============
 section(tpPage, "ТЕЛЕПОРТ")
 soonCard(tpPage)
 
 -- ============ SETTINGS ============
 section(settingsPage, "НАСТРОЙКИ")
-infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс токена.")
+infoCard(settingsPage, "КНОПКА ВЫХОДА", "Выход из аккаунта — сброс сохранённого токена.")
 
 local logoutBtn = create("TextButton", {
     Size = UDim2.new(1, 0, 0, 38),
@@ -1400,13 +2039,19 @@ logoutBtn.MouseButton1Click:Connect(function()
     clearToken()
     STATE.authed = false
     STATE.token = nil
-    if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
+
+    if mainGui and mainGui.Parent then
+        pcall(function() mainGui:Destroy() end)
+    end
+
     local ok, err = pcall(function()
         loadstring(game:HttpGet(
             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
         ))()
     end)
-    if not ok then warn("[RH-HUB] Перезапуск не удался: " .. tostring(err)) end
+    if not ok then
+        warn("[RH-HUB] Перезапуск не удался: " .. tostring(err))
+    end
 end)
 
 -- ============ ABOUT ============
@@ -1415,326 +2060,42 @@ infoCard(aboutPage, "RH-HUB", "Standalone Roblox Multi-Tool Hub")
 infoCard(aboutPage, "ВЕРСИЯ", CONFIG.VERSION)
 infoCard(aboutPage, "РАЗРАБОТЧИК", "Telegram: t.me/generalvaneska2024")
 
--- ============ GAMES ============
-section(gamesPage, "ИГРЫ  •  СПИСОК")
-
--- Синхронная загрузка AutoFarm (без task.spawn, чтобы UI точно построился)
-local AutoFarm = nil
-do
-    local url = CONFIG.AUTOFARM_URL .. "?v=7&t=" .. os.time()
-    local ok, src = pcall(function() return game:HttpGet(url) end)
-
-    if not ok or type(src) ~= "string" or #src < 100 then
-        warn("[RH-HUB] AutoFarm: не удалось скачать")
-    else
-        print("[RH-HUB] AutoFarm: " .. #src .. " байт")
-
-        -- Патч зоны по X
-        local pt = "local J=Dk(t,H,B)"
-        local pr = [[local J
-local __px = H.X
-if __px >= 5200 then J = "Light Dark"
-elseif __px >= 4750 then J = "Titan Temple"
-elseif __px >= 4000 then J = "Cherry Blossom"
-elseif __px >= 3350 then J = "Cosmic"
-elseif __px >= 2780 then J = "Prehistoric"
-elseif __px >= 2250 then J = "Abyss Ocean"
-elseif __px >= 1850 then J = "Volcano"
-elseif __px >= 1450 then J = "Snow"
-elseif __px >= 1150 then J = "Jungle"
-elseif __px >= 920 then J = "Desert"
-elseif __px >= 720 then J = "Lake"
-else J = "Forest" end]]
-        local src2, cnt = src:gsub(pt:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"), pr, 1)
-        if cnt > 0 then
-            print("[RH-HUB] AutoFarm: патч зоны ок")
-            src = src2
-        end
-
-        local fn, err = loadstring(src)
-        if fn then
-            local runOK, result = pcall(fn)
-            if runOK and type(result) == "table" and result.State then
-                AutoFarm = result
-                print("[RH-HUB] AutoFarm loaded successfully")
-            else
-                warn("[RH-HUB] AutoFarm runtime: " .. tostring(result))
-            end
-        else
-            warn("[RH-HUB] AutoFarm syntax: " .. tostring(err))
-        end
-    end
-end
-
--- UI карточки
-if AutoFarm then
-    local h = AutoFarm.State
-
-    local stealWrap = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 64),
-        BackgroundColor3 = C.surface,
-        BorderSizePixel = 0,
-        ClipsDescendants = false,
-    }, gamesPage)
-    corner(stealWrap, 12)
-    local stealStroke = stroke(stealWrap, C.border, 1, 0.3)
-
-    local stealHeadBtn = create("TextButton", {
-        Size = UDim2.new(1, 0, 0, 64),
-        BackgroundTransparency = 1,
-        Text = "",
-    }, stealWrap)
-
-    local stealIcon = create("TextLabel", {
-        Size = UDim2.fromOffset(40, 40),
-        Position = UDim2.new(0, 12, 0, 12),
-        BackgroundColor3 = C.surface2,
-        Text = "🥚",
-        TextColor3 = C.text,
-        TextSize = 20,
-        Font = Enum.Font.GothamBold,
-    }, stealWrap)
-    corner(stealIcon, 10)
-
-    create("TextLabel", {
-        Position = UDim2.new(0, 62, 0, 12),
-        Size = UDim2.new(1, -110, 0, 20),
-        BackgroundTransparency = 1,
-        Text = "Steal An Egg",
-        TextColor3 = C.text,
-        TextSize = 14,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, stealWrap)
-
-    create("TextLabel", {
-        Position = UDim2.new(0, 62, 0, 32),
-        Size = UDim2.new(1, -110, 0, 16),
-        BackgroundTransparency = 1,
-        Text = "Auto-farm, Guard Strike, Auto Place, Auto Hatch",
-        TextColor3 = C.muted,
-        TextSize = 10,
-        Font = Enum.Font.Gotham,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, stealWrap)
-
-    local stealArrow = create("TextLabel", {
-        Position = UDim2.new(1, -36, 0, 0),
-        Size = UDim2.fromOffset(36, 64),
-        BackgroundTransparency = 1,
-        Text = "▶",
-        TextColor3 = C.muted,
-        TextSize = 16,
-        Font = Enum.Font.GothamBold,
-    }, stealWrap)
-
-    local stealBody = create("Frame", {
-        Position = UDim2.new(0, 0, 0, 68),
-        Size = UDim2.new(1, 0, 0, 0),
-        BackgroundTransparency = 1,
-        ClipsDescendants = true,
-        Visible = false,
-    }, stealWrap)
-
-    create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }, stealBody)
-    create("UIPadding", {
-        PaddingTop = UDim.new(0, 6),
-        PaddingBottom = UDim.new(0, 6),
-        PaddingLeft = UDim.new(0, 4),
-        PaddingRight = UDim.new(0, 4),
-    }, stealBody)
-
-    local statusCard = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 55),
-        BackgroundColor3 = C.surface2,
-        BorderSizePixel = 0,
-    }, stealBody)
-    corner(statusCard, 10)
-    stroke(statusCard, C.accent, 1, 0.4)
-    create("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 8),
-        Size = UDim2.new(1, -20, 0, 18),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = "SYSTEM STATUS",
-        TextColor3 = C.accent,
-        TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, statusCard)
-    local statusDesc = create("TextLabel", {
-        Position = UDim2.new(0, 12, 0, 26),
-        Size = UDim2.new(1, -20, 0, 22),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamMedium,
-        Text = "Ready",
-        TextColor3 = C.text,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, statusCard)
-
-    AddToggle(stealBody, "Auto Steal (Tween)", "Плавный полёт к яйцу", h.pureTweenFarm == true, function(state)
-        AutoFarm.SetFarmMode(state and "TWEEN" or "NONE")
-    end)
-    AddToggle(stealBody, "Auto Steal (Teleport)", "Warp-snipe", h.autoFarmLoop == true, function(state)
-        AutoFarm.SetFarmMode(state and "WARP" or "NONE")
-    end)
-    AddToggle(stealBody, "Auto Return", "Возврат на X=525", h.autoGlide ~= false, function(state)
-        h.autoGlide = state
-    end)
-    AddToggle(stealBody, "Auto Place (Every 5)", "Установка каждые 5 краж", h.autoPlaceEvery5 == true, function(state)
-        h.autoPlaceEvery5 = state
-        if not state then h.batchStealCount = 0 end
-    end)
-    AddToggle(stealBody, "Auto Hatch", "Авто-вылупление", h.autoHatch ~= false, function(state)
-        h.autoHatch = state
-    end)
-    AddToggle(stealBody, "Fast Pickup (Skip Guard)", "Подбор и сразу домой", h.fastPickup ~= false, function(state)
-        h.fastPickup = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddToggle(stealBody, "Ignore Rarity Filter", "Все яйца в выбранных зонах", h.ignoreRarity ~= false, function(state)
-        h.ignoreRarity = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddButton(stealBody, "Place Carried Eggs Now", "Вернуться и установить всё", function()
-        task.spawn(function()
-            AutoFarm.ExecuteManualPlaceSequence(h.glideSpeed, nil, true)
-        end)
-    end)
-    AddToggle(stealBody, "Auto Treadmill", "Бег на дорожке", h.autoTreadmill ~= false, function(state)
-        h.autoTreadmill = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddToggle(stealBody, "Auto Upgrade Treadmill", "Апгрейд дорожки", h.autoUpgradeTreadmill ~= false, function(state)
-        h.autoUpgradeTreadmill = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddToggle(stealBody, "Auto Buy & Equip Trails", "Покупка трейлов", h.autoBuyTrails ~= false, function(state)
-        h.autoBuyTrails = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddMultiDropdown(stealBody, "Target Zones", AutoFarm.ZoneList, h.selectedZones, function(selectedMap)
-        h.selectedZones = selectedMap
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddMultiDropdown(stealBody, "Target Rarities", AutoFarm.RarityList, h.selectedRarities, function(selectedMap)
-        h.selectedRarities = selectedMap
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddToggle(stealBody, "Always Steal Secret+ Eggs", "Secret/Eternal/Divine", h.alwaysCollectSecretPlus ~= false, function(state)
-        h.alwaysCollectSecretPlus = state
-        AutoFarm.SaveEggSelectConfig(h)
-    end)
-    AddSlider(stealBody, "Flight Cruise Speed", 100, 1000, h.glideSpeed or 600, function(val)
-        h.glideSpeed = val
-        AutoFarm.SaveSpeed(val)
-    end)
-
-    local stealExpanded = false
-    local function refreshStealHeight()
-        task.wait()
-        if stealExpanded then
-            local contentHeight = stealBody.UIListLayout.AbsoluteContentSize.Y + 12
-            stealBody.Size = UDim2.new(1, 0, 0, contentHeight)
-            stealWrap.Size = UDim2.new(1, 0, 0, 64 + 8 + contentHeight)
-        else
-            stealBody.Size = UDim2.new(1, 0, 0, 0)
-            stealWrap.Size = UDim2.new(1, 0, 0, 64)
-        end
-    end
-
-    stealHeadBtn.MouseButton1Click:Connect(function()
-        stealExpanded = not stealExpanded
-        stealBody.Visible = stealExpanded
-        stealArrow.Text = stealExpanded and "▼" or "▶"
-        stealStroke.Color = stealExpanded and C.accent or C.border
-        TweenService:Create(stealStroke, TweenInfo.new(0.2), {
-            Transparency = stealExpanded and 0.1 or 0.3,
-        }):Play()
-        refreshStealHeight()
-    end)
-
-    stealBody.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if stealExpanded then refreshStealHeight() end
-    end)
-
-    task.spawn(function()
-        while gamesPage and gamesPage.Parent do
-            if statusDesc and statusDesc.Parent then
-                local carried = AutoFarm.GetTotalEggCount()
-                local statusStr = tostring(h.statusText or "Ready")
-                if statusStr:sub(1, 1) == "[" then
-                    statusDesc.Text = string.format("%s • Bag: %d eggs", statusStr, carried)
-                else
-                    statusDesc.Text = string.format("[%s] • Bag: %d eggs", statusStr, carried)
-                end
-            end
-            task.wait(0.25)
-        end
-    end)
-
-    _G.RH_HUB_FARM_ACTIVE = function()
-        return h.pureTweenFarm or h.autoFarmLoop or h.teleporting
-            or h.glidingToTarget or h.securingEgg or h.delivering
-            or h.isReturning
-    end
-else
-    local warnCard = create("Frame", {
-        Size = UDim2.new(1, 0, 0, 100),
-        BackgroundColor3 = C.surface,
-        BorderSizePixel = 0,
-    }, gamesPage)
-    corner(warnCard, 12)
-    stroke(warnCard, C.yellow, 1, 0.3)
-    create("TextLabel", {
-        Position = UDim2.new(0, 15, 0, 12),
-        Size = UDim2.new(1, -30, 0, 20),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        Text = "⚠ AutoFarm не загрузился",
-        TextColor3 = C.yellow,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    }, warnCard)
-    create("TextLabel", {
-        Position = UDim2.new(0, 15, 0, 36),
-        Size = UDim2.new(1, -30, 0, 55),
-        BackgroundTransparency = 1,
-        Font = Enum.Font.Gotham,
-        Text = "Проверь авторизацию и ссылку autofarm.lua",
-        TextColor3 = C.muted,
-        TextSize = 10,
-        TextWrapped = true,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-    }, warnCard)
-end
+-- [КОНЕЦ ЧАСТИ 2]
 
 -- ============ DRAG MAIN WINDOW ============
-local dragMain = { active = false, startPointer = nil, startPos = nil }
+local dragMain = { active = false, input = nil, startPointer = nil, startPos = nil }
+
 header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = true
+        dragMain.input = input
         dragMain.startPointer = input.Position
         dragMain.startPos = main.Position
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if not dragMain.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
     local d = input.Position - dragMain.startPointer
     main.Position = UDim2.new(
         dragMain.startPos.X.Scale, dragMain.startPos.X.Offset + d.X,
         dragMain.startPos.Y.Scale, dragMain.startPos.Y.Offset + d.Y
     )
 end)
+
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragMain.active = false
+        dragMain.input = nil
     end
 end)
 
--- ============ OVERLAY ============
+-- ============ OVERLAY (RH | FPS | PING) ============
 local overlayGui = create("ScreenGui", {
     Name = "RH_HUB_OVERLAY",
     ResetOnSpawn = false,
@@ -1763,10 +2124,15 @@ stroke(overlayFrame, C.accent, 1, 0.2)
 
 local statsService = game:GetService("Stats")
 local fpsFrames, fpsElapsed = 0, 0
+
 local function readPing()
     local ping = nil
-    pcall(function() ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue() end)
-    if typeof(ping) == "number" then return math.max(0, math.floor(ping + 0.5)) end
+    pcall(function()
+        ping = statsService.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if typeof(ping) == "number" then
+        return math.max(0, math.floor(ping + 0.5))
+    end
     return nil
 end
 
@@ -1776,25 +2142,38 @@ RunService.RenderStepped:Connect(function(dt)
     if fpsElapsed >= 0.5 then
         local currentFPS = math.floor(fpsFrames / fpsElapsed + 0.5)
         local ping = readPing()
-        overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s", currentFPS, ping and tostring(ping) or "--")
+        overlayFrame.Text = string.format("RH  |  FPS %d  |  PING %s",
+            currentFPS,
+            ping and tostring(ping) or "--"
+        )
         fpsFrames, fpsElapsed = 0, 0
     end
 end)
 
-local dragOverlay = { active = false, startPointer = nil, startPos = nil, moved = false }
+local dragOverlay = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local OVERLAY_THRESHOLD = 6
+
 overlayFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragOverlay.active = true
+        dragOverlay.input = input
         dragOverlay.startPointer = input.Position
         dragOverlay.startPos = Vector2.new(overlayFrame.Position.X.Offset, overlayFrame.Position.Y.Offset)
         dragOverlay.moved = false
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if not dragOverlay.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
     local d = input.Position - dragOverlay.startPointer
-    if math.abs(d.X) > 6 or math.abs(d.Y) > 6 then dragOverlay.moved = true end
+    if math.abs(d.X) > OVERLAY_THRESHOLD or math.abs(d.Y) > OVERLAY_THRESHOLD then
+        dragOverlay.moved = true
+    end
+
     if dragOverlay.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
@@ -1803,8 +2182,10 @@ UserInputService.InputChanged:Connect(function(input)
         overlayFrame.Position = UDim2.fromOffset(x, y)
     end
 end)
+
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragOverlay.active = false
     end
 end)
@@ -1854,20 +2235,30 @@ local function startCirclePulse()
     end)
 end
 
-local dragCircle = { active = false, startPointer = nil, startPos = nil, moved = false }
+local dragCircle = { active = false, input = nil, startPointer = nil, startPos = nil, moved = false }
+local CIRCLE_THRESHOLD = 6
+
 circleButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = true
+        dragCircle.input = input
         dragCircle.startPointer = input.Position
         dragCircle.startPos = Vector2.new(circleButton.Position.X.Offset, circleButton.Position.Y.Offset)
         dragCircle.moved = false
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if not dragCircle.active then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
     local d = input.Position - dragCircle.startPointer
-    if math.abs(d.X) > 6 or math.abs(d.Y) > 6 then dragCircle.moved = true end
+    if math.abs(d.X) > CIRCLE_THRESHOLD or math.abs(d.Y) > CIRCLE_THRESHOLD then
+        dragCircle.moved = true
+    end
+
     if dragCircle.moved then
         local cam = workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
@@ -1876,10 +2267,13 @@ UserInputService.InputChanged:Connect(function(input)
         circleButton.Position = UDim2.fromOffset(x, y)
     end
 end)
+
 UserInputService.InputEnded:Connect(function(input)
     if not dragCircle.active then return end
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragCircle.active = false
+
         if not dragCircle.moved then
             circleGui.Enabled = false
             mainGui.Enabled = true
@@ -1888,35 +2282,297 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- ============ MODES ============
+-- ============ MINIMIZE / CIRCLE / OVERLAY ============
 local function setMode(newMode)
     if STATE.mode == newMode then return end
+
     mainGui.Enabled = false
     overlayGui.Enabled = false
     circleGui.Enabled = false
-    if newMode == "window" then mainGui.Enabled = true
-    elseif newMode == "overlay" then overlayGui.Enabled = true
+
+    if newMode == "window" then
+        mainGui.Enabled = true
+    elseif newMode == "overlay" then
+        overlayGui.Enabled = true
     elseif newMode == "circle" then
         circleGui.Enabled = true
         startCirclePulse()
     end
+
     STATE.mode = newMode
 end
 
 minimizeBtn.MouseButton1Click:Connect(function()
-    if STATE.mode == "window" then setMode("overlay")
-    elseif STATE.mode == "overlay" then setMode("window") end
+    if STATE.mode == "window" then
+        setMode("overlay")
+    elseif STATE.mode == "overlay" then
+        setMode("window")
+    end
 end)
+
 circleBtn.MouseButton1Click:Connect(function()
-    if STATE.mode == "window" then setMode("circle") end
+    if STATE.mode == "window" then
+        setMode("circle")
+    end
 end)
 
 local lastOverlayTap = 0
 overlayFrame.MouseButton1Click:Connect(function()
     local now = os.clock()
-    if now - lastOverlayTap < 0.6 then setMode("window") end
+    if now - lastOverlayTap < 0.6 then
+        setMode("window")
+    end
     lastOverlayTap = now
 end)
+
+-- ============ ⚡ RUSH — ГЛОБАЛЬНАЯ КНОПКА ============
+local rushGui = create("ScreenGui", {
+    Name = "RH_HUB_RUSH",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true,
+    DisplayOrder = 99997,
+    Enabled = true,
+})
+safeParent(rushGui)
+
+local rushBtn = create("TextButton", {
+    Name = "RushBtn",
+    AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, savedCfg.rushBtnPos.x, 1, savedCfg.rushBtnPos.y),
+    Size = UDim2.fromOffset(64, 64),
+    BackgroundColor3 = C.accent,
+    BackgroundTransparency = 0.15,
+    BorderSizePixel = 0,
+    Text = "⚡",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 28,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    Visible = false,
+}, rushGui)
+corner(rushBtn, 32)
+local rushStroke = stroke(rushBtn, C.pink, 2, 0.15)
+
+-- ============ HOOK WALKSPEED ============
+local hookInstalled = false
+local hookActive = false
+
+local function setupWalkSpeedHook()
+    if hookInstalled then return end
+    if type(hookmetamethod) ~= "function" or type(newcclosure) ~= "function" then
+        return
+    end
+
+    local oldIndex, oldNewIndex
+
+    oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        if key == "WalkSpeed" and hookActive then
+            local char = LocalPlayer.Character
+            if char and self == char:FindFirstChildOfClass("Humanoid") then
+                return 16
+            end
+        end
+        return oldIndex(self, key)
+    end))
+
+    oldNewIndex = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
+        if key == "WalkSpeed" and hookActive then
+            local char = LocalPlayer.Character
+            if char and self == char:FindFirstChildOfClass("Humanoid") then
+                return oldNewIndex(self, key, 16)
+            end
+        end
+        return oldNewIndex(self, key, value)
+    end))
+
+    hookInstalled = true
+end
+
+setupWalkSpeedHook()
+
+-- ============ ⚡ RUSH — ЛОГИКА ============
+local rushActive = false
+local rushEditMode = false
+
+-- Перезаписываем заглушку (объявлена в Части 2)
+_G.RH_HUB_RUSH_ACTIVE = function() return rushActive end
+
+local function activateRush()
+    if rushActive then return end
+    if not _G.RH_HUB_IS_WALKSPEED_ON() then return end
+    if not _G.RH_HUB_IS_RUSH_ON() then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    hookActive = true
+
+    local height = _G.RH_HUB_RUSH_HEIGHT or 5
+    hrp.CFrame = hrp.CFrame + Vector3.new(0, height, 0)
+
+    rushActive = true
+end
+
+local function deactivateRush()
+    if not rushActive then return end
+    rushActive = false
+    hookActive = false
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = { char }
+
+    local origin = hrp.Position
+    local direction = Vector3.new(0, -1000, 0)
+
+    local result = workspace:Raycast(origin, direction, rayParams)
+
+    if result then
+        local groundY = result.Position.Y + 3
+        hrp.CFrame = CFrame.new(hrp.Position.X, groundY, hrp.Position.Z)
+    end
+end
+
+-- CFrame Stepper — только когда rushActive
+RunService.RenderStepped:Connect(function(dt)
+    if not rushActive then return end
+    if rushEditMode then return end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    local moveDir = humanoid.MoveDirection
+
+    if moveDir.Magnitude > 0 then
+        local speed = _G.RH_HUB_RUSH_SPEED or 200
+        local step = moveDir.Unit * (speed / 60)
+        hrp.CFrame = hrp.CFrame + step
+    end
+end)
+
+-- Обработчики ⚡
+rushBtn.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    if rushEditMode then return end
+
+    activateRush()
+end)
+
+rushBtn.InputEnded:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    if rushEditMode then return end
+
+    deactivateRush()
+end)
+
+-- Перемещение кнопки в edit mode
+local rushDrag = { active = false, input = nil, startPointer = nil, startPos = nil }
+local RUSH_DRAG_THRESHOLD = 4
+
+rushBtn.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    if not rushEditMode then return end
+
+    rushDrag.active = true
+    rushDrag.input = input
+    rushDrag.startPointer = input.Position
+    rushDrag.startPos = Vector2.new(rushBtn.Position.X.Offset, rushBtn.Position.Y.Offset)
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not rushDrag.active then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch
+    and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+
+    local d = input.Position - rushDrag.startPointer
+
+    if math.abs(d.X) > RUSH_DRAG_THRESHOLD or math.abs(d.Y) > RUSH_DRAG_THRESHOLD then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(rushDrag.startPos.X + d.X, -vp.X + rushBtn.AbsoluteSize.X, 0)
+        local y = math.clamp(rushDrag.startPos.Y + d.Y, -vp.Y + rushBtn.AbsoluteSize.Y, 0)
+        rushBtn.Position = UDim2.new(1, x, 1, y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if not rushDrag.active then return end
+    if input.UserInputType == Enum.UserInputType.Touch
+    or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        rushDrag.active = false
+    end
+end)
+
+-- Внешние функции (перезаписываем заглушки из Части 2)
+_G.RH_HUB_SET_RUSH_VISIBLE = function(visible)
+    if rushEditMode then
+        rushBtn.Visible = true
+        return
+    end
+    rushBtn.Visible = visible
+end
+
+_G.RH_HUB_SET_RUSH_SPEED = function(speed)
+    _G.RH_HUB_RUSH_SPEED = speed
+end
+
+_G.RH_HUB_SET_RUSH_HEIGHT = function(height)
+    _G.RH_HUB_RUSH_HEIGHT = height
+end
+
+_G.RH_HUB_ENTER_RUSH_EDIT = function(enter)
+    rushEditMode = enter
+
+    if enter then
+        rushBtn.Visible = true
+        rushBtn.BackgroundTransparency = 0.5
+        rushBtn.Text = "✥"
+        rushBtn.TextSize = 26
+        rushStroke.Transparency = 0.5
+    else
+        savedCfg.rushBtnPos = {
+            x = rushBtn.Position.X.Offset,
+            y = rushBtn.Position.Y.Offset,
+        }
+        saveConfig()
+
+        rushBtn.BackgroundTransparency = 0.15
+        rushBtn.Text = "⚡"
+        rushBtn.TextSize = 28
+        rushStroke.Transparency = 0.15
+
+        if not _G.RH_HUB_IS_RUSH_ON() then
+            rushBtn.Visible = false
+        end
+    end
+end
 
 -- ============ TIMER HELPERS ============
 local function formatRemaining(sec)
@@ -1924,10 +2580,12 @@ local function formatRemaining(sec)
     sec = tonumber(sec)
     if not sec then return "--" end
     if sec <= 0 then return "истек" end
+
     local d = math.floor(sec / 86400)
     local h = math.floor((sec % 86400) / 3600)
     local m = math.floor((sec % 3600) / 60)
     local s = math.floor(sec % 60)
+
     if d > 0 then return string.format("%dд %dч", d, h) end
     if h > 0 then return string.format("%dч %dм", h, m) end
     if m > 0 then return string.format("%dм %dс", m, s) end
@@ -1936,22 +2594,33 @@ end
 
 local function updateTimerLabel(remaining)
     if not timerLabel then return end
+
     timerLabel.Text = "⏱ " .. formatRemaining(remaining)
-    if remaining == nil then timerLabel.TextColor3 = C.muted
-    elseif remaining <= 60 then timerLabel.TextColor3 = C.red
-    elseif remaining <= 300 then timerLabel.TextColor3 = C.yellow
-    else timerLabel.TextColor3 = C.green end
+
+    if remaining == nil then
+        timerLabel.TextColor3 = C.muted
+    elseif remaining <= 60 then
+        timerLabel.TextColor3 = C.red
+    elseif remaining <= 300 then
+        timerLabel.TextColor3 = C.yellow
+    else
+        timerLabel.TextColor3 = C.green
+    end
 end
 
 -- ============ AUTH CALLBACK ============
 onAuthSuccess = function(token)
     STATE.authed = true
     STATE.token = token
+
     if token then saveToken(token) end
+
     setStatus("Успешная авторизация!", "ok")
     authToast("Добро пожаловать!", "ok")
+
     task.spawn(function()
         task.wait(0.7)
+
         if authMain and authMain.Parent then
             local tw = TweenService:Create(authMain, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
                 BackgroundTransparency = 1,
@@ -1960,15 +2629,23 @@ onAuthSuccess = function(token)
             tw:Play()
             tw.Completed:Wait()
         end
-        if authGui and authGui.Parent then pcall(function() authGui:Destroy() end) end
+
+        if authGui and authGui.Parent then
+            pcall(function() authGui:Destroy() end)
+        end
+
         mainGui.Enabled = true
         STATE.mode = "window"
+
         task.spawn(function()
             local result = api("/verify", { token = token })
             if result and result.valid == true and result.remaining_seconds then
                 updateTimerLabel(tonumber(result.remaining_seconds))
-            else updateTimerLabel(nil) end
+            else
+                updateTimerLabel(nil)
+            end
         end)
+
         print("[RH-HUB] Меню открыто.")
     end)
 end
@@ -1976,6 +2653,7 @@ end
 -- ============ HEARTBEAT ============
 task.spawn(function()
     task.wait(2)
+
     local localRemaining = nil
     local heartbeatActive = true
 
@@ -1984,13 +2662,17 @@ task.spawn(function()
             if STATE.authed and localRemaining and localRemaining > 0 then
                 localRemaining = localRemaining - 1
                 updateTimerLabel(localRemaining)
+
                 if localRemaining <= 0 then
                     clearToken()
                     STATE.authed = false
                     STATE.token = nil
+
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+                    if rushGui and rushGui.Parent then pcall(function() rushGui:Destroy() end) end
+
                     pcall(function()
                         loadstring(game:HttpGet(
                             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
@@ -2007,26 +2689,34 @@ task.spawn(function()
     while heartbeatActive do
         if STATE.authed and STATE.token then
             local result, err = api("/verify", { token = STATE.token })
+
             if result and result.valid == true then
                 localRemaining = tonumber(result.remaining_seconds)
                 updateTimerLabel(localRemaining)
             else
                 local errText = tostring(err or ""):lower()
                 local shouldKick = false
+
                 if not result then
                     if errText:find("expired") or errText:find("invalid") or errText:find("403") then
                         shouldKick = true
                     end
                 else
-                    if result.valid ~= true then shouldKick = true end
+                    if result.valid ~= true then
+                        shouldKick = true
+                    end
                 end
+
                 if shouldKick then
                     clearToken()
                     STATE.authed = false
                     STATE.token = nil
+
                     if mainGui and mainGui.Parent then pcall(function() mainGui:Destroy() end) end
                     if overlayGui and overlayGui.Parent then pcall(function() overlayGui:Destroy() end) end
                     if circleGui and circleGui.Parent then pcall(function() circleGui:Destroy() end) end
+                    if rushGui and rushGui.Parent then pcall(function() rushGui:Destroy() end) end
+
                     pcall(function()
                         loadstring(game:HttpGet(
                             "https://raw.githubusercontent.com/RAHER458/TEST-0.0.1/main/esp.lua?t=" .. os.time()
@@ -2037,6 +2727,7 @@ task.spawn(function()
                 end
             end
         end
+
         task.wait(5)
     end
 end)
@@ -2055,4 +2746,8 @@ print("----------------------------------------")
 print("RH-HUB INITIALIZED")
 print("Version: " .. CONFIG.VERSION)
 print("UserId: " .. tostring(LocalPlayer.UserId))
+print("API: " .. CONFIG.API_BASE)
 print("----------------------------------------")
+
+-- [КОНЕЦ ЧАСТИ 3]
+-- [[ КОНЕЦ ФАЙЛА ]]
