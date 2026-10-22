@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.22-beta (Beautiful Cards)
+    Version: 0.9.25-beta (Card Stretch Fix)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.22-beta",
+    VERSION        = "0.9.25-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -82,7 +82,7 @@ end)
 
 local STATE = { 
     authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
-    favorites = {}, currentPage = "games", lastNonCheatPage = "games" 
+    favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {}
 }
 
 -- ============================================================
@@ -851,28 +851,29 @@ local function updateStarVisuals(gameName)
 end
 
 -- ============================================================
--- CARDS (С ПОДДЕРЖКОЙ КАРТИНОК)
+-- CARDS (С ПОДДЕРЖКОЙ КАРТИНОК И ПРАВИЛЬНОЙ МАСКОЙ)
 -- ============================================================
 local function makeCard(parent, title, subtitle, icon, imageId, onClick)
     local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
     corner(card, 10)
     stroke(card, C.accent, 1, 0.6)
 
-    -- Иконка/Картинка (заполняет левую часть карточки)
-    local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.fromOffset(100, 78), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
-    local iconCorner = corner(iconFrame, 10)
+    -- Контейнер для левой части (Маска)
+    local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 100, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
+    local iconCorner = create("UICorner", { CornerRadius = UDim.new(0, 10) }, iconFrame)
+    -- Убираем скругление справа, чтобы стыковалось с текстом
+    iconCorner.CornerRadius = UDim.new(0, 10) 
     
     if imageId and imageId ~= "" then
-        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(imageId), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(imageId), ScaleType = Enum.ScaleType.Stretch }, iconFrame)
         
-        -- Защита от битых картинок
         local failed = false
         img.Changed:Connect(function(prop)
             if (prop == "IsLoaded" and not img.IsLoaded) or prop == "Image" then
                 if not failed and (not img.IsLoaded or img.Image == "") then
                     failed = true
                     img:Destroy()
-                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
                 end
             end
         end)
@@ -880,18 +881,18 @@ local function makeCard(parent, title, subtitle, icon, imageId, onClick)
             if not failed and img.Parent and img.IsLoaded == false then
                 failed = true
                 img:Destroy()
-                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
             end
         end)
     else
-        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
     end
 
     -- Текст
-    create("TextLabel", { Position = UDim2.new(0, 112, 0, 16), Size = UDim2.new(1, -200, 0, 20), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+    create("TextLabel", { Position = UDim2.new(0, 112, 0, 18), Size = UDim2.new(1, -200, 0, 20), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
 
     if subtitle and subtitle ~= "" then 
-        create("TextLabel", { Position = UDim2.new(0, 112, 0, 38), Size = UDim2.new(1, -200, 0, 16), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left }, card) 
+        create("TextLabel", { Position = UDim2.new(0, 112, 0, 40), Size = UDim2.new(1, -200, 0, 16), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left }, card) 
     end
 
     -- Звездочка избранного
@@ -931,33 +932,33 @@ local function createCheatCard(parent, cheat, index)
     local status = LinkStatus[cheat.id] or "unknown"
     local isDead = (status == "dead")
     
-    local card = create("Frame", { Name = "RatingCard_" .. cheat.id, Size = UDim2.new(1, 0, 0, 72), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = index }, parent)
+    local card = create("Frame", { Name = "RatingCard_" .. cheat.id, Size = UDim2.new(1, 0, 0, 72), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = index, ClipsDescendants = true }, parent)
     corner(card, 10)
     stroke(card, isDead and C.border or ((rating.likes >= 4) and C.green or C.accent), 1, isDead and 0.8 or 0.5)
 
-    -- Иконка/Картинка чита (заполняет левую часть)
-    local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.fromOffset(72, 72), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
+    -- Иконка/Картинка чита
+    local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 72, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
     corner(iconFrame, 10)
     
     if cheat.image_id and cheat.image_id ~= "" then
-        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(cheat.image_id), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(cheat.image_id), ScaleType = Enum.ScaleType.Stretch }, iconFrame)
         local failed = false
         img.Changed:Connect(function(prop)
             if (prop == "IsLoaded" and not img.IsLoaded) or prop == "Image" then
                 if not failed and (not img.IsLoaded or img.Image == "") then
                     failed = true; img:Destroy()
-                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
                 end
             end
         end)
         task.delay(2, function()
             if not failed and img.Parent and img.IsLoaded == false then
                 failed = true; img:Destroy()
-                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
             end
         end)
     else
-        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
     end
 
     local title = create("TextLabel", { Position = UDim2.new(0, 84, 0, 14), Size = UDim2.new(1, -180, 0, 18), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
@@ -1048,7 +1049,7 @@ local function loadGamesList()
 
     STATE.games = {}
     local index = 1
-    local gameImages = result.gameImages or {}
+    STATE.gameImages = result.gameImages or {}
 
     for gameName, cheatsList in pairs(result.games) do
         local gameObj = { name = gameName, cheats = {} }
@@ -1061,7 +1062,7 @@ local function loadGamesList()
         local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
         
         local icon = GameIcons[gameName] or GameIcons.default
-        local gameImageId = gameImages[gameName] or ""
+        local gameImageId = STATE.gameImages[gameName] or ""
         
         local card = makeCard(gamesPage, gameName, subtitle, icon, gameImageId, function()
             showCheatsForGame(gameObj)
@@ -1087,7 +1088,6 @@ loadFavoritesPage = function()
     end
     
     local hasFavs = false
-    local gameImages = STATE.gameImages or {}
     for _, gameObj in ipairs(STATE.games) do
         if STATE.favorites[gameObj.name] then
             hasFavs = true
@@ -1095,7 +1095,7 @@ loadFavoritesPage = function()
             local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
             local icon = GameIcons[gameObj.name] or GameIcons.default
             
-            local gameImageId = gameImages[gameObj.name] or ""
+            local gameImageId = STATE.gameImages[gameObj.name] or ""
             if gameImageId == "" and gameObj.cheats[1] and gameObj.cheats[1].image_id then gameImageId = gameObj.cheats[1].image_id end
             
             local card = makeCard(favoritesPage, gameObj.name, subtitle, icon, gameImageId, function()
