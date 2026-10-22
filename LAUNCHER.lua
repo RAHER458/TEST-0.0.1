@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.8.5-beta (Layout Fix + Syntax Fix)
+    Version: 0.9.0-beta (Sidebar Design Update)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,13 +15,13 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.8.5-beta",
+    VERSION        = "0.9.0-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
     DEVICE_FILE    = "RH_LAUNCHER_DEVICE.dat",
     TG_LINK        = "https://t.me/generalvaneska2024",
-    WINDOW_W       = 400,
+    WINDOW_W       = 480,
     WINDOW_H       = 460,
     RETRY_MAX      = 3,
     RETRY_DELAY    = 1.5,
@@ -417,51 +417,90 @@ fitMain()
 if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain) end
 
 -- ============================================================
--- HEADER
+-- SIDEBAR (Слева)
 -- ============================================================
-local header = create("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 2 }, main)
-corner(header, 16)
-create("Frame", { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -18), BackgroundColor3 = C.surface, BorderSizePixel = 0 }, header)
+local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
+corner(sidebar, 16)
 
-local logoLabel = create("TextLabel", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1, Text = "RH", TextColor3 = C.pink, Font = Enum.Font.GothamBlack, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center }, header)
-local titleLabel = create("TextLabel", { Position = UDim2.new(0, 50, 0, 8), Size = UDim2.new(1, -150, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
-create("TextLabel", { Position = UDim2.new(0, 50, 0, 28), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
+-- Градиент на сайдбаре
+local sideGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, sidebar)
+corner(sideGradFrame, 16)
+create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, sideGradFrame)
 
-local timerLabel = create("TextLabel", { Position = UDim2.new(1, -110, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(90, 28), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "⏱ ∞", TextColor3 = C.green, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, header)
-corner(timerLabel, 14)
+-- Заглушка под логотип
+local logoFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, sidebar)
+corner(logoFrame, 25)
+stroke(logoFrame, C.pink, 1.5, 0.2)
+create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "RH", TextColor3 = C.pink, Font = Enum.Font.GothamBlack, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, logoFrame)
+
+local navButtons = {}
+local function createNavButton(icon, text, order, pageName)
+    local btn = create("TextButton", { Size = UDim2.new(1, -10, 0, 40), Position = UDim2.new(0, 5, 0, 90 + (order * 45)), BackgroundColor3 = C.surface2, BackgroundTransparency = 1, Text = "", AutoButtonColor = false }, sidebar)
+    corner(btn, 8)
+    
+    local bgHighlight = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.accent, BackgroundTransparency = 1, BorderSizePixel = 0 }, btn)
+    corner(bgHighlight, 8)
+    
+    local iconLabel = create("TextLabel", { Size = UDim2.fromOffset(24, 24), Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundTransparency = 1, Text = icon, TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, btn)
+    local textLabel = create("TextLabel", { Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 38, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center }, btn)
+    
+    navButtons[pageName] = { btn = btn, iconLabel = iconLabel, textLabel = textLabel, bg = bgHighlight }
+    
+    btn.MouseButton1Click:Connect(function()
+        for pName, data in pairs(navButtons) do
+            data.iconLabel.TextColor3 = C.muted
+            data.textLabel.TextColor3 = C.muted
+            TweenService:Create(data.bg, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
+        end
+        iconLabel.TextColor3 = C.accent
+        textLabel.TextColor3 = C.accent
+        TweenService:Create(bgHighlight, TweenInfo.new(0.2), { BackgroundTransparency = 0.8 }):Play()
+        
+        showPage(pageName)
+    end)
+    return btn
+end
+
+createNavButton("🏠", "Главная", 0, "games")
+createNavButton("⭐", "Избранное", 1, "favorites")
+createNavButton("⚙️", "Настройки", 2, "settings")
+createNavButton("👤", "Профиль", 3, "profile")
+
+-- ============================================================
+-- CONTENT AREA (Справа)
+-- ============================================================
+local contentArea = create("Frame", { Position = UDim2.new(0, 110, 0, 0), Size = UDim2.new(1, -110, 1, 0), BackgroundTransparency = 1 }, main)
+
+-- Шапка
+local header = create("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = C.bg, BorderSizePixel = 0 }, contentArea)
+local titleLabel = create("TextLabel", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -130, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
+create("TextLabel", { Position = UDim2.new(0, 12, 0, 28), Size = UDim2.new(1, -130, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
+
+local timerLabel = create("TextLabel", { Position = UDim2.new(1, -100, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(80, 24), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "⏱ ∞", TextColor3 = C.green, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, header)
+corner(timerLabel, 12)
 stroke(timerLabel, C.border, 1, 0.5)
 
 makeDraggable(main, header)
 
--- ============================================================
--- BANNER
--- ============================================================
-local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, main)
+-- Баннер
+local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, contentArea)
 corner(banner, 10)
 stroke(banner, C.accent, 1, 0.3)
-
 local gradientFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.7, BorderSizePixel = 0 }, banner)
 corner(gradientFrame, 10)
-local grad = create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 45 }, gradientFrame)
-
+create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 45 }, gradientFrame)
 create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left }, banner)
 create("TextLabel", { Position = UDim2.new(0, 12, 0, 26), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, banner)
 
--- ============================================================
--- SEARCH BAR
--- ============================================================
-local searchFrame = create("Frame", { Position = UDim2.new(0, 8, 0, 120), Size = UDim2.new(1, -16, 0, 36), BackgroundColor3 = C.input, BorderSizePixel = 0 }, main)
+-- Поиск
+local searchFrame = create("Frame", { Position = UDim2.new(0, 8, 0, 120), Size = UDim2.new(1, -16, 0, 36), BackgroundColor3 = C.input, BorderSizePixel = 0 }, contentArea)
 corner(searchFrame, 8)
 stroke(searchFrame, C.border, 1, 0.5)
-
 create("TextLabel", { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.fromOffset(20, 36), BackgroundTransparency = 1, Text = "🔍", TextColor3 = C.muted, TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, searchFrame)
-
 local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Поиск игр...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
 
--- ============================================================
--- CONTENT
--- ============================================================
-local content = create("Frame", { Position = UDim2.new(0, 8, 0, 160), Size = UDim2.new(1, -16, 1, -168), BackgroundTransparency = 1, ClipsDescendants = true }, main)
+-- Страницы
+local content = create("Frame", { Position = UDim2.new(0, 8, 0, 160), Size = UDim2.new(1, -16, 1, -168), BackgroundTransparency = 1, ClipsDescendants = true }, contentArea)
 
 local function makePage(parent, name)
     local page = create("ScrollingFrame", { Name = name, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.accent, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false }, parent)
@@ -472,6 +511,16 @@ end
 
 local gamesPage = makePage(content, "GamesPage")
 local cheatsPage = makePage(content, "CheatsPage")
+local favoritesPage = makePage(content, "FavoritesPage")
+local settingsPage = makePage(content, "SettingsPage")
+local profilePage = makePage(content, "ProfilePage")
+
+local function createStub(parent, text)
+    create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = text, TextColor3 = C.muted, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, parent)
+end
+createStub(favoritesPage, "Избранное пока пустое")
+createStub(settingsPage, "Настройки в разработке")
+createStub(profilePage, "Профиль в разработке")
 
 local cheatsBackBtn = create("TextButton", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "←  НАЗАД К ИГРАМ", TextColor3 = C.text, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true, LayoutOrder = -2 }, cheatsPage)
 corner(cheatsBackBtn, 8)
@@ -484,15 +533,25 @@ create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.
 local function showPage(name)
     gamesPage.Visible = (name == "games")
     cheatsPage.Visible = (name == "cheats")
-    searchFrame.Visible = (name == "games")
-    banner.Visible = (name == "games")
+    favoritesPage.Visible = (name == "favorites")
+    settingsPage.Visible = (name == "settings")
+    profilePage.Visible = (name == "profile")
     
-    if name == "games" then
+    local showTop = (name == "games")
+    banner.Visible = showTop
+    searchFrame.Visible = showTop
+    
+    if showTop then
         TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 160) }):Play()
     else
         TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 64) }):Play()
     end
 end
+
+-- Активируем "Главная" по умолчанию
+navButtons["games"].iconLabel.TextColor3 = C.accent
+navButtons["games"].textLabel.TextColor3 = C.accent
+navButtons["games"].bg.BackgroundTransparency = 0.8
 
 -- ============================================================
 -- CHEAT TRACKER
@@ -701,29 +760,29 @@ end
 -- CARDS
 -- ============================================================
 local function makeCard(parent, title, subtitle, icon, onClick)
-    local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 72), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
-    corner(card, 12)
+    local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
+    corner(card, 10)
     stroke(card, C.accent, 1, 0.6)
 
-    local iconFrame = create("Frame", { Position = UDim2.new(0, 10, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(52, 52), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, card)
-    corner(iconFrame, 10)
+    local iconFrame = create("Frame", { Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, card)
+    corner(iconFrame, 8)
     stroke(iconFrame, C.border, 1, 0.5)
     
-    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
 
-    create("TextLabel", { Position = UDim2.new(0, 74, 0, 14), Size = UDim2.new(1, -140, 0, 18), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+    create("TextLabel", { Position = UDim2.new(0, 58, 0, 10), Size = UDim2.new(1, -120, 0, 16), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
 
     if subtitle and subtitle ~= "" then 
-        create("TextLabel", { Position = UDim2.new(0, 74, 0, 34), Size = UDim2.new(1, -140, 0, 16), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left }, card) 
+        create("TextLabel", { Position = UDim2.new(0, 58, 0, 28), Size = UDim2.new(1, -120, 0, 14), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, card) 
     end
 
-    local arrowBtn = create("TextButton", { Position = UDim2.new(1, -44, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "›", TextColor3 = C.accent, Font = Enum.Font.GothamBold, TextSize = 22, AutoButtonColor = false, Active = false }, card)
-    corner(arrowBtn, 15)
+    local arrowBtn = create("TextButton", { Position = UDim2.new(1, -38, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "›", TextColor3 = C.accent, Font = Enum.Font.GothamBold, TextSize = 18, AutoButtonColor = false, Active = false }, card)
+    corner(arrowBtn, 13)
     stroke(arrowBtn, C.accent, 1.5, 0.3)
 
-    card.MouseButton1Down:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(0.97, 0, 0, 70), Position = UDim2.new(0.015, 0, 0, 2) }):Play() end)
-    card.MouseButton1Up:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 72), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
-    card.MouseLeave:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 72), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
+    card.MouseButton1Down:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(0.97, 0, 0, 58), Position = UDim2.new(0.015, 0, 0, 2) }):Play() end)
+    card.MouseButton1Up:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 60), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
+    card.MouseLeave:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 60), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
 
     card.MouseButton1Click:Connect(function() 
         local ok, err = pcall(onClick); 
