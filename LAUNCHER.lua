@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.11-beta (Star Toast & Sync Fix)
+    Version: 0.9.16-beta (UI Separation & Colors)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.11-beta",
+    VERSION        = "0.9.16-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -450,12 +450,13 @@ local loadFavoritesPage
 -- ============================================================
 -- SIDEBAR
 -- ============================================================
-local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
+local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.bg, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
 corner(sidebar, 16)
 
-local sideGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, sidebar)
+-- Легкий градиент для левой панели (темный, чтобы отличался от правой)
+local sideGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.9, BorderSizePixel = 0 }, sidebar)
 corner(sideGradFrame, 16)
-create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, sideGradFrame)
+create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.bg), ColorSequenceKeypoint.new(1, C.surface)}, Rotation = 90 }, sideGradFrame)
 
 local logoFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, sidebar)
 corner(logoFrame, 25)
@@ -464,7 +465,7 @@ create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, 
 
 local navButtons = {}
 local function createNavButton(icon, text, order, pageName)
-    local btn = create("TextButton", { Size = UDim2.new(1, -10, 0, 40), Position = UDim2.new(0, 5, 0, 90 + (order * 45)), BackgroundColor3 = C.surface2, BackgroundTransparency = 1, Text = "", AutoButtonColor = false }, sidebar)
+    local btn = create("TextButton", { Size = UDim2.new(1, -10, 0, 40), Position = UDim2.new(0, 5, 0, 90 + (order * 45)), BackgroundColor3 = C.surface2, BackgroundTransparency = 0.5, Text = "", AutoButtonColor = false }, sidebar)
     corner(btn, 8)
     
     local bgHighlight = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.accent, BackgroundTransparency = 1, BorderSizePixel = 0 }, btn)
@@ -514,40 +515,62 @@ local function setLoaderStatus(text, color)
 end
 
 -- ============================================================
+-- DIVIDER (Разделитель)
+-- ============================================================
+local divider = create("Frame", { Position = UDim2.new(0, 110, 0, 8), Size = UDim2.new(0, 2, 1, -16), BackgroundColor3 = C.accent, BackgroundTransparency = 0.6, BorderSizePixel = 0, ZIndex = 6 }, main)
+corner(divider, 1)
+
+-- ============================================================
 -- CONTENT AREA (Справа)
 -- ============================================================
 local contentArea = create("Frame", { Position = UDim2.new(0, 110, 0, 0), Size = UDim2.new(1, -110, 1, 0), BackgroundTransparency = 1 }, main)
 
--- Шапка
-local header = create("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = C.bg, BorderSizePixel = 0 }, contentArea)
-local titleLabel = create("TextLabel", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.new(1, -130, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
-create("TextLabel", { Position = UDim2.new(0, 12, 0, 28), Size = UDim2.new(1, -130, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
+-- Фон правой части (более светлый и с синим градиентом)
+local rightBg = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 1 }, contentArea)
+corner(rightBg, 16)
+stroke(rightBg, C.border, 1, 0.8)
 
-local timerLabel = create("TextLabel", { Position = UDim2.new(1, -100, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(80, 24), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "⏱ ∞", TextColor3 = C.green, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, header)
-corner(timerLabel, 12)
-stroke(timerLabel, C.border, 1, 0.5)
+local rightGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, rightBg)
+corner(rightGradFrame, 16)
+create("UIGradient", { 
+    Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, 
+    Rotation = 90 
+}, rightGradFrame)
 
-makeDraggable(main, header)
+local glow = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, 200), BackgroundColor3 = C.accent, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2 }, rightBg)
+corner(glow, 16)
+create("UIGradient", { 
+    Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.accent), ColorSequenceKeypoint.new(1, C.surface)}, 
+    Transparency = NumberSequence.new(0.8, 1),
+    Rotation = 90 
+}, glow)
 
--- Баннер
-local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, contentArea)
+-- ============================================================
+-- BANNER (Теперь это наша шапка)
+-- ============================================================
+local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 0, 64), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3 }, contentArea)
 corner(banner, 10)
 stroke(banner, C.accent, 1, 0.3)
+
 local gradientFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.7, BorderSizePixel = 0 }, banner)
 corner(gradientFrame, 10)
 create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 45 }, gradientFrame)
-create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left }, banner)
-create("TextLabel", { Position = UDim2.new(0, 12, 0, 26), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, banner)
+
+create("TextLabel", { Position = UDim2.new(0, 16, 0, 8), Size = UDim2.new(1, -32, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left }, banner)
+create("TextLabel", { Position = UDim2.new(0, 16, 0, 36), Size = UDim2.new(1, -32, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left }, banner)
+
+-- Перетаскивание за баннер
+makeDraggable(main, banner)
 
 -- Поиск
-local searchFrame = create("Frame", { Position = UDim2.new(0, 8, 0, 120), Size = UDim2.new(1, -16, 0, 36), BackgroundColor3 = C.input, BorderSizePixel = 0 }, contentArea)
+local searchFrame = create("Frame", { Position = UDim2.new(0, 8, 0, 80), Size = UDim2.new(1, -16, 0, 36), BackgroundColor3 = C.input, BorderSizePixel = 0, ZIndex = 3 }, contentArea)
 corner(searchFrame, 8)
 stroke(searchFrame, C.border, 1, 0.5)
 create("TextLabel", { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.fromOffset(20, 36), BackgroundTransparency = 1, Text = "🔍", TextColor3 = C.muted, TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, searchFrame)
 local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Поиск игр...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
 
--- Страницы
-local content = create("Frame", { Position = UDim2.new(0, 8, 0, 160), Size = UDim2.new(1, -16, 1, -168), BackgroundTransparency = 1, ClipsDescendants = true }, contentArea)
+-- Страницы (контент теперь ниже)
+local content = create("Frame", { Position = UDim2.new(0, 8, 0, 124), Size = UDim2.new(1, -16, 1, -132), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 3 }, contentArea)
 
 local function makePage(parent, name)
     local page = create("ScrollingFrame", { Name = name, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.accent, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false }, parent)
@@ -746,16 +769,9 @@ local function formatRemaining(sec)
 end
 
 local function updateTimerLabel(remaining)
-    if not timerLabel then return end
-    local timeStr = formatRemaining(remaining)
-    timerLabel.Text = "⏱ " .. (remaining and timeStr or "∞")
-    if remaining == nil then timerLabel.TextColor3 = C.muted
-    elseif remaining <= 60 then timerLabel.TextColor3 = C.red
-    elseif remaining <= 300 then timerLabel.TextColor3 = C.yellow
-    else timerLabel.TextColor3 = C.green end
-    
-    -- Обновляем профиль
+    -- Обновляем только профиль, так как таймер сверху мы убрали
     if profileKeyLbl then
+        local timeStr = formatRemaining(remaining)
         profileKeyLbl.Text = remaining and ("Осталось: " .. timeStr) or "Навсегда (∞)"
         if remaining == nil then profileKeyLbl.TextColor3 = C.green
         elseif remaining <= 60 then profileKeyLbl.TextColor3 = C.red
@@ -888,21 +904,19 @@ local function makeCard(parent, title, subtitle, icon, onClick)
         toggleFavorite(title)
         local nowFav = STATE.favorites[title] == true
         
-        -- Меняем визуал ТОЛЬКО у этой кнопки (мгновенный фидбек)
         starLbl.Text = nowFav and "⭐" or "☆"
         starLbl.TextColor3 = nowFav and C.yellow or C.muted
         
-        -- Всплывающий текст
         if nowFav then
             showToast("Добавлено в избранное", "ok")
         else
             showToast("Удалено из избранного", "warn")
         end
         
-        updateStarVisuals(title) -- Синхронизируем звезду на всех остальных страницах
+        updateStarVisuals(title)
         
         if favoritesPage.Visible then
-            loadFavoritesPage() -- Перезагружаем список избранного, если мы в нем
+            loadFavoritesPage()
         end
     end)
 
@@ -1180,13 +1194,13 @@ showPage = function(name)
     
     if showTop then
         TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 160),
-            Size = UDim2.new(1, -16, 1, -168)
+            Position = UDim2.new(0, 8, 0, 124),
+            Size = UDim2.new(1, -16, 1, -132)
         }):Play()
     else
         TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 64),
-            Size = UDim2.new(1, -16, 1, -72)
+            Position = UDim2.new(0, 8, 0, 8),
+            Size = UDim2.new(1, -16, 1, -16)
         }):Play()
     end
     
