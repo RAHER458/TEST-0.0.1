@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.7.6-beta (Wider Window + Header Fix + Syntax Fix)
+    Version: 0.7.7-beta (Ideal Header)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,14 +15,14 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.7.6-beta",
+    VERSION        = "0.7.7-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
     DEVICE_FILE    = "RH_LAUNCHER_DEVICE.dat",
     TG_LINK        = "https://t.me/generalvaneska2024",
-    WINDOW_W       = 360, -- Расширили окно
-    WINDOW_H       = 420, -- Сделали чуть выше
+    WINDOW_W       = 360,
+    WINDOW_H       = 420,
     RETRY_MAX      = 3,
     RETRY_DELAY    = 1.5,
     HEARTBEAT_S    = 300,
@@ -423,23 +423,26 @@ local header = create("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3
 corner(header, 16)
 create("Frame", { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -18), BackgroundColor3 = C.surface, BorderSizePixel = 0 }, header)
 
+-- Логотип RH (Фиолетовый, статичный)
 local logoLabel = create("TextLabel", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1, Text = "RH", TextColor3 = C.pink, Font = Enum.Font.GothamBlack, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center }, header)
 
-local titleLabel = create("TextLabel", { Position = UDim2.new(0, 50, 0, 8), Size = UDim2.new(1, -190, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
-create("TextLabel", { Position = UDim2.new(0, 50, 0, 28), Size = UDim2.new(1, -190, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
+-- Название лаунчера
+local titleLabel = create("TextLabel", { Position = UDim2.new(0, 50, 0, 8), Size = UDim2.new(1, -200, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
+create("TextLabel", { Position = UDim2.new(0, 50, 0, 28), Size = UDim2.new(1, -200, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
 
--- Блок профиля (Таймер + Ник + Аватарка)
-local timerLabel = create("TextLabel", { Position = UDim2.new(1, -140, 0, 12), Size = UDim2.fromOffset(40, 14), BackgroundTransparency = 1, Text = "⏱ ∞", TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right }, header)
-local nameLabel = create("TextLabel", { Position = UDim2.new(1, -95, 0, 12), Size = UDim2.fromOffset(50, 14), BackgroundTransparency = 1, Text = LocalPlayer.Name, TextColor3 = C.text, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd }, header)
+-- Профиль: Ник и Таймер (слева от аватарки)
+local timerLabel = create("TextLabel", { Position = UDim2.new(1, -150, 0, 30), Size = UDim2.fromOffset(100, 14), BackgroundTransparency = 1, Text = "⏱ ∞", TextColor3 = C.green, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right }, header)
+local nameLabel = create("TextLabel", { Position = UDim2.new(1, -150, 0, 12), Size = UDim2.fromOffset(100, 16), BackgroundTransparency = 1, Text = LocalPlayer.Name, TextColor3 = C.text, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd }, header)
 
-local profileFrame = create("Frame", { Position = UDim2.new(1, -38, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(34, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, header)
-corner(profileFrame, 17)
+-- Аватарка (справа)
+local profileFrame = create("Frame", { Position = UDim2.new(1, -42, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(36, 36), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, header)
+corner(profileFrame, 18)
 stroke(profileFrame, C.accent, 1.5, 0.2)
 
 local userId = LocalPlayer.UserId
 local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(userId) .. "&width=150&height=150&format=png"
 local avatarImg = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = avatarUrl, ScaleType = Enum.ScaleType.Crop }, profileFrame)
-corner(avatarImg, 17)
+corner(avatarImg, 18)
 
 local fallbackLetter = create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = string.sub(LocalPlayer.Name, 1, 1):upper(), TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Visible = false }, profileFrame)
 
@@ -462,15 +465,6 @@ task.delay(2, function()
 end)
 
 makeDraggable(main, header)
-
-task.spawn(function()
-    local hue = 0
-    while mainGui.Parent do
-        hue = (hue + 0.008) % 1
-        if logoLabel.Parent then logoLabel.TextColor3 = Color3.fromHSV(hue, 0.7, 1) end
-        task.wait(0.05)
-    end
-end)
 
 -- ============================================================
 -- CONTENT
