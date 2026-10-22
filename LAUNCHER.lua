@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.0-beta (Sidebar Design Update)
+    Version: 0.9.7-beta (Black Bar Geometry Fix)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.0-beta",
+    VERSION        = "0.9.7-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -422,12 +422,10 @@ if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal
 local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
 corner(sidebar, 16)
 
--- Градиент на сайдбаре
 local sideGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, sidebar)
 corner(sideGradFrame, 16)
 create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, sideGradFrame)
 
--- Заглушка под логотип
 local logoFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, sidebar)
 corner(logoFrame, 25)
 stroke(logoFrame, C.pink, 1.5, 0.2)
@@ -465,6 +463,24 @@ createNavButton("🏠", "Главная", 0, "games")
 createNavButton("⭐", "Избранное", 1, "favorites")
 createNavButton("⚙️", "Настройки", 2, "settings")
 createNavButton("👤", "Профиль", 3, "profile")
+
+-- Блок статуса внизу
+local statusFrame = create("Frame", { Position = UDim2.new(0, 5, 1, -65), Size = UDim2.new(1, -10, 0, 50), BackgroundColor3 = C.surface2, BackgroundTransparency = 0.5, BorderSizePixel = 0 }, sidebar)
+corner(statusFrame, 8)
+
+local statusDot = create("Frame", { Position = UDim2.new(0, 8, 0, 10), Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.yellow, BorderSizePixel = 0 }, statusFrame)
+corner(statusDot, 4)
+
+local statusLabel = create("TextLabel", { Position = UDim2.new(0, 20, 0, 6), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "Статус", TextColor3 = C.muted, TextSize = 8, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
+local statusText = create("TextLabel", { Position = UDim2.new(0, 20, 0, 18), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.yellow, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
+
+local versionLabel = create("TextLabel", { Position = UDim2.new(0, 8, 0, 34), Size = UDim2.new(1, -16, 0, 10), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 7, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
+
+local function setLoaderStatus(text, color)
+    statusText.Text = text
+    statusText.TextColor3 = color
+    statusDot.BackgroundColor3 = color
+end
 
 -- ============================================================
 -- CONTENT AREA (Справа)
@@ -522,14 +538,15 @@ createStub(favoritesPage, "Избранное пока пустое")
 createStub(settingsPage, "Настройки в разработке")
 createStub(profilePage, "Профиль в разработке")
 
+-- Кнопка "Назад" для читов
 local cheatsBackBtn = create("TextButton", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "←  НАЗАД К ИГРАМ", TextColor3 = C.text, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true, LayoutOrder = -2 }, cheatsPage)
 corner(cheatsBackBtn, 8)
 
 local cheatsTitleLbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", TextColor3 = C.accent, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = -1 }, cheatsPage)
 
-local cheatsListFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 0 }, cheatsPage)
-create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6) }, cheatsListFrame)
-
+-- ============================================================
+-- ВОТ ТУТ МЫ ИСПРАВЛЯЕМ ЧЕРНУЮ ПОЛОСУ!
+-- ============================================================
 local function showPage(name)
     gamesPage.Visible = (name == "games")
     cheatsPage.Visible = (name == "cheats")
@@ -542,9 +559,17 @@ local function showPage(name)
     searchFrame.Visible = showTop
     
     if showTop then
-        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 160) }):Play()
+        -- На главной: позиция 160, высота оставляет 8px снизу
+        TweenService:Create(content, TweenInfo.new(0.2), { 
+            Position = UDim2.new(0, 8, 0, 160),
+            Size = UDim2.new(1, -16, 1, -168)
+        }):Play()
     else
-        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 64) }):Play()
+        -- На читах/настройках: поднимаем наверх (Y=64) И РАСТЯГИВАЕМ ВНИЗ
+        TweenService:Create(content, TweenInfo.new(0.2), { 
+            Position = UDim2.new(0, 8, 0, 64),
+            Size = UDim2.new(1, -16, 1, -72)
+        }):Play()
     end
 end
 
@@ -891,11 +916,14 @@ local function loadGamesList()
         end 
     end
 
+    setLoaderStatus("Загрузка...", C.yellow)
+
     local result, err = api("/get_scripts", nil, "GET")
     
     if not result or result.success ~= true or type(result.games) ~= "table" then
         local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Ошибка загрузки списка игр.\nПроверьте интернет.", TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
         lbl.LayoutOrder = 1
+        setLoaderStatus("Нет связи", C.red)
         return
     end
 
@@ -929,28 +957,50 @@ local function loadGamesList()
         local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Пока нет доступных игр.\nДобавьте их через Telegram-бота.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
         lbl.LayoutOrder = 1
     end
+
+    setLoaderStatus("Готов к работе", C.green)
 end
 
 showCheatsForGame = function(selectedGame)
-    for _, child in ipairs(cheatsListFrame:GetChildren()) do if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end end
+    -- Очищаем страницу читов (кроме кнопки Назад и заголовка)
+    for _, child in ipairs(cheatsPage:GetChildren()) do 
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") and child ~= cheatsBackBtn and child ~= cheatsTitleLbl then 
+            child:Destroy() 
+        end 
+    end
+    
     cheatsTitleLbl.Text = "ЧИТЫ ДЛЯ " .. tostring(selectedGame.name):upper()
 
     if not selectedGame.cheats or #selectedGame.cheats == 0 then
-        create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "Читы пока не добавлены", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, cheatsListFrame)
+        create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "Читы пока не добавлены", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, cheatsPage)
         showPage("cheats")
         return
     end
 
+    setLoaderStatus("Проверка...", C.yellow)
+
     for i, cheat in ipairs(selectedGame.cheats) do 
         checkLink(cheat)
-        createCheatCard(cheatsListFrame, cheat, i) 
+        createCheatCard(cheatsPage, cheat, i) 
     end
     showPage("cheats")
 
     task.spawn(function()
-        task.wait(2)
+        local allChecked = false
+        while not allChecked do
+            task.wait(0.5)
+            allChecked = true
+            for _, cheat in ipairs(selectedGame.cheats) do
+                if LinkStatus[cheat.id] == "checking" or LinkStatus[cheat.id] == nil then
+                    allChecked = false
+                    break
+                end
+            end
+        end
+        setLoaderStatus("Готов к работе", C.green)
+        
         if not cheatsPage.Visible then return end
-        for _, child in ipairs(cheatsListFrame:GetChildren()) do
+        for _, child in ipairs(cheatsPage:GetChildren()) do
             if child:IsA("Frame") and child.Name:sub(1, 11) == "RatingCard_" then
                 local cheatId = child.Name:sub(12)
                 local status = LinkStatus[cheatId] or "unknown"
@@ -1058,7 +1108,11 @@ end)
 task.spawn(function()
     task.wait(0.3)
     local saved = loadToken()
-    if not saved then setStatus("Введите ключ доступа", nil); return end
+    if not saved then 
+        setLoaderStatus("Ожидание", C.red)
+        setStatus("Введите ключ доступа", nil)
+        return 
+    end
     
     setStatus("Проверка сессии...", nil); setBusy(true)
     local valid, reason = verifySavedToken(saved)
