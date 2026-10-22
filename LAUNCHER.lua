@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.7-beta (Black Bar Geometry Fix)
+    Version: 0.9.11-beta (Star Toast & Sync Fix)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,11 +15,12 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.7-beta",
+    VERSION        = "0.9.11-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
     DEVICE_FILE    = "RH_LAUNCHER_DEVICE.dat",
+    FAV_FILE       = "RH_LAUNCHER_FAVS.dat",
     TG_LINK        = "https://t.me/generalvaneska2024",
     WINDOW_W       = 480,
     WINDOW_H       = 460,
@@ -79,7 +80,10 @@ pcall(function()
     end
 end)
 
-local STATE = { authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil }
+local STATE = { 
+    authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
+    favorites = {}, currentPage = "games", lastNonCheatPage = "games" 
+}
 
 -- ============================================================
 -- HELPERS
@@ -127,6 +131,26 @@ local function hasFileAPI()
     return type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function"
 end
 
+-- ==== FAVORITES LOGIC ====
+local function loadFavorites()
+    if hasFileAPI() and isfile(CONFIG.FAV_FILE) then
+        local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG.FAV_FILE)) end)
+        if ok and type(data) == "table" then STATE.favorites = data end
+    end
+end
+loadFavorites()
+
+local function saveFavorites()
+    if hasFileAPI() then pcall(writefile, CONFIG.FAV_FILE, HttpService:JSONEncode(STATE.favorites)) end
+end
+
+local function toggleFavorite(gameName)
+    STATE.favorites[gameName] = not STATE.favorites[gameName]
+    if STATE.favorites[gameName] == false then STATE.favorites[gameName] = nil end
+    saveFavorites()
+end
+
+-- ============================================================
 local function generateDeviceId() return "RH-" .. HttpService:GenerateGUID(false) end
 
 local function loadDeviceId()
@@ -417,7 +441,14 @@ fitMain()
 if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain) end
 
 -- ============================================================
--- SIDEBAR (Слева)
+-- FORWARD DECLARATIONS
+-- ============================================================
+local showPage
+local showCheatsForGame
+local loadFavoritesPage
+
+-- ============================================================
+-- SIDEBAR
 -- ============================================================
 local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
 corner(sidebar, 16)
@@ -531,12 +562,9 @@ local favoritesPage = makePage(content, "FavoritesPage")
 local settingsPage = makePage(content, "SettingsPage")
 local profilePage = makePage(content, "ProfilePage")
 
-local function createStub(parent, text)
-    create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = text, TextColor3 = C.muted, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, parent)
-end
-createStub(favoritesPage, "Избранное пока пустое")
-createStub(settingsPage, "Настройки в разработке")
-createStub(profilePage, "Профиль в разработке")
+-- Заглушка для настроек
+create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "⚙️", TextColor3 = C.muted, TextSize = 28, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, settingsPage)
+create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "Настройки в разработке", TextColor3 = C.muted, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, settingsPage)
 
 -- Кнопка "Назад" для читов
 local cheatsBackBtn = create("TextButton", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "←  НАЗАД К ИГРАМ", TextColor3 = C.text, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true, LayoutOrder = -2 }, cheatsPage)
@@ -545,38 +573,53 @@ corner(cheatsBackBtn, 8)
 local cheatsTitleLbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", TextColor3 = C.accent, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = -1 }, cheatsPage)
 
 -- ============================================================
--- ВОТ ТУТ МЫ ИСПРАВЛЯЕМ ЧЕРНУЮ ПОЛОСУ!
+-- PROFILE PAGE UI
 -- ============================================================
-local function showPage(name)
-    gamesPage.Visible = (name == "games")
-    cheatsPage.Visible = (name == "cheats")
-    favoritesPage.Visible = (name == "favorites")
-    settingsPage.Visible = (name == "settings")
-    profilePage.Visible = (name == "profile")
-    
-    local showTop = (name == "games")
-    banner.Visible = showTop
-    searchFrame.Visible = showTop
-    
-    if showTop then
-        -- На главной: позиция 160, высота оставляет 8px снизу
-        TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 160),
-            Size = UDim2.new(1, -16, 1, -168)
-        }):Play()
-    else
-        -- На читах/настройках: поднимаем наверх (Y=64) И РАСТЯГИВАЕМ ВНИЗ
-        TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 64),
-            Size = UDim2.new(1, -16, 1, -72)
-        }):Play()
-    end
-end
+local profileFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 280), BackgroundColor3 = C.surface, BorderSizePixel = 0 }, profilePage)
+corner(profileFrame, 12)
+stroke(profileFrame, C.accent, 1, 0.4)
+profileFrame.LayoutOrder = 1
 
--- Активируем "Главная" по умолчанию
-navButtons["games"].iconLabel.TextColor3 = C.accent
-navButtons["games"].textLabel.TextColor3 = C.accent
-navButtons["games"].bg.BackgroundTransparency = 0.8
+local avatarFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(70, 70), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileFrame)
+corner(avatarFrame, 35)
+stroke(avatarFrame, C.accent, 2, 0)
+
+local userId = LocalPlayer.UserId
+local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(userId) .. "&width=150&height=150&format=png"
+local avatarImg = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = avatarUrl, ScaleType = Enum.ScaleType.Crop }, avatarFrame)
+corner(avatarImg, 35)
+local fallbackLetter = create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = string.sub(LocalPlayer.Name, 1, 1):upper(), TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 30, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Visible = false }, avatarFrame)
+
+avatarImg.Changed:Connect(function(prop)
+    if prop == "IsLoaded" or prop == "Image" then
+        if avatarImg.IsLoaded == false or avatarImg.Image == "" then avatarImg.Visible = false; fallbackLetter.Visible = true
+        else avatarImg.Visible = true; fallbackLetter.Visible = false end
+    end
+end)
+task.delay(2, function()
+    if avatarImg.IsLoaded == false and avatarImg.Parent then avatarImg.Visible = false; fallbackLetter.Visible = true end
+end)
+
+create("TextLabel", { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, Text = LocalPlayer.Name, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center }, profileFrame)
+create("TextLabel", { Position = UDim2.new(0, 0, 0, 126), Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "ID: " .. tostring(userId), TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center }, profileFrame)
+
+local keyStatusFrame = create("Frame", { Position = UDim2.new(0, 16, 0, 160), Size = UDim2.new(1, -32, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileFrame)
+corner(keyStatusFrame, 8)
+stroke(keyStatusFrame, C.border, 1, 0.5)
+
+create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "ВАШ КЛЮЧ ДОСТУПА", TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 20), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+
+local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 220), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "💳 ПРОДЛИТЬ КЛЮЧ", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileFrame)
+corner(renewBtn, 8)
+
+renewBtn.MouseButton1Click:Connect(function()
+    local copied = false
+    if type(setclipboard) == "function" then copied = pcall(setclipboard, CONFIG.TG_LINK)
+    elseif type(toclipboard) == "function" then copied = pcall(toclipboard, CONFIG.TG_LINK) end
+    if copied then showToast("Ссылка на продление скопирована!", "ok")
+    else showToast("Ссылка: " .. CONFIG.TG_LINK, "warn") end
+end)
 
 -- ============================================================
 -- CHEAT TRACKER
@@ -691,12 +734,12 @@ end
 -- TIMER
 -- ============================================================
 local function formatRemaining(sec)
-    if sec == nil then return "∞" end
+    if sec == nil then return "∞ Бесконечный" end
     sec = tonumber(sec)
     if not sec then return "--" end
-    if sec <= 0 then return "истёк" end
+    if sec <= 0 then return "Истёк" end
     local d = math.floor(sec / 86400); local h = math.floor((sec % 86400) / 3600); local m = math.floor((sec % 3600) / 60); local s = math.floor(sec % 60)
-    if d > 0 then return string.format("%dд %dч", d, h) end
+    if d > 0 then return string.format("%dд %dч %dм", d, h, m) end
     if h > 0 then return string.format("%dч %dм", h, m) end
     if m > 0 then return string.format("%dм %dс", m, s) end
     return string.format("%dс", s)
@@ -704,11 +747,21 @@ end
 
 local function updateTimerLabel(remaining)
     if not timerLabel then return end
-    timerLabel.Text = "⏱ " .. formatRemaining(remaining)
+    local timeStr = formatRemaining(remaining)
+    timerLabel.Text = "⏱ " .. (remaining and timeStr or "∞")
     if remaining == nil then timerLabel.TextColor3 = C.muted
     elseif remaining <= 60 then timerLabel.TextColor3 = C.red
     elseif remaining <= 300 then timerLabel.TextColor3 = C.yellow
     else timerLabel.TextColor3 = C.green end
+    
+    -- Обновляем профиль
+    if profileKeyLbl then
+        profileKeyLbl.Text = remaining and ("Осталось: " .. timeStr) or "Навсегда (∞)"
+        if remaining == nil then profileKeyLbl.TextColor3 = C.green
+        elseif remaining <= 60 then profileKeyLbl.TextColor3 = C.red
+        elseif remaining <= 300 then profileKeyLbl.TextColor3 = C.yellow
+        else profileKeyLbl.TextColor3 = C.green end
+    end
 end
 
 -- ============================================================
@@ -782,6 +835,30 @@ local function submitVote(cheatId, voteType)
 end
 
 -- ============================================================
+-- STAR SYNC HELPER
+-- ============================================================
+local function updateStarVisuals(gameName)
+    local isFav = STATE.favorites[gameName] == true
+    local text = isFav and "⭐" or "☆"
+    local color = isFav and C.yellow or C.muted
+    
+    for _, page in ipairs({gamesPage, favoritesPage}) do
+        for _, child in ipairs(page:GetChildren()) do
+            if child:IsA("TextButton") and child:GetAttribute("GameName") == gameName then
+                local starBtn = child:FindFirstChild("StarButton")
+                if starBtn then
+                    local star = starBtn:FindFirstChild("StarIcon")
+                    if star then
+                        star.Text = text
+                        star.TextColor3 = color
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
 -- CARDS
 -- ============================================================
 local function makeCard(parent, title, subtitle, icon, onClick)
@@ -795,12 +872,41 @@ local function makeCard(parent, title, subtitle, icon, onClick)
     
     create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
 
-    create("TextLabel", { Position = UDim2.new(0, 58, 0, 10), Size = UDim2.new(1, -120, 0, 16), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+    -- Текст
+    create("TextLabel", { Position = UDim2.new(0, 58, 0, 10), Size = UDim2.new(1, -150, 0, 16), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
 
     if subtitle and subtitle ~= "" then 
-        create("TextLabel", { Position = UDim2.new(0, 58, 0, 28), Size = UDim2.new(1, -120, 0, 14), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, card) 
+        create("TextLabel", { Position = UDim2.new(0, 58, 0, 28), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, card) 
     end
 
+    -- Звездочка избранного
+    local starBtn = create("TextButton", { Name = "StarButton", Position = UDim2.new(1, -70, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 2 }, card)
+    local isFav = STATE.favorites[title] == true
+    local starLbl = create("TextLabel", { Name = "StarIcon", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isFav and "⭐" or "☆", TextColor3 = isFav and C.yellow or C.muted, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, starBtn)
+    
+    starBtn.MouseButton1Click:Connect(function()
+        toggleFavorite(title)
+        local nowFav = STATE.favorites[title] == true
+        
+        -- Меняем визуал ТОЛЬКО у этой кнопки (мгновенный фидбек)
+        starLbl.Text = nowFav and "⭐" or "☆"
+        starLbl.TextColor3 = nowFav and C.yellow or C.muted
+        
+        -- Всплывающий текст
+        if nowFav then
+            showToast("Добавлено в избранное", "ok")
+        else
+            showToast("Удалено из избранного", "warn")
+        end
+        
+        updateStarVisuals(title) -- Синхронизируем звезду на всех остальных страницах
+        
+        if favoritesPage.Visible then
+            loadFavoritesPage() -- Перезагружаем список избранного, если мы в нем
+        end
+    end)
+
+    -- Стрелочка
     local arrowBtn = create("TextButton", { Position = UDim2.new(1, -38, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "›", TextColor3 = C.accent, Font = Enum.Font.GothamBold, TextSize = 18, AutoButtonColor = false, Active = false }, card)
     corner(arrowBtn, 13)
     stroke(arrowBtn, C.accent, 1.5, 0.3)
@@ -891,8 +997,6 @@ end
 -- ============================================================
 -- SEARCH LOGIC & GAME LOADING
 -- ============================================================
-local showCheatsForGame -- Forward declaration
-
 local function filterGames()
     local query = string.lower(searchBox.Text)
     for _, child in ipairs(gamesPage:GetChildren()) do
@@ -961,8 +1065,32 @@ local function loadGamesList()
     setLoaderStatus("Готов к работе", C.green)
 end
 
+-- Функция для отрисовки избранного
+loadFavoritesPage = function()
+    for _, child in ipairs(favoritesPage:GetChildren()) do 
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end 
+    end
+    
+    local hasFavs = false
+    for _, gameObj in ipairs(STATE.games) do
+        if STATE.favorites[gameObj.name] then
+            hasFavs = true
+            local count = #gameObj.cheats
+            local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
+            local icon = GameIcons[gameObj.name] or GameIcons.default
+            local card = makeCard(favoritesPage, gameObj.name, subtitle, icon, function()
+                showCheatsForGame(gameObj)
+            end)
+            card:SetAttribute("GameName", gameObj.name)
+        end
+    end
+    
+    if not hasFavs then
+        create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Вы пока не добавили игры в избранное.\nНажмите ☆ на карточке игры.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, favoritesPage)
+    end
+end
+
 showCheatsForGame = function(selectedGame)
-    -- Очищаем страницу читов (кроме кнопки Назад и заголовка)
     for _, child in ipairs(cheatsPage:GetChildren()) do 
         if child:IsA("GuiObject") and not child:IsA("UIListLayout") and child ~= cheatsBackBtn and child ~= cheatsTitleLbl then 
             child:Destroy() 
@@ -1024,7 +1152,53 @@ showCheatsForGame = function(selectedGame)
     end)
 end
 
-cheatsBackBtn.MouseButton1Click:Connect(function() showPage("games") end)
+cheatsBackBtn.MouseButton1Click:Connect(function() 
+    showPage(STATE.lastNonCheatPage or "games") 
+end)
+
+-- ============================================================
+-- SHOW PAGE LOGIC
+-- ============================================================
+showPage = function(name)
+    if name == "cheats" then
+        if STATE.currentPage ~= "cheats" then
+            STATE.lastNonCheatPage = STATE.currentPage
+        end
+    else
+        STATE.currentPage = name
+    end
+
+    gamesPage.Visible = (name == "games")
+    cheatsPage.Visible = (name == "cheats")
+    favoritesPage.Visible = (name == "favorites")
+    settingsPage.Visible = (name == "settings")
+    profilePage.Visible = (name == "profile")
+    
+    local showTop = (name == "games")
+    banner.Visible = showTop
+    searchFrame.Visible = showTop
+    
+    if showTop then
+        TweenService:Create(content, TweenInfo.new(0.2), { 
+            Position = UDim2.new(0, 8, 0, 160),
+            Size = UDim2.new(1, -16, 1, -168)
+        }):Play()
+    else
+        TweenService:Create(content, TweenInfo.new(0.2), { 
+            Position = UDim2.new(0, 8, 0, 64),
+            Size = UDim2.new(1, -16, 1, -72)
+        }):Play()
+    end
+    
+    if name == "favorites" then
+        loadFavoritesPage()
+    end
+end
+
+-- Активируем "Главная" по умолчанию
+navButtons["games"].iconLabel.TextColor3 = C.accent
+navButtons["games"].textLabel.TextColor3 = C.accent
+navButtons["games"].bg.BackgroundTransparency = 0.8
 
 -- ============================================================
 -- ON AUTH SUCCESS / KICK
@@ -1051,6 +1225,8 @@ onAuthSuccess = function(token)
         
         if STATE.localRemaining then
              updateTimerLabel(STATE.localRemaining)
+        else
+             updateTimerLabel(nil)
         end
 
         task.spawn(function()
