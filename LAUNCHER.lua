@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.16-beta (UI Separation & Colors)
+    Version: 0.9.21-beta (Image Covers)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.16-beta",
+    VERSION        = "0.9.21-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -453,7 +453,6 @@ local loadFavoritesPage
 local sidebar = create("Frame", { Size = UDim2.new(0, 110, 1, 0), BackgroundColor3 = C.bg, BorderSizePixel = 0, ZIndex = 5, ClipsDescendants = true }, main)
 corner(sidebar, 16)
 
--- Легкий градиент для левой панели (темный, чтобы отличался от правой)
 local sideGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.9, BorderSizePixel = 0 }, sidebar)
 corner(sideGradFrame, 16)
 create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.bg), ColorSequenceKeypoint.new(1, C.surface)}, Rotation = 90 }, sideGradFrame)
@@ -496,7 +495,6 @@ createNavButton("⭐", "Избранное", 1, "favorites")
 createNavButton("⚙️", "Настройки", 2, "settings")
 createNavButton("👤", "Профиль", 3, "profile")
 
--- Блок статуса внизу
 local statusFrame = create("Frame", { Position = UDim2.new(0, 5, 1, -65), Size = UDim2.new(1, -10, 0, 50), BackgroundColor3 = C.surface2, BackgroundTransparency = 0.5, BorderSizePixel = 0 }, sidebar)
 corner(statusFrame, 8)
 
@@ -525,28 +523,20 @@ corner(divider, 1)
 -- ============================================================
 local contentArea = create("Frame", { Position = UDim2.new(0, 110, 0, 0), Size = UDim2.new(1, -110, 1, 0), BackgroundTransparency = 1 }, main)
 
--- Фон правой части (более светлый и с синим градиентом)
 local rightBg = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 1 }, contentArea)
 corner(rightBg, 16)
 stroke(rightBg, C.border, 1, 0.8)
 
 local rightGradFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, rightBg)
 corner(rightGradFrame, 16)
-create("UIGradient", { 
-    Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, 
-    Rotation = 90 
-}, rightGradFrame)
+create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, rightGradFrame)
 
 local glow = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, 200), BackgroundColor3 = C.accent, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2 }, rightBg)
 corner(glow, 16)
-create("UIGradient", { 
-    Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.accent), ColorSequenceKeypoint.new(1, C.surface)}, 
-    Transparency = NumberSequence.new(0.8, 1),
-    Rotation = 90 
-}, glow)
+create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.accent), ColorSequenceKeypoint.new(1, C.surface)}, Transparency = NumberSequence.new(0.8, 1), Rotation = 90 }, glow)
 
 -- ============================================================
--- BANNER (Теперь это наша шапка)
+-- BANNER (Шапка)
 -- ============================================================
 local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 0, 64), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3 }, contentArea)
 corner(banner, 10)
@@ -559,7 +549,6 @@ create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.
 create("TextLabel", { Position = UDim2.new(0, 16, 0, 8), Size = UDim2.new(1, -32, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left }, banner)
 create("TextLabel", { Position = UDim2.new(0, 16, 0, 36), Size = UDim2.new(1, -32, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left }, banner)
 
--- Перетаскивание за баннер
 makeDraggable(main, banner)
 
 -- Поиск
@@ -569,7 +558,7 @@ stroke(searchFrame, C.border, 1, 0.5)
 create("TextLabel", { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.fromOffset(20, 36), BackgroundTransparency = 1, Text = "🔍", TextColor3 = C.muted, TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, searchFrame)
 local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Поиск игр...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
 
--- Страницы (контент теперь ниже)
+-- Страницы
 local content = create("Frame", { Position = UDim2.new(0, 8, 0, 124), Size = UDim2.new(1, -16, 1, -132), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 3 }, contentArea)
 
 local function makePage(parent, name)
@@ -718,7 +707,6 @@ local function launchCheat(cheat)
 
     task.spawn(function()
         local secureUrl = CONFIG.API_BASE .. "/secure_load?cheat_id=" .. cheat.id .. "&token=" .. tostring(STATE.token)
-        
         local okFetch, source = pcall(function() return game:HttpGet(secureUrl) end)
         
         if not okFetch or type(source) ~= "string" or #source < 10 then 
@@ -769,7 +757,6 @@ local function formatRemaining(sec)
 end
 
 local function updateTimerLabel(remaining)
-    -- Обновляем только профиль, так как таймер сверху мы убрали
     if profileKeyLbl then
         local timeStr = formatRemaining(remaining)
         profileKeyLbl.Text = remaining and ("Осталось: " .. timeStr) or "Навсегда (∞)"
@@ -794,20 +781,13 @@ local function checkLink(cheat)
         local req = getRequestFn()
         if not req then LinkStatus[cheat.id] = "unknown"; return end
         
-        local ok, res = pcall(function()
-            return req({ Url = cheat.url, Method = "GET" })
-        end)
+        local ok, res = pcall(function() return req({ Url = cheat.url, Method = "GET" }) end)
         
         if ok and res then
             local status = tonumber(res.StatusCode or res.Status or 0) or 0
-            if status >= 200 and status < 300 and type(res.Body) == "string" and #res.Body > 10 then
-                LinkStatus[cheat.id] = "ok"
-            else
-                LinkStatus[cheat.id] = "dead"
-            end
-        else
-            LinkStatus[cheat.id] = "dead"
-        end
+            if status >= 200 and status < 300 and type(res.Body) == "string" and #res.Body > 10 then LinkStatus[cheat.id] = "ok"
+            else LinkStatus[cheat.id] = "dead" end
+        else LinkStatus[cheat.id] = "dead" end
     end)
 end
 
@@ -832,7 +812,6 @@ local function fetchRatings(force)
         return true
     end
     Ratings.loading = false
-    warn("[RH-LAUNCHER] Ratings fetch failed: " .. tostring(err or "invalid response"))
     return false
 end
 
@@ -864,10 +843,7 @@ local function updateStarVisuals(gameName)
                 local starBtn = child:FindFirstChild("StarButton")
                 if starBtn then
                     local star = starBtn:FindFirstChild("StarIcon")
-                    if star then
-                        star.Text = text
-                        star.TextColor3 = color
-                    end
+                    if star then star.Text = text; star.TextColor3 = color end
                 end
             end
         end
@@ -875,24 +851,49 @@ local function updateStarVisuals(gameName)
 end
 
 -- ============================================================
--- CARDS
+-- CARDS (С ПОДДЕРЖКОЙ КАРТИНОК)
 -- ============================================================
-local function makeCard(parent, title, subtitle, icon, onClick)
-    local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
+local function makeCard(parent, title, subtitle, icon, imageId, onClick)
+    local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 70), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
     corner(card, 10)
     stroke(card, C.accent, 1, 0.6)
 
-    local iconFrame = create("Frame", { Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, card)
+    -- Иконка/Картинка
+    local iconFrame = create("Frame", { Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(54, 54), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
     corner(iconFrame, 8)
     stroke(iconFrame, C.border, 1, 0.5)
     
-    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+    -- Если есть ID картинки, грузим ImageLabel, иначе TextLabel с эмодзи
+    if imageId and imageId ~= "" then
+        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(imageId), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+        
+        -- Защита: если картинка не загрузилась, показываем эмодзи
+        local failed = false
+        img.Changed:Connect(function(prop)
+            if (prop == "IsLoaded" and not img.IsLoaded) or prop == "Image" then
+                if not failed and (not img.IsLoaded or img.Image == "") then
+                    failed = true
+                    img:Destroy()
+                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                end
+            end
+        end)
+        task.delay(2, function()
+            if not failed and img.Parent and img.IsLoaded == false then
+                failed = true
+                img:Destroy()
+                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+            end
+        end)
+    else
+        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+    end
 
     -- Текст
-    create("TextLabel", { Position = UDim2.new(0, 58, 0, 10), Size = UDim2.new(1, -150, 0, 16), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+    create("TextLabel", { Position = UDim2.new(0, 72, 0, 14), Size = UDim2.new(1, -160, 0, 16), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
 
     if subtitle and subtitle ~= "" then 
-        create("TextLabel", { Position = UDim2.new(0, 58, 0, 28), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, card) 
+        create("TextLabel", { Position = UDim2.new(0, 72, 0, 34), Size = UDim2.new(1, -160, 0, 14), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, card) 
     end
 
     -- Звездочка избранного
@@ -903,21 +904,11 @@ local function makeCard(parent, title, subtitle, icon, onClick)
     starBtn.MouseButton1Click:Connect(function()
         toggleFavorite(title)
         local nowFav = STATE.favorites[title] == true
-        
         starLbl.Text = nowFav and "⭐" or "☆"
         starLbl.TextColor3 = nowFav and C.yellow or C.muted
-        
-        if nowFav then
-            showToast("Добавлено в избранное", "ok")
-        else
-            showToast("Удалено из избранного", "warn")
-        end
-        
+        if nowFav then showToast("Добавлено в избранное", "ok") else showToast("Удалено из избранного", "warn") end
         updateStarVisuals(title)
-        
-        if favoritesPage.Visible then
-            loadFavoritesPage()
-        end
+        if favoritesPage.Visible then loadFavoritesPage() end
     end)
 
     -- Стрелочка
@@ -925,9 +916,9 @@ local function makeCard(parent, title, subtitle, icon, onClick)
     corner(arrowBtn, 13)
     stroke(arrowBtn, C.accent, 1.5, 0.3)
 
-    card.MouseButton1Down:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(0.97, 0, 0, 58), Position = UDim2.new(0.015, 0, 0, 2) }):Play() end)
-    card.MouseButton1Up:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 60), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
-    card.MouseLeave:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 60), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
+    card.MouseButton1Down:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(0.97, 0, 0, 68), Position = UDim2.new(0.015, 0, 0, 2) }):Play() end)
+    card.MouseButton1Up:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 70), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
+    card.MouseLeave:Connect(function() TweenService:Create(card, TweenInfo.new(0.1), { Size = UDim2.new(1, 0, 0, 70), Position = UDim2.new(0, 0, 0, 0) }):Play() end)
 
     card.MouseButton1Click:Connect(function() 
         local ok, err = pcall(onClick); 
@@ -942,30 +933,49 @@ local function createCheatCard(parent, cheat, index)
     local status = LinkStatus[cheat.id] or "unknown"
     local isDead = (status == "dead")
     
-    local card = create("Frame", { Name = "RatingCard_" .. cheat.id, Size = UDim2.new(1, 0, 0, 64), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = index }, parent)
+    local card = create("Frame", { Name = "RatingCard_" .. cheat.id, Size = UDim2.new(1, 0, 0, 68), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = index }, parent)
     corner(card, 10)
     stroke(card, isDead and C.border or ((rating.likes >= 4) and C.green or C.accent), 1, isDead and 0.8 or 0.5)
 
-    local iconFrame = create("Frame", { Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(40, 40), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, card)
+    -- Иконка/Картинка чита
+    local iconFrame = create("Frame", { Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
     corner(iconFrame, 8)
     stroke(iconFrame, C.border, 1, 0.5)
-    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+    
+    if cheat.image_id and cheat.image_id ~= "" then
+        local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(cheat.image_id), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+        local failed = false
+        img.Changed:Connect(function(prop)
+            if (prop == "IsLoaded" and not img.IsLoaded) or prop == "Image" then
+                if not failed and (not img.IsLoaded or img.Image == "") then
+                    failed = true; img:Destroy()
+                    create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+                end
+            end
+        end)
+        task.delay(2, function()
+            if not failed and img.Parent and img.IsLoaded == false then
+                failed = true; img:Destroy()
+                create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+            end
+        end)
+    else
+        create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
+    end
 
-    local title = create("TextLabel", { Position = UDim2.new(0, 56, 0, 8), Size = UDim2.new(1, -150, 0, 16), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+    local title = create("TextLabel", { Position = UDim2.new(0, 60, 0, 8), Size = UDim2.new(1, -155, 0, 16), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
     
     local badgeText = "✓ ПРОВЕРЕН"
     if isDead then badgeText = "🔄 НА ОБНОВЛЕНИИ"
     elseif status == "checking" then badgeText = "⏳ ПРОВЕРКА..."
     else badgeText = "👍 " .. rating.likes .. "   👎 " .. rating.dislikes end
 
-    local badge = create("TextLabel", { Name = "VerifiedBadge", Position = UDim2.new(0, 56, 0, 26), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1, Text = badgeText, TextColor3 = isDead and C.muted or (status == "checking" and C.yellow or (rating.likes >= 4 and C.green or C.muted)), Font = Enum.Font.GothamBold, TextSize = 8, TextXAlignment = Enum.TextXAlignment.Left }, card)
+    local badge = create("TextLabel", { Name = "VerifiedBadge", Position = UDim2.new(0, 60, 0, 26), Size = UDim2.new(1, -155, 0, 14), BackgroundTransparency = 1, Text = badgeText, TextColor3 = isDead and C.muted or (status == "checking" and C.yellow or (rating.likes >= 4 and C.green or C.muted)), Font = Enum.Font.GothamBold, TextSize = 8, TextXAlignment = Enum.TextXAlignment.Left }, card)
     
     local launchBtn = create("TextButton", { Position = UDim2.new(1, -85, 0, 8), Size = UDim2.fromOffset(75, 24), BackgroundColor3 = isDead and C.surface2 or C.accent, BorderSizePixel = 0, Text = isDead and "ОБНОВ." or "ЗАПУСТИТЬ", TextColor3 = isDead and C.muted or Color3.new(1, 1, 1), TextSize = 9, Font = Enum.Font.GothamBold, AutoButtonColor = false }, card)
     corner(launchBtn, 6)
     
-    if not isDead then
-        stroke(launchBtn, C.accent, 1, 0.3)
-    end
+    if not isDead then stroke(launchBtn, C.accent, 1, 0.3) end
 
     launchBtn.MouseButton1Click:Connect(function() 
         if isDead then showToast("Чит скоро вернется после обновления", "warn")
@@ -976,7 +986,6 @@ local function createCheatCard(parent, cheat, index)
     if not isDead then
         likeBtn = create("TextButton", { Position = UDim2.new(1, -85, 0, 36), Size = UDim2.fromOffset(33, 20), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "👍", TextColor3 = C.green, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true }, card)
         corner(likeBtn, 6)
-        
         dislikeBtn = create("TextButton", { Position = UDim2.new(1, -48, 0, 36), Size = UDim2.fromOffset(33, 20), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "👎", TextColor3 = C.red, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true }, card)
         corner(dislikeBtn, 6)
     end
@@ -1016,11 +1025,8 @@ local function filterGames()
     for _, child in ipairs(gamesPage:GetChildren()) do
         if child:IsA("GuiObject") and child.Name == "GameCard" then
             local gameName = string.lower(child:GetAttribute("GameName") or "")
-            if query == "" or string.find(gameName, query, 1, true) then
-                child.Visible = true
-            else
-                child.Visible = false
-            end
+            if query == "" or string.find(gameName, query, 1, true) then child.Visible = true
+            else child.Visible = false end
         end
     end
 end
@@ -1029,9 +1035,7 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(filterGames)
 
 local function loadGamesList()
     for _, child in ipairs(gamesPage:GetChildren()) do 
-        if child:IsA("GuiObject") and not child:IsA("UIListLayout") then 
-            child:Destroy() 
-        end 
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end 
     end
 
     setLoaderStatus("Загрузка...", C.yellow)
@@ -1047,14 +1051,12 @@ local function loadGamesList()
 
     STATE.games = {}
     local index = 1
+    local gameImages = result.gameImages or {}
 
     for gameName, cheatsList in pairs(result.games) do
-        local gameObj = {
-            name = gameName,
-            cheats = {}
-        }
+        local gameObj = { name = gameName, cheats = {} }
         for _, c in ipairs(cheatsList) do
-            table.insert(gameObj.cheats, { id = c.id, name = c.name, url = c.url })
+            table.insert(gameObj.cheats, { id = c.id, name = c.name, url = c.url, image_id = c.image_id })
         end
         table.insert(STATE.games, gameObj)
 
@@ -1062,7 +1064,9 @@ local function loadGamesList()
         local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
         
         local icon = GameIcons[gameName] or GameIcons.default
-        local card = makeCard(gamesPage, gameName, subtitle, icon, function()
+        local gameImageId = gameImages[gameName] or ""
+        
+        local card = makeCard(gamesPage, gameName, subtitle, icon, gameImageId, function()
             showCheatsForGame(gameObj)
         end)
         card.Name = "GameCard"
@@ -1092,7 +1096,12 @@ loadFavoritesPage = function()
             local count = #gameObj.cheats
             local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
             local icon = GameIcons[gameObj.name] or GameIcons.default
-            local card = makeCard(favoritesPage, gameObj.name, subtitle, icon, function()
+            
+            -- Ищем ID картинки в первом чите этой игры, если есть
+            local gameImageId = ""
+            if gameObj.cheats[1] and gameObj.cheats[1].image_id then gameImageId = gameObj.cheats[1].image_id end
+            
+            local card = makeCard(favoritesPage, gameObj.name, subtitle, icon, gameImageId, function()
                 showCheatsForGame(gameObj)
             end)
             card:SetAttribute("GameName", gameObj.name)
@@ -1106,9 +1115,7 @@ end
 
 showCheatsForGame = function(selectedGame)
     for _, child in ipairs(cheatsPage:GetChildren()) do 
-        if child:IsA("GuiObject") and not child:IsA("UIListLayout") and child ~= cheatsBackBtn and child ~= cheatsTitleLbl then 
-            child:Destroy() 
-        end 
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") and child ~= cheatsBackBtn and child ~= cheatsTitleLbl then child:Destroy() end 
     end
     
     cheatsTitleLbl.Text = "ЧИТЫ ДЛЯ " .. tostring(selectedGame.name):upper()
@@ -1133,10 +1140,7 @@ showCheatsForGame = function(selectedGame)
             task.wait(0.5)
             allChecked = true
             for _, cheat in ipairs(selectedGame.cheats) do
-                if LinkStatus[cheat.id] == "checking" or LinkStatus[cheat.id] == nil then
-                    allChecked = false
-                    break
-                end
+                if LinkStatus[cheat.id] == "checking" or LinkStatus[cheat.id] == nil then allChecked = false; break end
             end
         end
         setLoaderStatus("Готов к работе", C.green)
@@ -1175,9 +1179,7 @@ end)
 -- ============================================================
 showPage = function(name)
     if name == "cheats" then
-        if STATE.currentPage ~= "cheats" then
-            STATE.lastNonCheatPage = STATE.currentPage
-        end
+        if STATE.currentPage ~= "cheats" then STATE.lastNonCheatPage = STATE.currentPage end
     else
         STATE.currentPage = name
     end
@@ -1193,23 +1195,14 @@ showPage = function(name)
     searchFrame.Visible = showTop
     
     if showTop then
-        TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 124),
-            Size = UDim2.new(1, -16, 1, -132)
-        }):Play()
+        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 124), Size = UDim2.new(1, -16, 1, -132) }):Play()
     else
-        TweenService:Create(content, TweenInfo.new(0.2), { 
-            Position = UDim2.new(0, 8, 0, 8),
-            Size = UDim2.new(1, -16, 1, -16)
-        }):Play()
+        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 1, -16) }):Play()
     end
     
-    if name == "favorites" then
-        loadFavoritesPage()
-    end
+    if name == "favorites" then loadFavoritesPage() end
 end
 
--- Активируем "Главная" по умолчанию
 navButtons["games"].iconLabel.TextColor3 = C.accent
 navButtons["games"].textLabel.TextColor3 = C.accent
 navButtons["games"].bg.BackgroundTransparency = 0.8
@@ -1234,14 +1227,10 @@ onAuthSuccess = function(token)
         authMain.BackgroundTransparency = 0
         mainGui.Enabled = true
         showPage("games")
-
         loadGamesList()
         
-        if STATE.localRemaining then
-             updateTimerLabel(STATE.localRemaining)
-        else
-             updateTimerLabel(nil)
-        end
+        if STATE.localRemaining then updateTimerLabel(STATE.localRemaining)
+        else updateTimerLabel(nil) end
 
         task.spawn(function()
             local result = api("/verify", { token = token })
@@ -1307,16 +1296,10 @@ task.spawn(function()
     setStatus("Проверка сессии...", nil); setBusy(true)
     local valid, reason = verifySavedToken(saved)
     setBusy(false)
-    if valid then 
-        onAuthSuccess(saved)
-    elseif reason == "expired" then 
-        setStatus("Ключ истёк — введите новый", "warn")
-    elseif reason == "invalid" then 
-        clearToken()
-        setStatus("Сессия недействительна", "warn")
-    else 
-        setStatus("Введите ключ доступа", nil) 
-    end
+    if valid then onAuthSuccess(saved)
+    elseif reason == "expired" then setStatus("Ключ истёк — введите новый", "warn")
+    elseif reason == "invalid" then clearToken(); setStatus("Сессия недействительна", "warn")
+    else setStatus("Введите ключ доступа", nil) end
 end)
 
 showPage("games")
