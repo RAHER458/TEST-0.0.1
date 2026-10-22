@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.7.9-beta (Clean Header)
+    Version: 0.8.5-beta (Layout Fix + Syntax Fix)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,14 +15,14 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.7.9-beta",
+    VERSION        = "0.8.5-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
     DEVICE_FILE    = "RH_LAUNCHER_DEVICE.dat",
     TG_LINK        = "https://t.me/generalvaneska2024",
-    WINDOW_W       = 360,
-    WINDOW_H       = 420,
+    WINDOW_W       = 400,
+    WINDOW_H       = 460,
     RETRY_MAX      = 3,
     RETRY_DELAY    = 1.5,
     HEARTBEAT_S    = 300,
@@ -417,20 +417,16 @@ fitMain()
 if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitMain) end
 
 -- ============================================================
--- HEADER (Чистая шапка, таймер справа)
+-- HEADER
 -- ============================================================
 local header = create("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = C.surface, BorderSizePixel = 0, ZIndex = 2 }, main)
 corner(header, 16)
 create("Frame", { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -18), BackgroundColor3 = C.surface, BorderSizePixel = 0 }, header)
 
--- Логотип RH
 local logoLabel = create("TextLabel", { Position = UDim2.new(0, 12, 0, 8), Size = UDim2.fromOffset(40, 40), BackgroundTransparency = 1, Text = "RH", TextColor3 = C.pink, Font = Enum.Font.GothamBlack, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center }, header)
-
--- Название лаунчера
 local titleLabel = create("TextLabel", { Position = UDim2.new(0, 50, 0, 8), Size = UDim2.new(1, -150, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, TextSize = 14, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, header)
 create("TextLabel", { Position = UDim2.new(0, 50, 0, 28), Size = UDim2.new(1, -150, 0, 14), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 9, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, header)
 
--- Таймер (справа, в капсуле)
 local timerLabel = create("TextLabel", { Position = UDim2.new(1, -110, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(90, 28), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "⏱ ∞", TextColor3 = C.green, TextSize = 11, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, header)
 corner(timerLabel, 14)
 stroke(timerLabel, C.border, 1, 0.5)
@@ -438,9 +434,34 @@ stroke(timerLabel, C.border, 1, 0.5)
 makeDraggable(main, header)
 
 -- ============================================================
+-- BANNER
+-- ============================================================
+local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 64), Size = UDim2.new(1, -16, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, main)
+corner(banner, 10)
+stroke(banner, C.accent, 1, 0.3)
+
+local gradientFrame = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.accent, BackgroundTransparency = 0.7, BorderSizePixel = 0 }, banner)
+corner(gradientFrame, 10)
+local grad = create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 45 }, gradientFrame)
+
+create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 20), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left }, banner)
+create("TextLabel", { Position = UDim2.new(0, 12, 0, 26), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, banner)
+
+-- ============================================================
+-- SEARCH BAR
+-- ============================================================
+local searchFrame = create("Frame", { Position = UDim2.new(0, 8, 0, 120), Size = UDim2.new(1, -16, 0, 36), BackgroundColor3 = C.input, BorderSizePixel = 0 }, main)
+corner(searchFrame, 8)
+stroke(searchFrame, C.border, 1, 0.5)
+
+create("TextLabel", { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.fromOffset(20, 36), BackgroundTransparency = 1, Text = "🔍", TextColor3 = C.muted, TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, searchFrame)
+
+local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Поиск игр...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
+
+-- ============================================================
 -- CONTENT
 -- ============================================================
-local content = create("Frame", { Position = UDim2.new(0, 8, 0, 60), Size = UDim2.new(1, -16, 1, -68), BackgroundTransparency = 1, ClipsDescendants = true }, main)
+local content = create("Frame", { Position = UDim2.new(0, 8, 0, 160), Size = UDim2.new(1, -16, 1, -168), BackgroundTransparency = 1, ClipsDescendants = true }, main)
 
 local function makePage(parent, name)
     local page = create("ScrollingFrame", { Name = name, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = C.accent, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false }, parent)
@@ -463,6 +484,14 @@ create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.
 local function showPage(name)
     gamesPage.Visible = (name == "games")
     cheatsPage.Visible = (name == "cheats")
+    searchFrame.Visible = (name == "games")
+    banner.Visible = (name == "games")
+    
+    if name == "games" then
+        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 160) }):Play()
+    else
+        TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 64) }):Play()
+    end
 end
 
 -- ============================================================
@@ -775,7 +804,75 @@ local function createCheatCard(parent, cheat, index)
     return card
 end
 
-local function showCheatsForGame(selectedGame)
+-- ============================================================
+-- SEARCH LOGIC & GAME LOADING
+-- ============================================================
+local showCheatsForGame -- Forward declaration
+
+local function filterGames()
+    local query = string.lower(searchBox.Text)
+    for _, child in ipairs(gamesPage:GetChildren()) do
+        if child:IsA("GuiObject") and child.Name == "GameCard" then
+            local gameName = string.lower(child:GetAttribute("GameName") or "")
+            if query == "" or string.find(gameName, query, 1, true) then
+                child.Visible = true
+            else
+                child.Visible = false
+            end
+        end
+    end
+end
+
+searchBox:GetPropertyChangedSignal("Text"):Connect(filterGames)
+
+local function loadGamesList()
+    for _, child in ipairs(gamesPage:GetChildren()) do 
+        if child:IsA("GuiObject") and not child:IsA("UIListLayout") then 
+            child:Destroy() 
+        end 
+    end
+
+    local result, err = api("/get_scripts", nil, "GET")
+    
+    if not result or result.success ~= true or type(result.games) ~= "table" then
+        local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Ошибка загрузки списка игр.\nПроверьте интернет.", TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
+        lbl.LayoutOrder = 1
+        return
+    end
+
+    STATE.games = {}
+    local index = 1
+
+    for gameName, cheatsList in pairs(result.games) do
+        local gameObj = {
+            name = gameName,
+            cheats = {}
+        }
+        for _, c in ipairs(cheatsList) do
+            table.insert(gameObj.cheats, { id = c.id, name = c.name, url = c.url })
+        end
+        table.insert(STATE.games, gameObj)
+
+        local count = #gameObj.cheats
+        local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
+        
+        local icon = GameIcons[gameName] or GameIcons.default
+        local card = makeCard(gamesPage, gameName, subtitle, icon, function()
+            showCheatsForGame(gameObj)
+        end)
+        card.Name = "GameCard"
+        card:SetAttribute("GameName", gameName)
+        card.LayoutOrder = index
+        index = index + 1
+    end
+
+    if index == 1 then
+        local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Пока нет доступных игр.\nДобавьте их через Telegram-бота.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
+        lbl.LayoutOrder = 1
+    end
+end
+
+showCheatsForGame = function(selectedGame)
     for _, child in ipairs(cheatsListFrame:GetChildren()) do if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end end
     cheatsTitleLbl.Text = "ЧИТЫ ДЛЯ " .. tostring(selectedGame.name):upper()
 
@@ -819,54 +916,6 @@ local function showCheatsForGame(selectedGame)
 end
 
 cheatsBackBtn.MouseButton1Click:Connect(function() showPage("games") end)
-
--- ============================================================
--- ЗАГРУЗКА СПИСКА ИГР С СЕРВЕРА
--- ============================================================
-local function loadGamesList()
-    for _, child in ipairs(gamesPage:GetChildren()) do 
-        if child:IsA("GuiObject") and not child:IsA("UIListLayout") then 
-            child:Destroy() 
-        end 
-    end
-
-    local result, err = api("/get_scripts", nil, "GET")
-    
-    if not result or result.success ~= true or type(result.games) ~= "table" then
-        local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Ошибка загрузки списка игр.\nПроверьте интернет.", TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
-        lbl.LayoutOrder = 1
-        return
-    end
-
-    STATE.games = {}
-    local index = 1
-
-    for gameName, cheatsList in pairs(result.games) do
-        local gameObj = {
-            name = gameName,
-            cheats = {}
-        }
-        for _, c in ipairs(cheatsList) do
-            table.insert(gameObj.cheats, { id = c.id, name = c.name, url = c.url })
-        end
-        table.insert(STATE.games, gameObj)
-
-        local count = #gameObj.cheats
-        local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
-        
-        local icon = GameIcons[gameName] or GameIcons.default
-        local card = makeCard(gamesPage, gameName, subtitle, icon, function()
-            showCheatsForGame(gameObj)
-        end)
-        card.LayoutOrder = index
-        index = index + 1
-    end
-
-    if index == 1 then
-        local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Пока нет доступных игр.\nДобавьте их через Telegram-бота.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
-        lbl.LayoutOrder = 1
-    end
-end
 
 -- ============================================================
 -- ON AUTH SUCCESS / KICK
