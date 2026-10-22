@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 0.9.28.1-beta (Image Load Timeout Fix)
+    Version: 0.9.28.2-beta (Logo Circle Fix)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "0.9.28.1-beta",
+    VERSION        = "0.9.28.2-beta",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -68,11 +68,8 @@ local GameIcons = {
 
 local GUI_NAMES = { "RH_LAUNCHER_GUI", "RH_LAUNCHER_AUTH_GUI", "RH_LAUNCHER_TOAST" }
 
--- ==== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ВЫГРУЗКИ ====
 local activeConnections = {}
 local isRunning = false
-local heartbeatThread = nil
-local timerThread = nil
 
 local function addConnection(conn)
     table.insert(activeConnections, conn)
@@ -274,7 +271,7 @@ local function apiWithRetry(path, body)
 end
 
 -- ============================================================
--- ФУНКЦИЯ ЗАПУСКА (Вся отрисовка внутри)
+-- ФУНКЦИЯ ЗАПУСКА
 -- ============================================================
 local startLauncher
 
@@ -493,13 +490,14 @@ startLauncher = function()
     corner(sideGradFrame, 16)
     create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.bg), ColorSequenceKeypoint.new(1, C.surface)}, Rotation = 90 }, sideGradFrame)
 
-    -- ЛОГОТИП
+    -- ЛОГОТИП (ФИКС КРУГА)
     local logoFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, sidebar)
     corner(logoFrame, 25)
-    stroke(logoFrame, C.pink, 1.5, 0.2)
+    stroke(logoFrame, C.accent, 1.5, 0.2) -- Изменили цвет на синий
 
     if CONFIG.LOGO_IMAGE_ID and CONFIG.LOGO_IMAGE_ID ~= "" then
         local logoImg = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(CONFIG.LOGO_IMAGE_ID), ScaleType = Enum.ScaleType.Crop }, logoFrame)
+        corner(logoImg, 25) -- ДОБАВИЛИ ОБРЕЗКУ КАРТИНКИ В КРУГ
         
         local failed = false
         addConnection(logoImg.Changed:Connect(function(prop)
@@ -615,7 +613,6 @@ startLauncher = function()
     stroke(closeBtn, C.red, 1, 0.5)
 
     addConnection(closeBtn.MouseButton1Click:Connect(function()
-        -- ПОЛНАЯ ВЫГРУЗКА
         isRunning = false
         disconnectAll()
         clearAllGuis()
