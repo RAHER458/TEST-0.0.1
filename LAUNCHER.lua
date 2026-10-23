@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.1.4 (Online Counter)
+    Version: 1.0.3 (Auto Language Detection)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -12,11 +12,12 @@ local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService      = game:GetService("HttpService")
 local ContentProvider  = game:GetService("ContentProvider")
+local LocalizationService = game:GetService("LocalizationService")
 
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.1.4",
+    VERSION        = "1.0.3",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -136,6 +137,7 @@ local LOC = {
         toast_dislike = "Дизлайк засчитан!",
         toast_vote_err = "Не удалось отправить голос: ",
         toast_cheat_dead = "Чит скоро вернется после обновления",
+        toast_refreshed = "Список обновлён!",
         err_invalid_key = "❌ Неверный ключ",
         err_bound = "❌ Ключ привязан к другому устройству",
         err_expired = "❌ Ключ истёк",
@@ -208,6 +210,7 @@ local LOC = {
         toast_dislike = "Dislike counted!",
         toast_vote_err = "Failed to send vote: ",
         toast_cheat_dead = "Cheat will be back after update",
+        toast_refreshed = "List refreshed!",
         err_invalid_key = "❌ Invalid key",
         err_bound = "❌ Key bound to another device",
         err_expired = "❌ Key expired",
@@ -422,6 +425,22 @@ local function verifySavedToken(token)
     if result.valid ~= true then return false, "invalid" end
     return true, "ok"
 end
+
+-- АВТООПРЕДЕЛЕНИЕ ЯЗЫКА (ПУНКТ 16)
+local function detectLanguage()
+    local success, locale = pcall(function()
+        return LocalizationService.SystemLocaleId
+    end)
+    if success and type(locale) == "string" then
+        local lowerLocale = string.lower(locale)
+        if string.find(lowerLocale, "ru") then
+            return "ru"
+        end
+    end
+    return "en"
+end
+
+STATE.language = detectLanguage()
 
 local startLauncher
 local onAuthSuccess
@@ -774,7 +793,6 @@ startLauncher = function()
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 4), Size = UDim2.new(1, -64, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 28), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
     
-    -- НОВЫЙ ЭЛЕМЕНТ: Счётчик онлайна
     local onlineLbl = create("TextLabel", { Position = UDim2.new(0, 16, 0, 44), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "🟢 " .. L("menu_online") .. "0", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
 
     local closeBtn = create("TextButton", { Position = UDim2.new(1, -34, 0, 16), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface3, BorderSizePixel = 0, Text = "✖", TextColor3 = C.red, TextSize = 14, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 3 }, banner)
@@ -782,8 +800,16 @@ startLauncher = function()
     stroke(closeBtn, C.red, 1, 0.5)
 
     addConnection(closeBtn.MouseButton1Click:Connect(function()
-        showToast(L("toast_closed"), "warn")
+        if not isRunning then return end
         isRunning = false
+        
+        local mainScale = main:FindFirstChildOfClass("UIScale") or create("UIScale", { Scale = 1 }, main)
+        TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.85 }):Play()
+        TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { BackgroundTransparency = 1 }):Play()
+        
+        task.wait(0.25)
+        
+        showToast(L("toast_closed"), "warn")
         disconnectAll()
         clearAllGuis()
         task.wait(3)
@@ -939,7 +965,9 @@ startLauncher = function()
         killNewConnections(CheatTracker.connSnap)
         CheatTracker.connSnap = nil
         CheatTracker.active = false; CheatTracker.killFlag = false; CheatTracker.currentName = nil
-    end    local function launchCheat(cheat)
+    end
+
+    local function launchCheat(cheat)
         if STATE.busy then return end
         if not STATE.authed then showToast(L("toast_need_key"), "warn"); return end
         if not cheat or not cheat.id or cheat.id == "" then showToast(L("toast_err_id"), "warn"); return end
@@ -1299,6 +1327,44 @@ startLauncher = function()
 
     addConnection(searchBox:GetPropertyChangedSignal("Text"):Connect(filterGames))
 
+    local function showSkeletons()
+        for _, child in ipairs(gamesPage:GetChildren()) do
+            if child:IsA("Frame") and child.Name == "SkeletonCard" then child:Destroy() end
+        end
+        
+        for i = 1, 4 do
+            local sk = create("Frame", { Name = "SkeletonCard", Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = i, ClipsDescendants = true }, gamesPage)
+            corner(sk, 10)
+            
+            local skGrad = create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, sk)
+            corner(skGrad, 10)
+            
+            create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 130, 1, 0), BackgroundColor3 = C.surface3, BorderSizePixel = 0 }, sk)
+            
+            create("Frame", { Position = UDim2.new(0, 142, 0, 24), Size = UDim2.new(0.5, 0, 0, 16), BackgroundColor3 = C.surface3, BorderSizePixel = 0 }, sk)
+            create("Frame", { Position = UDim2.new(0, 142, 0, 46), Size = UDim2.new(0.3, 0, 0, 10), BackgroundColor3 = C.surface3, BorderSizePixel = 0 }, sk)
+            
+            local shine = create("Frame", { Position = UDim2.new(-1, 0, 0, 0), Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.new(1,1,1), BackgroundTransparency = 0.95, BorderSizePixel = 0, ZIndex = 5 }, sk)
+            corner(shine, 10)
+            create("UIGradient", {
+                Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 1),
+                    NumberSequenceKeypoint.new(0.5, 0.7),
+                    NumberSequenceKeypoint.new(1, 1)
+                }),
+                Rotation = 15
+            }, shine)
+            
+            task.spawn(function()
+                while sk and sk.Parent do
+                    shine.Position = UDim2.new(-1, 0, 0, 0)
+                    TweenService:Create(shine, TweenInfo.new(1.2, Enum.EasingStyle.Linear), { Position = UDim2.new(1, 0, 0, 0) }):Play()
+                    task.wait(1.5)
+                end
+            end)
+        end
+    end
+
     local function loadGamesList()
         if STATE.gamesLoading then return end
         STATE.gamesLoading = true
@@ -1307,10 +1373,15 @@ startLauncher = function()
             if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end 
         end
 
+        showSkeletons()
         setLoaderStatus("menu_loading", C.yellow)
 
         local result, err = api("/get_scripts", nil, "GET")
         
+        for _, child in ipairs(gamesPage:GetChildren()) do
+            if child.Name == "SkeletonCard" then child:Destroy() end
+        end
+
         if not result or result.success ~= true or type(result.games) ~= "table" then
             local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = L("menu_no_games"), TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
             lbl.LayoutOrder = 1
@@ -1521,7 +1592,6 @@ startLauncher = function()
         end)
         task.spawn(function() fetchRatings(true) end)
         
-        -- Запуск пинга онлайна
         task.spawn(function()
             while isRunning and STATE.authed do
                 local res = api("/heartbeat", { device_id = STATE.deviceId })
@@ -1534,7 +1604,7 @@ startLauncher = function()
                         end
                     end
                 end
-                task.wait(120) -- пинг раз в 2 минуты
+                task.wait(120)
             end
         end)
     end
