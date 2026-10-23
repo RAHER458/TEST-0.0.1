@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.5 (Profile Update & Full Kill)
+    Version: 1.0.6 (Bugs & Optimizations)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -11,11 +11,12 @@ local RunService       = game:GetService("RunService")
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService      = game:GetService("HttpService")
+local ContentProvider  = game:GetService("ContentProvider")
 
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.5",
+    VERSION        = "1.0.6",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -97,7 +98,7 @@ end
 local STATE = { 
     authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
     favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {},
-    activatedAt = nil
+    activatedAt = nil, gamesLoaded = false, gamesLoading = false
 }
 
 local function create(class, props, parent)
@@ -269,6 +270,7 @@ local function verifySavedToken(token)
 end
 
 local startLauncher
+local onAuthSuccess
 
 startLauncher = function()
     if isRunning then return end
@@ -552,7 +554,6 @@ startLauncher = function()
     corner(rightGradFrame, 16)
     create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, rightGradFrame)
 
-    -- БАННЕР
     local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 0, 64), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3 }, contentArea)
     corner(banner, 10)
     stroke(banner, C.accent, 1, 0.3)
@@ -564,7 +565,6 @@ startLauncher = function()
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 8), Size = UDim2.new(1, -64, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 36), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
 
-    -- КНОПКА ПОЛНОГО ЗАКРЫТИЯ
     local closeBtn = create("TextButton", { Position = UDim2.new(1, -34, 0, 16), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface3, BorderSizePixel = 0, Text = "✖", TextColor3 = C.red, TextSize = 14, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 3 }, banner)
     corner(closeBtn, 6)
     stroke(closeBtn, C.red, 1, 0.5)
@@ -608,18 +608,15 @@ startLauncher = function()
     corner(cheatsBackBtn, 8)
     local cheatsTitleLbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", TextColor3 = C.accent, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = -1 }, cheatsPage)
 
-    -- PROFILE PAGE UI
     local profileFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 300), BackgroundColor3 = C.surface, BorderSizePixel = 0, ClipsDescendants = true }, profilePage)
     corner(profileFrame, 12)
     stroke(profileFrame, C.accent, 1, 0.4)
     profileFrame.LayoutOrder = 1
     
-    -- (2) ФОН ПРОФИЛЯ
     local profileGradFrame = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.accent, BackgroundTransparency = 0.85, BorderSizePixel = 0 }, profileFrame)
     corner(profileGradFrame, 12)
     create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.pink)}, Rotation = 90 }, profileGradFrame)
 
-    -- (4) КОНТЕЙНЕР ДЛЯ АНИМАЦИИ
     local profileContent = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, profileFrame)
     
     local avatarFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(80, 80), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileContent)
@@ -649,7 +646,6 @@ startLauncher = function()
     create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "ВАШ КЛЮЧ ДОСТУПА", TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
     local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 18), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
     
-    -- (7) ДАТА АКТИВАЦИИ
     local activatedLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Активирован: --", TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
 
     local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 245), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "💳 ПРОДЛИТЬ КЛЮЧ", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileContent)
@@ -663,7 +659,6 @@ startLauncher = function()
         else showToast("Ссылка: " .. CONFIG.TG_LINK, "warn") end
     end))
 
-    -- CHEAT TRACKER
     local CheatTracker = { active = false, killFlag = false, guis = {}, connSnap = nil, currentName = nil }
     local PROTECTED_GUI_NAMES = { RH_LAUNCHER_AUTH_GUI = true, RH_LAUNCHER_GUI = true, RH_LAUNCHER_TOAST = true }
     local function isProtectedGui(obj) return PROTECTED_GUI_NAMES[obj.Name] == true end
@@ -1028,6 +1023,9 @@ startLauncher = function()
     addConnection(searchBox:GetPropertyChangedSignal("Text"):Connect(filterGames))
 
     local function loadGamesList()
+        if STATE.gamesLoading then return end
+        STATE.gamesLoading = true
+
         for _, child in ipairs(gamesPage:GetChildren()) do 
             if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end 
         end
@@ -1040,6 +1038,7 @@ startLauncher = function()
             local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Ошибка загрузки списка игр.\nПроверьте интернет.", TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
             lbl.LayoutOrder = 1
             setLoaderStatus("Нет связи", C.red)
+            STATE.gamesLoading = false
             return
         end
 
@@ -1075,6 +1074,8 @@ startLauncher = function()
         end
 
         setLoaderStatus("Готов к работе", C.green)
+        STATE.gamesLoaded = true
+        STATE.gamesLoading = false
     end
 
     loadFavoritesPage = function()
@@ -1192,9 +1193,7 @@ startLauncher = function()
         if name == "favorites" then 
             loadFavoritesPage() 
         elseif name == "profile" then
-            -- (4) АНИМАЦИЯ ПРОФИЛЯ
             profileContent.Position = UDim2.fromScale(0, 0.2)
-            profileContent.TextTransparency = 1
             TweenService:Create(profileContent, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0, 0) }):Play()
             
             if STATE.activatedAt then
@@ -1217,7 +1216,7 @@ startLauncher = function()
         
         mainGui.Enabled = true
         showPage("games")
-        loadGamesList()
+        if not STATE.gamesLoaded then loadGamesList() end
         
         if STATE.localRemaining then updateTimerLabel(STATE.localRemaining)
         else updateTimerLabel(nil) end
@@ -1240,7 +1239,6 @@ startLauncher = function()
     end
 
     task.spawn(function()
-        task.wait(2)
         task.spawn(function()
             while isRunning do
                 if STATE.authed and STATE.localRemaining and STATE.localRemaining > 0 then
@@ -1306,11 +1304,10 @@ startLauncher = function()
         updateAuthLayout()
     end
 
-    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(connectCamera)
+    addConnection(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(connectCamera))
     connectCamera()
 
     task.spawn(function()
-        task.wait(0.3)
         local saved = loadToken()
         if not saved then 
             setLoaderStatus("Ожидание", C.red)
@@ -1332,6 +1329,22 @@ startLauncher = function()
     end)
 
     showPage("games")
+
+    -- Параллельная загрузка списка игр (до входа)
+    task.spawn(function()
+        loadGamesList()
+    end)
+
+    -- Предзагрузка фона и логотипа (без блокировки старта)
+    task.spawn(function()
+        pcall(function()
+            local list = {}
+            if Background and Background.Parent then table.insert(list, Background) end
+            local logoImg = logoFrame:FindFirstChildOfClass("ImageLabel")
+            if logoImg then table.insert(list, logoImg) end
+            if #list > 0 then ContentProvider:PreloadAsync(list) end
+        end)
+    end)
 end
 
 startLauncher()
