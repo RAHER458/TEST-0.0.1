@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.4 (Optimized & Banner Fix)
+    Version: 1.0.5 (Profile Update & Full Kill)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -15,7 +15,7 @@ local HttpService      = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.4",
+    VERSION        = "1.0.5",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -94,7 +94,11 @@ local function clearAllGuis()
     end)
 end
 
-local STATE = { authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {} }
+local STATE = { 
+    authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
+    favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {},
+    activatedAt = nil
+}
 
 local function create(class, props, parent)
     local obj = Instance.new(class)
@@ -415,7 +419,14 @@ startLauncher = function()
                 return
             end
             if type(result.token) ~= "string" or result.token == "" then isBusy = false; LoginBtn.Text = "Войти"; LoginBtn.TextColor3 = C.text; notify("❌ Сервер не выдал токен", C.red); return end
+            
             if result.remaining_seconds then STATE.localRemaining = tonumber(result.remaining_seconds) end
+            if result.activated_at then 
+                STATE.activatedAt = result.activated_at 
+            else
+                STATE.activatedAt = os.date("%d.%m.%Y %H:%M")
+            end
+            
             isBusy = false
             notify("Успешный вход!", C.green)
             LoginBtn.Text = "Успех"
@@ -541,7 +552,7 @@ startLauncher = function()
     corner(rightGradFrame, 16)
     create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 90 }, rightGradFrame)
 
-    -- ИСПРАВЛЕННЫЙ БАННЕР
+    -- БАННЕР
     local banner = create("Frame", { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 0, 64), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3 }, contentArea)
     corner(banner, 10)
     stroke(banner, C.accent, 1, 0.3)
@@ -553,6 +564,7 @@ startLauncher = function()
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 8), Size = UDim2.new(1, -64, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
     create("TextLabel", { Position = UDim2.new(0, 16, 0, 36), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
 
+    -- КНОПКА ПОЛНОГО ЗАКРЫТИЯ
     local closeBtn = create("TextButton", { Position = UDim2.new(1, -34, 0, 16), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface3, BorderSizePixel = 0, Text = "✖", TextColor3 = C.red, TextSize = 14, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 3 }, banner)
     corner(closeBtn, 6)
     stroke(closeBtn, C.red, 1, 0.5)
@@ -561,7 +573,7 @@ startLauncher = function()
         isRunning = false
         disconnectAll()
         clearAllGuis()
-        showToast("Лаунчер закрыт.", "warn")
+        showToast("Лаунчер закрыт. Перезапустите скрипт.", "warn")
         task.wait(3)
         if toastGui then toastGui:Destroy() end
     end))
@@ -596,20 +608,29 @@ startLauncher = function()
     corner(cheatsBackBtn, 8)
     local cheatsTitleLbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", TextColor3 = C.accent, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = -1 }, cheatsPage)
 
-    local profileFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 280), BackgroundColor3 = C.surface, BorderSizePixel = 0 }, profilePage)
+    -- PROFILE PAGE UI
+    local profileFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 300), BackgroundColor3 = C.surface, BorderSizePixel = 0, ClipsDescendants = true }, profilePage)
     corner(profileFrame, 12)
     stroke(profileFrame, C.accent, 1, 0.4)
     profileFrame.LayoutOrder = 1
+    
+    -- (2) ФОН ПРОФИЛЯ
+    local profileGradFrame = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.accent, BackgroundTransparency = 0.85, BorderSizePixel = 0 }, profileFrame)
+    corner(profileGradFrame, 12)
+    create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.pink)}, Rotation = 90 }, profileGradFrame)
 
-    local avatarFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(70, 70), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileFrame)
-    corner(avatarFrame, 35)
+    -- (4) КОНТЕЙНЕР ДЛЯ АНИМАЦИИ
+    local profileContent = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, profileFrame)
+    
+    local avatarFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(80, 80), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileContent)
+    corner(avatarFrame, 40)
     stroke(avatarFrame, C.accent, 2, 0)
 
     local userId = LocalPlayer.UserId
     local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(userId) .. "&width=150&height=150&format=png"
     local avatarImg = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = avatarUrl, ScaleType = Enum.ScaleType.Crop }, avatarFrame)
-    corner(avatarImg, 35)
-    local fallbackLetter = create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = string.sub(LocalPlayer.Name, 1, 1):upper(), TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 30, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Visible = false }, avatarFrame)
+    corner(avatarImg, 40)
+    local fallbackLetter = create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = string.sub(LocalPlayer.Name, 1, 1):upper(), TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 36, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, Visible = false }, avatarFrame)
 
     addConnection(avatarImg.Changed:Connect(function(prop)
         if prop == "IsLoaded" or prop == "Image" then
@@ -618,17 +639,20 @@ startLauncher = function()
         end
     end))
 
-    create("TextLabel", { Position = UDim2.new(0, 0, 0, 100), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, Text = LocalPlayer.Name, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center }, profileFrame)
-    create("TextLabel", { Position = UDim2.new(0, 0, 0, 126), Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "ID: " .. tostring(userId), TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center }, profileFrame)
+    local nameLbl = create("TextLabel", { Position = UDim2.new(0, 0, 0, 110), Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1, Text = LocalPlayer.Name, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 20, TextXAlignment = Enum.TextXAlignment.Center }, profileContent)
+    create("TextLabel", { Position = UDim2.new(0, 0, 0, 136), Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "ID: " .. tostring(userId), TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center }, profileContent)
 
-    local keyStatusFrame = create("Frame", { Position = UDim2.new(0, 16, 0, 160), Size = UDim2.new(1, -32, 0, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0 }, profileFrame)
+    local keyStatusFrame = create("Frame", { Position = UDim2.new(0, 16, 0, 170), Size = UDim2.new(1, -32, 0, 65), BackgroundColor3 = C.surface2, BorderSizePixel = 0, BackgroundTransparency = 0.3 }, profileContent)
     corner(keyStatusFrame, 8)
     stroke(keyStatusFrame, C.border, 1, 0.5)
 
     create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "ВАШ КЛЮЧ ДОСТУПА", TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
-    local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 20), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+    local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 18), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+    
+    -- (7) ДАТА АКТИВАЦИИ
+    local activatedLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Активирован: --", TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
 
-    local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 220), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "💳 ПРОДЛИТЬ КЛЮЧ", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileFrame)
+    local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 245), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "💳 ПРОДЛИТЬ КЛЮЧ", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileContent)
     corner(renewBtn, 8)
 
     addConnection(renewBtn.MouseButton1Click:Connect(function()
@@ -639,6 +663,7 @@ startLauncher = function()
         else showToast("Ссылка: " .. CONFIG.TG_LINK, "warn") end
     end))
 
+    -- CHEAT TRACKER
     local CheatTracker = { active = false, killFlag = false, guis = {}, connSnap = nil, currentName = nil }
     local PROTECTED_GUI_NAMES = { RH_LAUNCHER_AUTH_GUI = true, RH_LAUNCHER_GUI = true, RH_LAUNCHER_TOAST = true }
     local function isProtectedGui(obj) return PROTECTED_GUI_NAMES[obj.Name] == true end
@@ -1164,7 +1189,20 @@ startLauncher = function()
             TweenService:Create(content, TweenInfo.new(0.2), { Position = UDim2.new(0, 8, 0, 8), Size = UDim2.new(1, -16, 1, -16) }):Play()
         end
         
-        if name == "favorites" then loadFavoritesPage() end
+        if name == "favorites" then 
+            loadFavoritesPage() 
+        elseif name == "profile" then
+            -- (4) АНИМАЦИЯ ПРОФИЛЯ
+            profileContent.Position = UDim2.fromScale(0, 0.2)
+            profileContent.TextTransparency = 1
+            TweenService:Create(profileContent, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0, 0) }):Play()
+            
+            if STATE.activatedAt then
+                activatedLbl.Text = "Активирован: " .. STATE.activatedAt
+            else
+                activatedLbl.Text = "Активирован: --"
+            end
+        end
     end
 
     navButtons["games"].iconLabel.TextColor3 = C.accent
