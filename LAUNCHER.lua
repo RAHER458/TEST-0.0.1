@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.13 (Card Gradients Restored)
+    Version: 1.1.3 (New Logo)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local ContentProvider  = game:GetService("ContentProvider")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.13",
+    VERSION        = "1.1.3",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -32,7 +32,7 @@ local CONFIG = {
     GUI_WATCH_STEP = 0.5,
     LINK_TIMEOUT_S = 8,
     CHEATS_WAIT_S  = 12,
-    LOGO_IMAGE_ID  = "101226271656911",
+    LOGO_IMAGE_ID  = "139399470610034",
     BACKGROUND_ID  = "120280268407455"
 }
 
@@ -70,11 +70,167 @@ local GameIcons = {
     default = "🎮"
 }
 
+local LOC = {
+    ru = {
+        auth_welcome = "Добро пожаловать!",
+        auth_subtitle = "Войдите в свой аккаунт RH-LAUNCHER",
+        auth_placeholder = "Введите ключ...",
+        auth_btn_login = "Войти",
+        auth_btn_checking = "Проверка...",
+        auth_btn_check_sess = "Проверка сессии...",
+        auth_btn_success = "Успех",
+        auth_no_key = "Нет ключа?",
+        auth_get_key = "Получить ключ",
+        auth_link_copied = "Ссылка скопирована!",
+        auth_sess_saved = "Сессия сохранена. Нажмите «Войти»",
+        auth_sess_expired = "Сессия истекла. Введите ключ заново.",
+        auth_sess_invalid = "Сессия недействительна — введите ключ",
+        auth_checking_sess = "Проверяем сохранённую сессию...",
+        auth_connecting = "Соединение с сервером...",
+        menu_main = "Главная",
+        menu_fav = "Избранное",
+        menu_settings = "Настройки",
+        menu_profile = "Профиль",
+        menu_status = "Статус",
+        menu_loading = "Загрузка...",
+        menu_ready = "Готов к работе",
+        menu_no_conn = "Нет связи",
+        menu_checking = "Проверка...",
+        menu_waiting = "Ожидание",
+        menu_search = "Поиск игр...",
+        menu_no_games = "Ошибка загрузки списка игр.\nПроверьте интернет.",
+        menu_empty = "Пока нет доступных игр.\nДобавьте их через Telegram-бота.",
+        menu_empty_fav = "Вы пока не добавили игры в избранное.\nНажмите ☆ на карточке игры.",
+        menu_count_cheat = "чит",
+        menu_count_cheats = "читов",
+        prof_key_title = "ВАШ КЛЮЧ ДОСТУПА",
+        prof_time_left = "Осталось: ",
+        prof_forever = "Навсегда (∞)",
+        prof_activated = "Активирован: ",
+        prof_btn_renew = "💳 ПРОДЛИТЬ КЛЮЧ",
+        prof_renew_copied = "Ссылка на продление скопирована!",
+        prof_link = "Ссылка: ",
+        set_dev = "Настройки в разработке",
+        cheat_back = "←  НАЗАД К ИГРАМ",
+        cheat_title = "ЧИТЫ ДЛЯ ",
+        cheat_btn_launch = "ЗАПУСТИТЬ",
+        cheat_btn_update = "ОБНОВ.",
+        cheat_no = "Читы пока не добавлены",
+        cheat_verified = "✓ ПРОВЕРЕН",
+        cheat_updating = "🔄 НА ОБНОВЛЕНИИ",
+        cheat_checking = "⏳ ПРОВЕРКА...",
+        toast_welcome = "Добро пожаловать!",
+        toast_closed = "Лаунчер закрыт. Перезапустите скрипт.",
+        toast_fav_add = "Добавлено в избранное",
+        toast_fav_rem = "Удалено из избранного",
+        toast_need_key = "Нужен ключ доступа",
+        toast_err_id = "Ошибка ID чита",
+        toast_load_cheat = "Загрузка: ",
+        toast_cheat_update = "Чит на обновлении",
+        toast_compile_err = "Ошибка компиляции",
+        toast_cheat_err = "Ошибка в ",
+        toast_need_auth = "Сначала авторизуйтесь",
+        toast_no_id = "Не указан ID чита",
+        toast_like = "Лайк засчитан!",
+        toast_dislike = "Дизлайк засчитан!",
+        toast_vote_err = "Не удалось отправить голос: ",
+        toast_cheat_dead = "Чит скоро вернется после обновления",
+        err_invalid_key = "❌ Неверный ключ",
+        err_bound = "❌ Ключ привязан к другому устройству",
+        err_expired = "❌ Ключ истёк",
+        err_timeout = "❌ Сервер не отвечает",
+        err_no_token = "❌ Сервер не выдал токен",
+        err_enter_key = "Введите ключ доступа",
+    },
+    en = {
+        auth_welcome = "Welcome!",
+        auth_subtitle = "Log in to your RH-LAUNCHER account",
+        auth_placeholder = "Enter key...",
+        auth_btn_login = "Login",
+        auth_btn_checking = "Checking...",
+        auth_btn_check_sess = "Checking session...",
+        auth_btn_success = "Success",
+        auth_no_key = "No key?",
+        auth_get_key = "Get key",
+        auth_link_copied = "Link copied!",
+        auth_sess_saved = "Session saved. Click «Login»",
+        auth_sess_expired = "Session expired. Enter key again.",
+        auth_sess_invalid = "Invalid session — enter key",
+        auth_checking_sess = "Checking saved session...",
+        auth_connecting = "Connecting to server...",
+        menu_main = "Main",
+        menu_fav = "Favorites",
+        menu_settings = "Settings",
+        menu_profile = "Profile",
+        menu_status = "Status",
+        menu_loading = "Loading...",
+        menu_ready = "Ready",
+        menu_no_conn = "No connection",
+        menu_checking = "Checking...",
+        menu_waiting = "Waiting",
+        menu_search = "Search games...",
+        menu_no_games = "Failed to load games.\nCheck your internet.",
+        menu_empty = "No games available yet.\nAdd them via Telegram bot.",
+        menu_empty_fav = "You haven't added any favorites yet.\nClick ☆ on a game card.",
+        menu_count_cheat = "cheat",
+        menu_count_cheats = "cheats",
+        prof_key_title = "YOUR ACCESS KEY",
+        prof_time_left = "Left: ",
+        prof_forever = "Forever (∞)",
+        prof_activated = "Activated: ",
+        prof_btn_renew = "💳 RENEW KEY",
+        prof_renew_copied = "Renew link copied!",
+        prof_link = "Link: ",
+        set_dev = "Settings in development",
+        cheat_back = "←  BACK TO GAMES",
+        cheat_title = "CHEATS FOR ",
+        cheat_btn_launch = "LAUNCH",
+        cheat_btn_update = "UPDATE",
+        cheat_no = "No cheats added yet",
+        cheat_verified = "✓ VERIFIED",
+        cheat_updating = "🔄 UPDATING",
+        cheat_checking = "⏳ CHECKING...",
+        toast_welcome = "Welcome!",
+        toast_closed = "Launcher closed. Restart script.",
+        toast_fav_add = "Added to favorites",
+        toast_fav_rem = "Removed from favorites",
+        toast_need_key = "Access key required",
+        toast_err_id = "Cheat ID error",
+        toast_load_cheat = "Loading: ",
+        toast_cheat_update = "Cheat is updating",
+        toast_compile_err = "Compilation error",
+        toast_cheat_err = "Error in ",
+        toast_need_auth = "Please log in first",
+        toast_no_id = "Cheat ID not specified",
+        toast_like = "Like counted!",
+        toast_dislike = "Dislike counted!",
+        toast_vote_err = "Failed to send vote: ",
+        toast_cheat_dead = "Cheat will be back after update",
+        err_invalid_key = "❌ Invalid key",
+        err_bound = "❌ Key bound to another device",
+        err_expired = "❌ Key expired",
+        err_timeout = "❌ Server is not responding",
+        err_no_token = "❌ Server did not issue a token",
+        err_enter_key = "Enter access key",
+    }
+}
+
 local GUI_NAMES = { "RH_LAUNCHER_GUI", "RH_LAUNCHER_AUTH_GUI", "RH_LAUNCHER_TOAST" }
 
 local activeConnections = {}
 local isRunning = false
 local chattedConnection = nil
+local uiElements = {}
+
+local STATE = { 
+    authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
+    favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {},
+    activatedAt = nil, gamesLoaded = false, gamesLoading = false, language = "ru",
+    lastSelectedGame = nil
+}
+
+local function L(key) return LOC[STATE.language][key] or key end
+local function registerText(obj, key) obj.Text = L(key); table.insert(uiElements, { obj = obj, key = key }) end
 
 local function addConnection(conn) table.insert(activeConnections, conn) end
 
@@ -97,12 +253,6 @@ local function clearAllGuis()
         end
     end)
 end
-
-local STATE = { 
-    authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
-    favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {},
-    activatedAt = nil, gamesLoaded = false, gamesLoading = false
-}
 
 local function create(class, props, parent)
     local obj = Instance.new(class)
@@ -273,6 +423,7 @@ end
 
 local startLauncher
 local onAuthSuccess
+local updateLanguage
 
 startLauncher = function()
     if isRunning then return end
@@ -309,7 +460,19 @@ startLauncher = function()
     corner(AuthPanel, 14)
 
     local BackgroundArea = create("Frame", { Name = "BackgroundArea", Size = UDim2.fromScale(0.60, 1), Position = UDim2.fromScale(0, 0), BackgroundColor3 = C.bg, BorderSizePixel = 0, ClipsDescendants = true }, AuthPanel)
+    
     local Background = create("ImageLabel", { Name = "BackgroundImage", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. CONFIG.BACKGROUND_ID, ScaleType = Enum.ScaleType.Crop }, BackgroundArea)
+
+    local particleContainer = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, BackgroundArea)
+    task.spawn(function()
+        while isRunning and particleContainer and particleContainer.Parent do
+            local p = create("Frame", { Position = UDim2.fromScale(math.random(5, 95)/100, 1.1), Size = UDim2.fromOffset(math.random(2, 4), math.random(2, 4)), BackgroundColor3 = C.cyan, BackgroundTransparency = math.random(30, 70)/100, BorderSizePixel = 0 }, particleContainer)
+            corner(p, 10)
+            TweenService:Create(p, TweenInfo.new(math.random(3, 6), Enum.EasingStyle.Linear), { Position = UDim2.fromScale(p.Position.X.Scale, -0.1), BackgroundTransparency = 1 }):Play()
+            task.delay(math.random(3, 6), function() if p then p:Destroy() end end)
+            task.wait(0.2)
+        end
+    end)
 
     local Card = create("Frame", { Name = "LoginCard", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.fromScale(0.98, 0.5), Size = UDim2.fromScale(0.38, 0.96), BackgroundColor3 = C.bg, BorderSizePixel = 0 }, AuthPanel)
     corner(Card, 19)
@@ -319,6 +482,14 @@ startLauncher = function()
     local BorderStroke = create("UIStroke", { Color = C.accent, Thickness = 2, Transparency = 0.1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, BorderFrame)
     gradient(BorderStroke, C.cyan, C.pink, 0)
 
+    local langBtnAuth = create("TextButton", { Position = UDim2.new(1, -40, 0, 10), Size = UDim2.fromOffset(30, 20), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = STATE.language == "ru" and "EN" or "RU", TextColor3 = C.accent, Font = Enum.Font.GothamBold, TextSize = 10, AutoButtonColor = false, ZIndex = 5 }, Card)
+    corner(langBtnAuth, 6)
+    stroke(langBtnAuth, C.accent, 1, 0.5)
+    addConnection(langBtnAuth.MouseButton1Click:Connect(function()
+        STATE.language = STATE.language == "ru" and "en" or "ru"
+        updateLanguage()
+    end))
+
     local Content = create("Frame", { Name = "Content", Position = UDim2.fromScale(0.065, 0.05), Size = UDim2.fromScale(0.87, 0.90), BackgroundTransparency = 1 }, Card)
 
     local function makeText(parent, name, text, position, size, font, color, minSize, maxSize)
@@ -327,10 +498,13 @@ startLauncher = function()
         return label
     end
 
-    local Welcome = makeText(Content, "Welcome", "Добро пожаловать!", UDim2.fromScale(0, 0.13), UDim2.fromScale(1, 0.115), Enum.Font.GothamBold, C.text, 10, 22)
+    local Welcome = makeText(Content, "Welcome", "", UDim2.fromScale(0, 0.13), UDim2.fromScale(1, 0.115), Enum.Font.GothamBold, C.text, 10, 22)
     Welcome.TextXAlignment = Enum.TextXAlignment.Left
-    local Subtitle = makeText(Content, "Subtitle", "Войдите в свой аккаунт RH-LAUNCHER", UDim2.fromScale(0, 0.255), UDim2.fromScale(1, 0.075), Enum.Font.Gotham, C.muted, 8, 14)
+    registerText(Welcome, "auth_welcome")
+
+    local Subtitle = makeText(Content, "Subtitle", "", UDim2.fromScale(0, 0.255), UDim2.fromScale(1, 0.075), Enum.Font.Gotham, C.muted, 8, 14)
     Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    registerText(Subtitle, "auth_subtitle")
 
     local InputFrame = create("Frame", { Name = "KeyInputFrame", Position = UDim2.fromScale(0, 0.375), Size = UDim2.fromScale(1, 0.135), BackgroundColor3 = C.input }, Content)
     corner(InputFrame, 10)
@@ -340,7 +514,7 @@ startLauncher = function()
     local keyIcon = create("TextLabel", { Position = UDim2.fromScale(0.03, 0), Size = UDim2.fromScale(0.08, 1), BackgroundTransparency = 1, Text = "🔑", TextColor3 = C.cyan, Font = Enum.Font.Gotham, TextScaled = true }, InputFrame)
     create("UITextSizeConstraint", { MinTextSize = 10, MaxTextSize = 16 }, keyIcon)
 
-    local KeyBox = create("TextBox", { Name = "KeyInput", Position = UDim2.fromScale(0.12, 0.08), Size = UDim2.fromScale(0.82, 0.84), BackgroundTransparency = 1, Text = "", PlaceholderText = "Введите ключ...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Code, TextScaled = true, ClearTextOnFocus = false }, InputFrame)
+    local KeyBox = create("TextBox", { Name = "KeyInput", Position = UDim2.fromScale(0.12, 0.08), Size = UDim2.fromScale(0.82, 0.84), BackgroundTransparency = 1, Text = "", PlaceholderText = L("auth_placeholder"), PlaceholderColor3 = C.muted, TextColor3 = C.text, TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Code, TextScaled = true, ClearTextOnFocus = false }, InputFrame)
     create("UITextSizeConstraint", { MinTextSize = 10, MaxTextSize = 16 }, KeyBox)
 
     local Notice = makeText(Content, "Notice", "", UDim2.fromScale(0, 0.52), UDim2.fromScale(1, 0.055), Enum.Font.Gotham, C.cyan, 8, 12)
@@ -372,14 +546,17 @@ startLauncher = function()
 
     local isBusy = false
     local savedSessionToken = nil
+    local loginBtnStateKey = "auth_btn_login"
+    
     local LoginBtn
-    LoginBtn = makeButton(Content, "LoginButton", "Войти", UDim2.fromScale(0, 0.58), UDim2.fromScale(1, 0.12), false, function()
+    LoginBtn = makeButton(Content, "LoginButton", "", UDim2.fromScale(0, 0.58), UDim2.fromScale(1, 0.12), false, function()
         if isBusy then return end
         if savedSessionToken then
             isBusy = true
-            LoginBtn.Text = "Проверка сессии..."
+            loginBtnStateKey = "auth_btn_check_sess"
+            LoginBtn.Text = L(loginBtnStateKey)
             LoginBtn.TextColor3 = C.muted
-            notify("Проверяем сохранённую сессию...", C.accent)
+            notify(L("auth_checking_sess"), C.accent)
             task.spawn(function()
                 local valid = verifySavedToken(savedSessionToken)
                 if valid then
@@ -389,40 +566,43 @@ startLauncher = function()
                 else
                     savedSessionToken = nil
                     isBusy = false
-                    LoginBtn.Text = "Войти"
+                    loginBtnStateKey = "auth_btn_login"
+                    LoginBtn.Text = L(loginBtnStateKey)
                     LoginBtn.TextColor3 = C.text
-                    Notice.Text = "Сессия истекла. Введите ключ заново."
+                    Notice.Text = L("auth_sess_expired")
                     Notice.TextColor3 = C.red
                     KeyBox.Text = ""
-                    notify("Сессия недействительна — введите ключ", C.red)
+                    notify(L("auth_sess_invalid"), C.red)
                 end
             end)
             return
         end
         local key = KeyBox.Text:gsub("%s+", "")
-        if key == "" then notify("Введите ключ доступа", C.red); return end
+        if key == "" then notify(L("err_enter_key"), C.red); return end
         isBusy = true
-        LoginBtn.Text = "Проверка..."
+        loginBtnStateKey = "auth_btn_checking"
+        LoginBtn.Text = L(loginBtnStateKey)
         LoginBtn.TextColor3 = C.muted
-        notify("Соединение с сервером...", C.accent)
+        notify(L("auth_connecting"), C.accent)
         task.spawn(function()
             if type(STATE.deviceId) ~= "string" or STATE.deviceId == "" then STATE.deviceId = generateDeviceId() end
             local body = { key = key, install_hash = STATE.deviceId, roblox_name = LocalPlayer.Name }
             local result, err, attempts = apiWithRetry("/activate", body)
             if not result then
                 isBusy = false
-                LoginBtn.Text = "Войти"
+                loginBtnStateKey = "auth_btn_login"
+                LoginBtn.Text = L(loginBtnStateKey)
                 LoginBtn.TextColor3 = C.text
-                local msg = tostring(err or "неизвестная ошибка")
+                local msg = tostring(err or "unknown error")
                 local low = string.lower(msg)
-                if string.find(low, "invalid license") then notify("❌ Неверный ключ", C.red)
-                elseif string.find(low, "bound to another") then notify("❌ Ключ привязан к другому устройству", C.red)
-                elseif string.find(low, "expired") then notify("❌ Ключ истёк", C.red)
-                elseif string.find(low, "таймаут") or string.find(low, "timeout") then notify("❌ Сервер не отвечает", C.red)
+                if string.find(low, "invalid license") then notify(L("err_invalid_key"), C.red)
+                elseif string.find(low, "bound to another") then notify(L("err_bound"), C.red)
+                elseif string.find(low, "expired") then notify(L("err_expired"), C.red)
+                elseif string.find(low, "таймаут") or string.find(low, "timeout") then notify(L("err_timeout"), C.red)
                 else notify("❌ " .. msg, C.red) end
                 return
             end
-            if type(result.token) ~= "string" or result.token == "" then isBusy = false; LoginBtn.Text = "Войти"; LoginBtn.TextColor3 = C.text; notify("❌ Сервер не выдал токен", C.red); return end
+            if type(result.token) ~= "string" or result.token == "" then isBusy = false; loginBtnStateKey = "auth_btn_login"; LoginBtn.Text = L(loginBtnStateKey); LoginBtn.TextColor3 = C.text; notify(L("err_no_token"), C.red); return end
             
             if result.remaining_seconds then STATE.localRemaining = tonumber(result.remaining_seconds) end
             if result.activated_at then 
@@ -433,28 +613,33 @@ startLauncher = function()
             
             isBusy = false
             notify("Успешный вход!", C.green)
-            LoginBtn.Text = "Успех"
+            loginBtnStateKey = "auth_btn_success"
+            LoginBtn.Text = L(loginBtnStateKey)
             LoginBtn.TextColor3 = C.green
             task.wait(0.5)
             authScreen:Destroy()
             onAuthSuccess(result.token)
         end)
     end)
+    LoginBtn.Text = L(loginBtnStateKey)
 
     local divFrame = create("Frame", { Position = UDim2.fromScale(0, 0.73), Size = UDim2.fromScale(1, 0.065), BackgroundTransparency = 1 }, Content)
     create("Frame", { Position = UDim2.fromScale(0, 0.5), Size = UDim2.fromScale(0.35, 0), BackgroundColor3 = C.muted, BackgroundTransparency = 0.6 }, divFrame)
     create("Frame", { Position = UDim2.fromScale(0.65, 0.5), Size = UDim2.fromScale(0.35, 0), BackgroundColor3 = C.muted, BackgroundTransparency = 0.6 }, divFrame)
-    local divText = makeText(divFrame, "DivText", "Нет ключа?", UDim2.fromScale(0.35, 0), UDim2.fromScale(0.3, 1), Enum.Font.Gotham, C.muted, 8, 12)
+    
+    local divText = makeText(divFrame, "DivText", "", UDim2.fromScale(0.35, 0), UDim2.fromScale(0.3, 1), Enum.Font.Gotham, C.muted, 8, 12)
     divText.TextXAlignment = Enum.TextXAlignment.Center
+    registerText(divText, "auth_no_key")
 
-    makeButton(Content, "GetKeyButton", "Получить ключ", UDim2.fromScale(0, 0.825), UDim2.fromScale(1, 0.12), true, function()
+    local GetKeyButton = makeButton(Content, "GetKeyButton", "", UDim2.fromScale(0, 0.825), UDim2.fromScale(1, 0.12), true, function()
         local link = CONFIG.TG_LINK
         local copied = false
         if type(setclipboard) == "function" then copied = pcall(setclipboard, link)
         elseif type(toclipboard) == "function" then copied = pcall(toclipboard, link) end
-        if copied then notify("Ссылка скопирована!", C.green)
+        if copied then notify(L("auth_link_copied"), C.green)
         else notify("t.me/rh_launcher_scripts", C.cyan) end
     end)
+    registerText(GetKeyButton, "auth_get_key")
 
     local mainGui = create("ScreenGui", { Name = "RH_LAUNCHER_GUI", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 99998, Enabled = false })
     safeParent(mainGui)
@@ -485,7 +670,21 @@ startLauncher = function()
 
     local logoFrame = create("Frame", { Position = UDim2.new(0.5, 0, 0, 20), AnchorPoint = Vector2.new(0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, sidebar)
     corner(logoFrame, 25)
-    stroke(logoFrame, C.accent, 1.5, 0.2)
+    
+    local logoStroke = create("UIStroke", { Color = C.accent, Thickness = 1.5, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, logoFrame)
+    local logoScale = create("UIScale", { Scale = 1 }, logoFrame)
+
+    task.spawn(function()
+        while isRunning and logoFrame and logoFrame.Parent do
+            TweenService:Create(logoScale, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Scale = 1.06 }):Play()
+            TweenService:Create(logoStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = C.cyan, Transparency = 0, Thickness = 2.5 }):Play()
+            task.wait(1)
+            if not (logoFrame and logoFrame.Parent) then break end
+            TweenService:Create(logoScale, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Scale = 1 }):Play()
+            TweenService:Create(logoStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = C.accent, Transparency = 0.4, Thickness = 1.5 }):Play()
+            task.wait(1)
+        end
+    end)
 
     if CONFIG.LOGO_IMAGE_ID and CONFIG.LOGO_IMAGE_ID ~= "" then
         local logoImg = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(CONFIG.LOGO_IMAGE_ID), ScaleType = Enum.ScaleType.Crop }, logoFrame)
@@ -504,13 +703,15 @@ startLauncher = function()
     end
 
     local navButtons = {}
-    local function createNavButton(icon, text, order, pageName)
+    local function createNavButton(icon, textKey, order, pageName)
+        local text = L(textKey)
         local btn = create("TextButton", { Size = UDim2.new(1, -10, 0, 40), Position = UDim2.new(0, 5, 0, 90 + (order * 45)), BackgroundColor3 = C.surface2, BackgroundTransparency = 0.5, Text = "", AutoButtonColor = false }, sidebar)
         corner(btn, 8)
         local bgHighlight = create("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.accent, BackgroundTransparency = 1, BorderSizePixel = 0 }, btn)
         corner(bgHighlight, 8)
         local iconLabel = create("TextLabel", { Size = UDim2.fromOffset(24, 24), Position = UDim2.new(0, 8, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5), BackgroundTransparency = 1, Text = icon, TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, btn)
         local textLabel = create("TextLabel", { Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 38, 0, 0), BackgroundTransparency = 1, Text = text, TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center }, btn)
+        table.insert(uiElements, {obj = textLabel, key = textKey})
         navButtons[pageName] = { btn = btn, iconLabel = iconLabel, textLabel = textLabel, bg = bgHighlight }
         addConnection(btn.MouseButton1Click:Connect(function()
             for pName, data in pairs(navButtons) do
@@ -526,21 +727,25 @@ startLauncher = function()
         return btn
     end
 
-    createNavButton("🏠", "Главная", 0, "games")
-    createNavButton("⭐", "Избранное", 1, "favorites")
-    createNavButton("⚙️", "Настройки", 2, "settings")
-    createNavButton("👤", "Профиль", 3, "profile")
+    createNavButton("🏠", "menu_main", 0, "games")
+    createNavButton("⭐", "menu_fav", 1, "favorites")
+    createNavButton("⚙️", "menu_settings", 2, "settings")
+    createNavButton("👤", "menu_profile", 3, "profile")
 
     local statusFrame = create("Frame", { Position = UDim2.new(0, 5, 1, -65), Size = UDim2.new(1, -10, 0, 50), BackgroundColor3 = C.surface2, BackgroundTransparency = 0.5, BorderSizePixel = 0 }, sidebar)
     corner(statusFrame, 8)
     local statusDot = create("Frame", { Position = UDim2.new(0, 8, 0, 10), Size = UDim2.fromOffset(8, 8), BackgroundColor3 = C.yellow, BorderSizePixel = 0 }, statusFrame)
     corner(statusDot, 4)
-    local statusLabel = create("TextLabel", { Position = UDim2.new(0, 20, 0, 6), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "Статус", TextColor3 = C.muted, TextSize = 8, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
-    local statusText = create("TextLabel", { Position = UDim2.new(0, 20, 0, 18), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.yellow, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
+    local statusLabel = create("TextLabel", { Position = UDim2.new(0, 20, 0, 6), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "", TextColor3 = C.muted, TextSize = 8, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
+    registerText(statusLabel, "menu_status")
+    
+    local statusText = create("TextLabel", { Position = UDim2.new(0, 20, 0, 18), Size = UDim2.new(1, -20, 0, 14), BackgroundTransparency = 1, Text = "", TextColor3 = C.yellow, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
     local versionLabel = create("TextLabel", { Position = UDim2.new(0, 8, 0, 34), Size = UDim2.new(1, -16, 0, 10), BackgroundTransparency = 1, Text = "v" .. CONFIG.VERSION, TextColor3 = C.muted, TextSize = 7, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left }, statusFrame)
 
-    local function setLoaderStatus(text, color)
-        statusText.Text = text
+    local currentStatusKey = "menu_loading"
+    local function setLoaderStatus(key, color)
+        currentStatusKey = key
+        statusText.Text = L(key)
         statusText.TextColor3 = color
         statusDot.BackgroundColor3 = color
     end
@@ -572,7 +777,7 @@ startLauncher = function()
     stroke(closeBtn, C.red, 1, 0.5)
 
     addConnection(closeBtn.MouseButton1Click:Connect(function()
-        showToast("Лаунчер закрыт. Перезапустите скрипт.", "warn")
+        showToast(L("toast_closed"), "warn")
         isRunning = false
         disconnectAll()
         clearAllGuis()
@@ -586,7 +791,7 @@ startLauncher = function()
     corner(searchFrame, 8)
     stroke(searchFrame, C.border, 1, 0.5)
     create("TextLabel", { Position = UDim2.new(0, 10, 0, 0), Size = UDim2.fromOffset(20, 36), BackgroundTransparency = 1, Text = "🔍", TextColor3 = C.muted, TextSize = 14, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, searchFrame)
-    local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Поиск игр...", PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
+    local searchBox = create("TextBox", { Position = UDim2.new(0, 34, 0, 0), Size = UDim2.new(1, -44, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = L("menu_search"), PlaceholderColor3 = C.muted, TextColor3 = C.text, TextSize = 12, Font = Enum.Font.Gotham, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left }, searchFrame)
 
     local content = create("Frame", { Position = UDim2.new(0, 8, 0, 124), Size = UDim2.new(1, -16, 1, -132), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 3 }, contentArea)
 
@@ -604,10 +809,20 @@ startLauncher = function()
     local profilePage = makePage(content, "ProfilePage")
 
     create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "⚙️", TextColor3 = C.muted, TextSize = 28, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, settingsPage)
-    create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "Настройки в разработке", TextColor3 = C.muted, TextSize = 12, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, settingsPage)
+    
+    local langBtnSettings = create("TextButton", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 12, AutoButtonColor = false, LayoutOrder = 1 }, settingsPage)
+    corner(langBtnSettings, 8)
+    stroke(langBtnSettings, C.accent, 1, 0.5)
+    langBtnSettings.Text = STATE.language == "ru" and "Язык / Language: RU" or "Language / Язык: EN"
+    addConnection(langBtnSettings.MouseButton1Click:Connect(function()
+        STATE.language = STATE.language == "ru" and "en" or "ru"
+        updateLanguage()
+    end))
 
-    local cheatsBackBtn = create("TextButton", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "←  НАЗАД К ИГРАМ", TextColor3 = C.text, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true, LayoutOrder = -2 }, cheatsPage)
+    local cheatsBackBtn = create("TextButton", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.surface2, BorderSizePixel = 0, Text = "", TextColor3 = C.text, TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = true, LayoutOrder = -2 }, cheatsPage)
     corner(cheatsBackBtn, 8)
+    registerText(cheatsBackBtn, "cheat_back")
+
     local cheatsTitleLbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "", TextColor3 = C.accent, TextSize = 10, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = -1 }, cheatsPage)
 
     local profileFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 300), BackgroundColor3 = C.surface, BorderSizePixel = 0, ClipsDescendants = true }, profilePage)
@@ -645,20 +860,23 @@ startLauncher = function()
     corner(keyStatusFrame, 8)
     stroke(keyStatusFrame, C.border, 1, 0.5)
 
-    create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "ВАШ КЛЮЧ ДОСТУПА", TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
-    local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 18), BackgroundTransparency = 1, Text = "Загрузка...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
-    
-    local activatedLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "Активирован: --", TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+    local profKeyTitle = create("TextLabel", { Position = UDim2.new(0, 12, 0, 6), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "", TextColor3 = C.muted, Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+    registerText(profKeyTitle, "prof_key_title")
 
-    local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 245), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "💳 ПРОДЛИТЬ КЛЮЧ", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileContent)
+    local profileKeyLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 22), Size = UDim2.new(1, -24, 0, 18), BackgroundTransparency = 1, Text = "Loading...", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+    
+    local activatedLbl = create("TextLabel", { Position = UDim2.new(0, 12, 0, 44), Size = UDim2.new(1, -24, 0, 14), BackgroundTransparency = 1, Text = "", TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left }, keyStatusFrame)
+
+    local renewBtn = create("TextButton", { Position = UDim2.new(0, 16, 0, 245), Size = UDim2.new(1, -32, 0, 40), BackgroundColor3 = C.accent, BorderSizePixel = 0, Text = "", TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = false }, profileContent)
     corner(renewBtn, 8)
+    registerText(renewBtn, "prof_btn_renew")
 
     addConnection(renewBtn.MouseButton1Click:Connect(function()
         local copied = false
         if type(setclipboard) == "function" then copied = pcall(setclipboard, CONFIG.TG_LINK)
         elseif type(toclipboard) == "function" then copied = pcall(toclipboard, CONFIG.TG_LINK) end
-        if copied then showToast("Ссылка на продление скопирована!", "ok")
-        else showToast("Ссылка: " .. CONFIG.TG_LINK, "warn") end
+        if copied then showToast(L("prof_renew_copied"), "ok")
+        else showToast(L("prof_link") .. CONFIG.TG_LINK, "warn") end
     end))
 
     local CheatTracker = { active = false, killFlag = false, guis = {}, connSnap = nil, currentName = nil }
@@ -720,15 +938,15 @@ startLauncher = function()
 
     local function launchCheat(cheat)
         if STATE.busy then return end
-        if not STATE.authed then showToast("Нужен ключ доступа", "warn"); return end
-        if not cheat or not cheat.id or cheat.id == "" then showToast("Ошибка ID чита", "warn"); return end
+        if not STATE.authed then showToast(L("toast_need_key"), "warn"); return end
+        if not cheat or not cheat.id or cheat.id == "" then showToast(L("toast_err_id"), "warn"); return end
 
         STATE.busy = true
         local guiSnap = snapshotGuis()
         local connSnap = snapshotConnections()
 
         CheatTracker.active = true; CheatTracker.killFlag = false; CheatTracker.guis = {}; CheatTracker.connSnap = connSnap; CheatTracker.currentName = cheat.name
-        showToast("Загрузка: " .. cheat.name, "ok")
+        showToast(L("toast_load_cheat") .. cheat.name, "ok")
 
         task.spawn(function()
             local secureUrl = CONFIG.API_BASE .. "/secure_load?cheat_id=" .. cheat.id .. "&token=" .. tostring(STATE.token)
@@ -736,20 +954,20 @@ startLauncher = function()
             
             if not okFetch or type(source) ~= "string" or #source < 10 then 
                 CheatTracker.active = false; CheatTracker.connSnap = nil; STATE.busy = false; 
-                showToast("Чит на обновлении", "warn") 
+                showToast(L("toast_cheat_update"), "warn") 
                 return 
             end
 
             local compiled
             if type(loadstring) == "function" then local okLs, fn = pcall(loadstring, source); if okLs then compiled = fn end end
-            if not compiled then CheatTracker.active = false; CheatTracker.connSnap = nil; STATE.busy = false; showToast("Ошибка компиляции", "err"); return end
+            if not compiled then CheatTracker.active = false; CheatTracker.connSnap = nil; STATE.busy = false; showToast(L("toast_compile_err"), "err"); return end
 
             mainGui.Enabled = false
             authScreen.Enabled = false
 
             task.spawn(function()
                 local okRun, err = pcall(compiled)
-                if not okRun then showToast("Ошибка в " .. cheat.name .. ": " .. tostring(err):sub(1, 90), "err"); CheatTracker.active = false; mainGui.Enabled = true end
+                if not okRun then showToast(L("toast_cheat_err") .. cheat.name .. ": " .. tostring(err):sub(1, 90), "err"); CheatTracker.active = false; mainGui.Enabled = true end
             end)
 
             task.spawn(function()
@@ -767,21 +985,23 @@ startLauncher = function()
     end
 
     local function formatRemaining(sec)
-        if sec == nil then return "∞ Бесконечный" end
+        if sec == nil then return "∞" end
         sec = tonumber(sec)
         if not sec then return "--" end
-        if sec <= 0 then return "Истёк" end
+        if sec <= 0 then return "0" end
         local d = math.floor(sec / 86400); local h = math.floor((sec % 86400) / 3600); local m = math.floor((sec % 3600) / 60); local s = math.floor(sec % 60)
-        if d > 0 then return string.format("%dд %dч %dм", d, h, m) end
-        if h > 0 then return string.format("%dч %dм", h, m) end
-        if m > 0 then return string.format("%dм %dс", m, s) end
-        return string.format("%dс", s)
+        if d > 0 then return string.format("%dd %dh %dm", d, h, m) end
+        if h > 0 then return string.format("%dh %dm", h, m) end
+        if m > 0 then return string.format("%dm %ds", m, s) end
+        return string.format("%ds", s)
     end
 
+    local currentTimerRemaining = nil
     local function updateTimerLabel(remaining)
+        currentTimerRemaining = remaining
         if profileKeyLbl then
             local timeStr = formatRemaining(remaining)
-            profileKeyLbl.Text = remaining and ("Осталось: " .. timeStr) or "Навсегда (∞)"
+            profileKeyLbl.Text = remaining and (L("prof_time_left") .. timeStr) or L("prof_forever")
             if remaining == nil then profileKeyLbl.TextColor3 = C.green
             elseif remaining <= 60 then profileKeyLbl.TextColor3 = C.red
             elseif remaining <= 300 then profileKeyLbl.TextColor3 = C.yellow
@@ -848,16 +1068,16 @@ startLauncher = function()
     end
 
     local function submitVote(cheatId, voteType)
-        if not STATE.authed or not STATE.token then showToast("Сначала авторизуйтесь", "warn"); return false end
-        if type(cheatId) ~= "string" or cheatId == "" then showToast("Не указан ID чита", "err"); return false end
+        if not STATE.authed or not STATE.token then showToast(L("toast_need_auth"), "warn"); return false end
+        if type(cheatId) ~= "string" or cheatId == "" then showToast(L("toast_no_id"), "err"); return false end
         if voteType ~= 1 and voteType ~= -1 then return false end
 
         local result, err = apiWithRetry("/vote", { token = STATE.token, cheat_id = cheatId, vote_type = voteType })
-        if not result or result.success ~= true then showToast("Не удалось отправить голос: " .. tostring(err or "ошибка сервера"), "err"); return false end
+        if not result or result.success ~= true then showToast(L("toast_vote_err") .. tostring(err or "server error"), "err"); return false end
 
         Ratings.data[cheatId] = { likes = tonumber(result.likes) or 0, dislikes = tonumber(result.dislikes) or 0, verified = result.verified == true }
         Ratings.lastFetch = os.clock()
-        showToast(voteType == 1 and "Лайк засчитан!" or "Дизлайк засчитан!", "ok")
+        showToast(voteType == 1 and L("toast_like") or L("toast_dislike"), "ok")
         return true
     end
 
@@ -940,7 +1160,7 @@ startLauncher = function()
             local nowFav = STATE.favorites[title] == true
             starLbl.Text = nowFav and "⭐" or "☆"
             starLbl.TextColor3 = nowFav and C.yellow or C.muted
-            if nowFav then showToast("Добавлено в избранное", "ok") else showToast("Удалено из избранного", "warn") end
+            if nowFav then showToast(L("toast_fav_add"), "ok") else showToast(L("toast_fav_rem"), "warn") end
             updateStarVisuals(title)
             if favoritesPage.Visible then loadFavoritesPage() end
         end))
@@ -1011,20 +1231,20 @@ startLauncher = function()
 
         local title = create("TextLabel", { Position = UDim2.new(0, 92, 0, 14), Size = UDim2.new(1, -180, 0, 18), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
         
-        local badgeText = "✓ ПРОВЕРЕН"
-        if isDead then badgeText = "🔄 НА ОБНОВЛЕНИИ"
-        elseif status == "checking" then badgeText = "⏳ ПРОВЕРКА..."
+        local badgeText = L("cheat_verified")
+        if isDead then badgeText = L("cheat_updating")
+        elseif status == "checking" then badgeText = L("cheat_checking")
         else badgeText = "👍 " .. rating.likes .. "   👎 " .. rating.dislikes end
 
         local badge = create("TextLabel", { Name = "VerifiedBadge", Position = UDim2.new(0, 92, 0, 36), Size = UDim2.new(1, -180, 0, 16), BackgroundTransparency = 1, Text = badgeText, TextColor3 = isDead and C.muted or (status == "checking" and C.yellow or (rating.likes >= 4 and C.green or C.muted)), Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, card)
         
-        local launchBtn = create("TextButton", { Position = UDim2.new(1, -90, 0, 10), Size = UDim2.fromOffset(80, 26), BackgroundColor3 = isDead and C.surface2 or C.accent, BorderSizePixel = 0, Text = isDead and "ОБНОВ." or "ЗАПУСТИТЬ", TextColor3 = isDead and C.muted or Color3.new(1, 1, 1), TextSize = 9, Font = Enum.Font.GothamBold, AutoButtonColor = false }, card)
+        local launchBtn = create("TextButton", { Position = UDim2.new(1, -90, 0, 10), Size = UDim2.fromOffset(80, 26), BackgroundColor3 = isDead and C.surface2 or C.accent, BorderSizePixel = 0, Text = isDead and L("cheat_btn_update") or L("cheat_btn_launch"), TextColor3 = isDead and C.muted or Color3.new(1, 1, 1), TextSize = 9, Font = Enum.Font.GothamBold, AutoButtonColor = false }, card)
         corner(launchBtn, 6)
         
         if not isDead then stroke(launchBtn, C.accent, 1, 0.3) end
 
         addConnection(launchBtn.MouseButton1Click:Connect(function() 
-            if isDead then showToast("Чит скоро вернется после обновления", "warn")
+            if isDead then showToast(L("toast_cheat_dead"), "warn")
             else launchCheat(cheat) end
         end))
 
@@ -1047,7 +1267,7 @@ startLauncher = function()
                 local success = submitVote(cheat.id, voteType)
                 if success and card.Parent then
                     local updated = getRating(cheat.id)
-                    badge.Text = (updated.likes >= 4) and "✓ ПРОВЕРЕН" or ("👍 " .. updated.likes .. "   👎 " .. updated.dislikes)
+                    badge.Text = (updated.likes >= 4) and L("cheat_verified") or ("👍 " .. updated.likes .. "   👎 " .. updated.dislikes)
                     badge.TextColor3 = (updated.likes >= 4) and C.green or C.muted
                     stroke(card, (updated.likes >= 4) and C.green or C.accent, 1, 0.5)
                 end
@@ -1084,14 +1304,14 @@ startLauncher = function()
             if child:IsA("GuiObject") and not child:IsA("UIListLayout") then child:Destroy() end 
         end
 
-        setLoaderStatus("Загрузка...", C.yellow)
+        setLoaderStatus("menu_loading", C.yellow)
 
         local result, err = api("/get_scripts", nil, "GET")
         
         if not result or result.success ~= true or type(result.games) ~= "table" then
-            local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Ошибка загрузки списка игр.\nПроверьте интернет.", TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
+            local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = L("menu_no_games"), TextColor3 = C.red, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
             lbl.LayoutOrder = 1
-            setLoaderStatus("Нет связи", C.red)
+            setLoaderStatus("menu_no_conn", C.red)
             STATE.gamesLoading = false
             return
         end
@@ -1112,7 +1332,7 @@ startLauncher = function()
             table.insert(STATE.games, gameObj)
 
             local count = #gameObj.cheats
-            local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
+            local subtitle = count .. " " .. (count == 1 and L("menu_count_cheat") or L("menu_count_cheats"))
             
             local icon = GameIcons[gameName] or GameIcons.default
             local gameImageId = STATE.gameImages[gameName] or ""
@@ -1136,11 +1356,11 @@ startLauncher = function()
         end
 
         if index == 1 then
-            local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Пока нет доступных игр.\nДобавьте их через Telegram-бота.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
+            local lbl = create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = L("menu_empty"), TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, gamesPage)
             lbl.LayoutOrder = 1
         end
 
-        setLoaderStatus("Готов к работе", C.green)
+        setLoaderStatus("menu_ready", C.green)
         STATE.gamesLoaded = true
         STATE.gamesLoading = false
     end
@@ -1155,7 +1375,7 @@ startLauncher = function()
             if STATE.favorites[gameObj.name] then
                 hasFavs = true
                 local count = #gameObj.cheats
-                local subtitle = count .. " " .. (count == 1 and "чит" or "читов")
+                local subtitle = count .. " " .. (count == 1 and L("menu_count_cheat") or L("menu_count_cheats"))
                 local icon = GameIcons[gameObj.name] or GameIcons.default
                 
                 local gameImageId = STATE.gameImages[gameObj.name] or ""
@@ -1169,24 +1389,25 @@ startLauncher = function()
         end
         
         if not hasFavs then
-            create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Вы пока не добавили игры в избранное.\nНажмите ☆ на карточке игры.", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, favoritesPage)
+            create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = L("menu_empty_fav"), TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, favoritesPage)
         end
     end
 
     showCheatsForGame = function(selectedGame)
+        STATE.lastSelectedGame = selectedGame
         for _, child in ipairs(cheatsPage:GetChildren()) do 
             if child:IsA("GuiObject") and not child:IsA("UIListLayout") and child ~= cheatsBackBtn and child ~= cheatsTitleLbl then child:Destroy() end 
         end
         
-        cheatsTitleLbl.Text = "ЧИТЫ ДЛЯ " .. tostring(selectedGame.name):upper()
+        cheatsTitleLbl.Text = L("cheat_title") .. tostring(selectedGame.name):upper()
 
         if not selectedGame.cheats or #selectedGame.cheats == 0 then
-            create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "Читы пока не добавлены", TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, cheatsPage)
+            create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = L("cheat_no"), TextColor3 = C.muted, TextSize = 11, Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, cheatsPage)
             showPage("cheats")
             return
         end
 
-        setLoaderStatus("Проверка...", C.yellow)
+        setLoaderStatus("menu_checking", C.yellow)
 
         for i, cheat in ipairs(selectedGame.cheats) do 
             checkLink(cheat)
@@ -1205,7 +1426,7 @@ startLauncher = function()
                 end
                 if not allChecked and os.clock() - t0 > CONFIG.CHEATS_WAIT_S then break end
             end
-            setLoaderStatus("Готов к работе", C.green)
+            setLoaderStatus("menu_ready", C.green)
             
             if not cheatsPage.Visible then return end
             for _, child in ipairs(cheatsPage:GetChildren()) do
@@ -1214,17 +1435,17 @@ startLauncher = function()
                     local status = LinkStatus[cheatId] or "unknown"
                     local badge = child:FindFirstChild("VerifiedBadge")
                     local launchBtn = nil
-                    for _, c in ipairs(child:GetChildren()) do if c:IsA("TextButton") and (c.Text == "ЗАПУСТИТЬ" or c.Text == "ОБНОВ.") then launchBtn = c break end end
+                    for _, c in ipairs(child:GetChildren()) do if c:IsA("TextButton") and (c.Text == L("cheat_btn_launch") or c.Text == L("cheat_btn_update")) then launchBtn = c break end end
 
                     if status == "dead" and badge then
-                        badge.Text = "🔄 НА ОБНОВЛЕНИИ"
+                        badge.Text = L("cheat_updating")
                         badge.TextColor3 = C.muted
                         badge.Visible = true
-                        if launchBtn then launchBtn.Text = "ОБНОВ."; launchBtn.BackgroundColor3 = C.surface2; launchBtn.TextColor3 = C.muted; launchBtn.Active = false end
+                        if launchBtn then launchBtn.Text = L("cheat_btn_update"); launchBtn.BackgroundColor3 = C.surface2; launchBtn.TextColor3 = C.muted; launchBtn.Active = false end
                         stroke(child, C.border, 1, 0.8)
                     elseif status == "ok" and badge then
                         local rating = getRating(cheatId)
-                        badge.Text = (rating.likes >= 4) and "✓ ПРОВЕРЕН" or ("👍 " .. rating.likes .. "   👎 " .. rating.dislikes)
+                        badge.Text = (rating.likes >= 4) and L("cheat_verified") or ("👍 " .. rating.likes .. "   👎 " .. rating.dislikes)
                         badge.TextColor3 = (rating.likes >= 4) and C.green or C.muted
                     end
                 end
@@ -1266,9 +1487,9 @@ startLauncher = function()
             TweenService:Create(profileContent, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0, 0) }):Play()
             
             if STATE.activatedAt then
-                activatedLbl.Text = "Активирован: " .. STATE.activatedAt
+                activatedLbl.Text = L("prof_activated") .. STATE.activatedAt
             else
-                activatedLbl.Text = "Активирован: --"
+                activatedLbl.Text = L("prof_activated") .. "--"
             end
         end
     end
@@ -1281,7 +1502,7 @@ startLauncher = function()
         if CheatTracker.active then killCheat("re-auth") end
         STATE.authed = true; STATE.token = token
         if token then saveToken(token) end
-        showToast("Добро пожаловать!", "ok")
+        showToast(L("toast_welcome"), "ok")
         
         mainGui.Enabled = true
         showPage("games")
@@ -1304,7 +1525,7 @@ startLauncher = function()
         clearToken(); updateTimerLabel(nil)
         isRunning = false
         startLauncher()
-        showToast(reason or "Нужен ключ доступа", "warn")
+        showToast(reason or L("toast_need_key"), "warn")
     end
 
     task.spawn(function()
@@ -1312,7 +1533,7 @@ startLauncher = function()
             while isRunning do
                 if STATE.authed and STATE.localRemaining and STATE.localRemaining > 0 then
                     STATE.localRemaining = STATE.localRemaining - 1; updateTimerLabel(STATE.localRemaining)
-                    if STATE.localRemaining <= 0 then kickToAuth("Ключ истёк") end
+                    if STATE.localRemaining <= 0 then kickToAuth("Key expired") end
                 end
                 task.wait(1)
             end
@@ -1321,10 +1542,10 @@ startLauncher = function()
             if STATE.authed and STATE.token then
                 local result, err = api("/verify", { token = STATE.token })
                 if result and result.valid == true then STATE.localRemaining = tonumber(result.remaining_seconds); updateTimerLabel(STATE.localRemaining)
-                elseif result and result.valid ~= true then kickToAuth("Ключ отозван")
+                elseif result and result.valid ~= true then kickToAuth("Key revoked")
                 elseif not result then
                     local low = string.lower(tostring(err or ""))
-                    if string.find(low, "expired") or string.find(low, "invalid") or string.find(low, "403") then kickToAuth("Ключ недействителен") end
+                    if string.find(low, "expired") or string.find(low, "invalid") or string.find(low, "403") then kickToAuth("Key invalid") end
                 end
             end
             task.wait(CONFIG.HEARTBEAT_S)
@@ -1379,7 +1600,7 @@ startLauncher = function()
     task.spawn(function()
         local saved = loadToken()
         if not saved then 
-            setLoaderStatus("Ожидание", C.red)
+            setLoaderStatus("menu_waiting", C.red)
             return 
         end
         
@@ -1387,10 +1608,11 @@ startLauncher = function()
         if valid then
             savedSessionToken = saved
             KeyBox.Text = ""
-            KeyBox.PlaceholderText = "Сессия сохранена"
-            Notice.Text = "Сессия сохранена. Нажмите «Войти»"
+            KeyBox.PlaceholderText = L("auth_sess_saved")
+            Notice.Text = L("auth_sess_saved")
             Notice.TextColor3 = C.green
-            LoginBtn.Text = "Войти"
+            loginBtnStateKey = "auth_btn_login"
+            LoginBtn.Text = L(loginBtnStateKey)
             LoginBtn.TextColor3 = C.text
         else
             savedSessionToken = nil
@@ -1398,6 +1620,36 @@ startLauncher = function()
     end)
 
     showPage("games")
+
+    updateLanguage = function()
+        for _, item in ipairs(uiElements) do
+            if item.obj and item.obj.Parent then
+                item.obj.Text = L(item.key)
+            end
+        end
+        if KeyBox and KeyBox.Parent then KeyBox.PlaceholderText = L("auth_placeholder") end
+        if searchBox and searchBox.Parent then searchBox.PlaceholderText = L("menu_search") end
+        if langBtnAuth and langBtnAuth.Parent then langBtnAuth.Text = STATE.language == "ru" and "EN" or "RU" end
+        if langBtnSettings and langBtnSettings.Parent then langBtnSettings.Text = STATE.language == "ru" and "Язык / Language: RU" or "Language / Язык: EN" end
+        
+        if statusText and statusText.Parent then statusText.Text = L(currentStatusKey) end
+        if profileKeyLbl and profileKeyLbl.Parent then updateTimerLabel(currentTimerRemaining) end
+        if LoginBtn and LoginBtn.Parent then LoginBtn.Text = L(loginBtnStateKey) end
+        
+        if STATE.currentPage == "games" and gamesPage and gamesPage.Parent then
+            loadGamesList()
+        elseif STATE.currentPage == "favorites" and favoritesPage and favoritesPage.Parent then
+            loadFavoritesPage()
+        elseif STATE.currentPage == "cheats" and STATE.lastSelectedGame and cheatsPage and cheatsPage.Parent then
+            showCheatsForGame(STATE.lastSelectedGame)
+        elseif STATE.currentPage == "profile" and activatedLbl and activatedLbl.Parent then
+            if STATE.activatedAt then
+                activatedLbl.Text = L("prof_activated") .. STATE.activatedAt
+            else
+                activatedLbl.Text = L("prof_activated") .. "--"
+            end
+        end
+    end
 
     task.spawn(function()
         loadGamesList()
