@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.1.3 (New Logo)
+    Version: 1.1.4 (Online Counter)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local ContentProvider  = game:GetService("ContentProvider")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.1.3",
+    VERSION        = "1.1.4",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -103,6 +103,7 @@ local LOC = {
         menu_empty_fav = "Вы пока не добавили игры в избранное.\nНажмите ☆ на карточке игры.",
         menu_count_cheat = "чит",
         menu_count_cheats = "читов",
+        menu_online = "Онлайн: ",
         prof_key_title = "ВАШ КЛЮЧ ДОСТУПА",
         prof_time_left = "Осталось: ",
         prof_forever = "Навсегда (∞)",
@@ -174,6 +175,7 @@ local LOC = {
         menu_empty_fav = "You haven't added any favorites yet.\nClick ☆ on a game card.",
         menu_count_cheat = "cheat",
         menu_count_cheats = "cheats",
+        menu_online = "Online: ",
         prof_key_title = "YOUR ACCESS KEY",
         prof_time_left = "Left: ",
         prof_forever = "Forever (∞)",
@@ -226,7 +228,7 @@ local STATE = {
     authed = false, token = nil, deviceId = nil, busy = false, games = {}, localRemaining = nil, 
     favorites = {}, currentPage = "games", lastNonCheatPage = "games", gameImages = {},
     activatedAt = nil, gamesLoaded = false, gamesLoading = false, language = "ru",
-    lastSelectedGame = nil
+    lastSelectedGame = nil, onlineCount = 0
 }
 
 local function L(key) return LOC[STATE.language][key] or key end
@@ -769,8 +771,11 @@ startLauncher = function()
     corner(bannerGradFrame, 10)
     create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.surface2), ColorSequenceKeypoint.new(1, C.accent)}, Rotation = 45 }, bannerGradFrame)
 
-    create("TextLabel", { Position = UDim2.new(0, 16, 0, 8), Size = UDim2.new(1, -64, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
-    create("TextLabel", { Position = UDim2.new(0, 16, 0, 36), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
+    create("TextLabel", { Position = UDim2.new(0, 16, 0, 4), Size = UDim2.new(1, -64, 0, 24), BackgroundTransparency = 1, Text = "RH-LAUNCHER", TextColor3 = C.text, Font = Enum.Font.GothamBlack, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
+    create("TextLabel", { Position = UDim2.new(0, 16, 0, 28), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "Быстрый • Удобный", TextColor3 = C.muted, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
+    
+    -- НОВЫЙ ЭЛЕМЕНТ: Счётчик онлайна
+    local onlineLbl = create("TextLabel", { Position = UDim2.new(0, 16, 0, 44), Size = UDim2.new(1, -64, 0, 14), BackgroundTransparency = 1, Text = "🟢 " .. L("menu_online") .. "0", TextColor3 = C.green, Font = Enum.Font.GothamBold, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 }, banner)
 
     local closeBtn = create("TextButton", { Position = UDim2.new(1, -34, 0, 16), Size = UDim2.fromOffset(26, 26), BackgroundColor3 = C.surface3, BorderSizePixel = 0, Text = "✖", TextColor3 = C.red, TextSize = 14, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 3 }, banner)
     corner(closeBtn, 6)
@@ -934,9 +939,7 @@ startLauncher = function()
         killNewConnections(CheatTracker.connSnap)
         CheatTracker.connSnap = nil
         CheatTracker.active = false; CheatTracker.killFlag = false; CheatTracker.currentName = nil
-    end
-
-    local function launchCheat(cheat)
+    end    local function launchCheat(cheat)
         if STATE.busy then return end
         if not STATE.authed then showToast(L("toast_need_key"), "warn"); return end
         if not cheat or not cheat.id or cheat.id == "" then showToast(L("toast_err_id"), "warn"); return end
@@ -1517,6 +1520,23 @@ startLauncher = function()
             else updateTimerLabel(nil) end
         end)
         task.spawn(function() fetchRatings(true) end)
+        
+        -- Запуск пинга онлайна
+        task.spawn(function()
+            while isRunning and STATE.authed do
+                local res = api("/heartbeat", { device_id = STATE.deviceId })
+                if res and res.success then
+                    local onlineRes = api("/get_online", nil, "GET")
+                    if onlineRes and onlineRes.success then
+                        STATE.onlineCount = onlineRes.online or 0
+                        if onlineLbl and onlineLbl.Parent then
+                            onlineLbl.Text = "🟢 " .. L("menu_online") .. STATE.onlineCount
+                        end
+                    end
+                end
+                task.wait(120) -- пинг раз в 2 минуты
+            end
+        end)
     end
 
     local function kickToAuth(reason)
@@ -1635,6 +1655,7 @@ startLauncher = function()
         if statusText and statusText.Parent then statusText.Text = L(currentStatusKey) end
         if profileKeyLbl and profileKeyLbl.Parent then updateTimerLabel(currentTimerRemaining) end
         if LoginBtn and LoginBtn.Parent then LoginBtn.Text = L(loginBtnStateKey) end
+        if onlineLbl and onlineLbl.Parent then onlineLbl.Text = "🟢 " .. L("menu_online") .. STATE.onlineCount end
         
         if STATE.currentPage == "games" and gamesPage and gamesPage.Parent then
             loadGamesList()
