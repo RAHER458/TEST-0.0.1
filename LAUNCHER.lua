@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.8 (Image Preload)
+    Version: 1.0.13 (Card Gradients Restored)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local ContentProvider  = game:GetService("ContentProvider")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.8",
+    VERSION        = "1.0.13",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -883,12 +883,26 @@ startLauncher = function()
         local card = create("TextButton", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.surface, BorderSizePixel = 0, Text = "", AutoButtonColor = false, ClipsDescendants = true }, parent)
         corner(card, 10)
         stroke(card, C.accent, 1, 0.6)
+        
+        create("UIGradient", { 
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, C.surface),
+                ColorSequenceKeypoint.new(1, C.surface3)
+            }),
+            Rotation = 15
+        }, card)
 
-        local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 100, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
+        local cardScale = create("UIScale", { Scale = 1 }, card)
+
+        local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 130, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
         corner(iconFrame, 10)
         
+        create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, iconFrame)
+
         if imageId and imageId ~= "" then
-            local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(imageId), ScaleType = Enum.ScaleType.Stretch }, iconFrame)
+            local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(imageId), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+            corner(img, 6)
+            stroke(img, C.accent, 1.5, 0.3)
             
             local failed = false
             addConnection(img.Changed:Connect(function(prop)
@@ -911,10 +925,10 @@ startLauncher = function()
             create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = icon, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
         end
 
-        create("TextLabel", { Position = UDim2.new(0, 112, 0, 18), Size = UDim2.new(1, -200, 0, 20), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+        create("TextLabel", { Position = UDim2.new(0, 142, 0, 18), Size = UDim2.new(1, -230, 0, 20), BackgroundTransparency = 1, Text = title, TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
 
         if subtitle and subtitle ~= "" then 
-            create("TextLabel", { Position = UDim2.new(0, 112, 0, 40), Size = UDim2.new(1, -200, 0, 16), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left }, card) 
+            create("TextLabel", { Position = UDim2.new(0, 142, 0, 40), Size = UDim2.new(1, -230, 0, 16), BackgroundTransparency = 1, Text = subtitle, TextColor3 = C.muted, Font = Enum.Font.Gotham, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left }, card) 
         end
 
         local starBtn = create("TextButton", { Name = "StarButton", Position = UDim2.new(1, -70, 0.5, 0), AnchorPoint = Vector2.new(1, 0.5), Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 2 }, card)
@@ -935,6 +949,18 @@ startLauncher = function()
         corner(arrowBtn, 13)
         stroke(arrowBtn, C.accent, 1.5, 0.3)
 
+        addConnection(card.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                TweenService:Create(cardScale, TweenInfo.new(0.1), { Scale = 0.96 }):Play()
+            end
+        end))
+        
+        addConnection(card.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                TweenService:Create(cardScale, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+            end
+        end))
+
         addConnection(card.MouseButton1Click:Connect(function() 
             local ok, err = pcall(onClick); 
             if not ok then warn("[RH-LAUNCHER] Card click: " .. tostring(err)) end 
@@ -951,12 +977,25 @@ startLauncher = function()
         local card = create("Frame", { Name = "RatingCard_" .. cheat.id, Size = UDim2.new(1, 0, 0, 72), BackgroundColor3 = C.surface, BorderSizePixel = 0, LayoutOrder = index, ClipsDescendants = true }, parent)
         corner(card, 10)
         stroke(card, isDead and C.border or ((rating.likes >= 4) and C.green or C.accent), 1, isDead and 0.8 or 0.5)
+        
+        create("UIGradient", { 
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, C.surface),
+                ColorSequenceKeypoint.new(1, C.surface3)
+            }),
+            Rotation = 15
+        }, card)
 
-        local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 72, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
+        local iconFrame = create("Frame", { Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(0, 80, 1, 0), BackgroundColor3 = C.surface2, BorderSizePixel = 0, ClipsDescendants = true }, card)
         corner(iconFrame, 10)
         
+        create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }, iconFrame)
+        
         if cheat.image_id and cheat.image_id ~= "" then
-            local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(cheat.image_id), ScaleType = Enum.ScaleType.Stretch }, iconFrame)
+            local img = create("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "rbxassetid://" .. tostring(cheat.image_id), ScaleType = Enum.ScaleType.Crop }, iconFrame)
+            corner(img, 6)
+            stroke(img, C.accent, 1.5, 0.3)
+            
             local failed = false
             addConnection(img.Changed:Connect(function(prop)
                 if (prop == "IsLoaded" and not img.IsLoaded) or prop == "Image" then
@@ -970,14 +1009,14 @@ startLauncher = function()
             create("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = isDead and "🔄" or "⚡", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, iconFrame)
         end
 
-        local title = create("TextLabel", { Position = UDim2.new(0, 84, 0, 14), Size = UDim2.new(1, -180, 0, 18), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
+        local title = create("TextLabel", { Position = UDim2.new(0, 92, 0, 14), Size = UDim2.new(1, -180, 0, 18), BackgroundTransparency = 1, Text = cheat.name, TextColor3 = isDead and C.muted or C.text, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd }, card)
         
         local badgeText = "✓ ПРОВЕРЕН"
         if isDead then badgeText = "🔄 НА ОБНОВЛЕНИИ"
         elseif status == "checking" then badgeText = "⏳ ПРОВЕРКА..."
         else badgeText = "👍 " .. rating.likes .. "   👎 " .. rating.dislikes end
 
-        local badge = create("TextLabel", { Name = "VerifiedBadge", Position = UDim2.new(0, 84, 0, 36), Size = UDim2.new(1, -180, 0, 16), BackgroundTransparency = 1, Text = badgeText, TextColor3 = isDead and C.muted or (status == "checking" and C.yellow or (rating.likes >= 4 and C.green or C.muted)), Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, card)
+        local badge = create("TextLabel", { Name = "VerifiedBadge", Position = UDim2.new(0, 92, 0, 36), Size = UDim2.new(1, -180, 0, 16), BackgroundTransparency = 1, Text = badgeText, TextColor3 = isDead and C.muted or (status == "checking" and C.yellow or (rating.likes >= 4 and C.green or C.muted)), Font = Enum.Font.GothamBold, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left }, card)
         
         local launchBtn = create("TextButton", { Position = UDim2.new(1, -90, 0, 10), Size = UDim2.fromOffset(80, 26), BackgroundColor3 = isDead and C.surface2 or C.accent, BorderSizePixel = 0, Text = isDead and "ОБНОВ." or "ЗАПУСТИТЬ", TextColor3 = isDead and C.muted or Color3.new(1, 1, 1), TextSize = 9, Font = Enum.Font.GothamBold, AutoButtonColor = false }, card)
         corner(launchBtn, 6)
