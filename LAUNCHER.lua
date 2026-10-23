@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.6 (Bugs & Optimizations)
+    Version: 1.0.8 (Image Preload)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -16,7 +16,7 @@ local ContentProvider  = game:GetService("ContentProvider")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.6",
+    VERSION        = "1.0.8",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
@@ -30,6 +30,8 @@ local CONFIG = {
     HEARTBEAT_S    = 300,
     GUI_WATCH_S    = 5,
     GUI_WATCH_STEP = 0.5,
+    LINK_TIMEOUT_S = 8,
+    CHEATS_WAIT_S  = 12,
     LOGO_IMAGE_ID  = "101226271656911",
     BACKGROUND_ID  = "120280268407455"
 }
@@ -72,6 +74,7 @@ local GUI_NAMES = { "RH_LAUNCHER_GUI", "RH_LAUNCHER_AUTH_GUI", "RH_LAUNCHER_TOAS
 
 local activeConnections = {}
 local isRunning = false
+local chattedConnection = nil
 
 local function addConnection(conn) table.insert(activeConnections, conn) end
 
@@ -123,20 +126,19 @@ local function makeDraggable(frame, dragArea)
     c1 = dragArea.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true; dragInput = input; dragStart = input.Position; startPos = frame.Position; moved = false
-            addConnection(input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end))
-        end
-    end)
-    c2 = dragArea.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then moved = true end
-            if moved then
-                frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
+            if c2 then pcall(function() c2:Disconnect() end); c2 = nil end
+            c2 = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    if c2 then pcall(function() c2:Disconnect() end); c2 = nil end
+                end
+            end)
         end
     end)
     addConnection(c1)
-    addConnection(c2)
+    addConnection(frame.Destroying:Connect(function()
+        if c2 then pcall(function() c2:Disconnect() end); c2 = nil end
+    end))
 end
 
 local function hasFileAPI() return type(readfile) == "function" and type(writefile) == "function" and type(isfile) == "function" end
@@ -570,10 +572,10 @@ startLauncher = function()
     stroke(closeBtn, C.red, 1, 0.5)
 
     addConnection(closeBtn.MouseButton1Click:Connect(function()
+        showToast("Лаунчер закрыт. Перезапустите скрипт.", "warn")
         isRunning = false
         disconnectAll()
         clearAllGuis()
-        showToast("Лаунчер закрыт. Перезапустите скрипт.", "warn")
         task.wait(3)
         if toastGui then toastGui:Destroy() end
     end))
@@ -797,14 +799,27 @@ startLauncher = function()
         task.spawn(function()
             local req = getRequestFn()
             if not req then LinkStatus[cheat.id] = "unknown"; return end
-            
-            local ok, res = pcall(function() return req({ Url = cheat.url, Method = "GET" }) end)
-            
-            if ok and res then
-                local status = tonumber(res.StatusCode or res.Status or 0) or 0
-                if status >= 200 and status < 300 and type(res.Body) == "string" and #res.Body > 10 then LinkStatus[cheat.id] = "ok"
-                else LinkStatus[cheat.id] = "dead" end
-            else LinkStatus[cheat.id] = "dead" end
+
+            local done = false
+            local result = nil
+            task.spawn(function()
+                local ok, res = pcall(function() return req({ Url = cheat.url, Method = "GET" }) end)
+                result = { ok = ok, res = res }
+                done = true
+            end)
+
+            local t0 = os.clock()
+            while not done and os.clock() - t0 < CONFIG.LINK_TIMEOUT_S do task.wait(0.1) end
+
+            if not done then LinkStatus[cheat.id] = "dead"; return end
+            if not result or not result.ok or not result.res then LinkStatus[cheat.id] = "dead"; return end
+
+            local status = tonumber(result.res.StatusCode or result.res.Status or 0) or 0
+            if status >= 200 and status < 300 and type(result.res.Body) == "string" and #result.res.Body > 10 then
+                LinkStatus[cheat.id] = "ok"
+            else
+                LinkStatus[cheat.id] = "dead"
+            end
         end)
     end
 
@@ -885,7 +900,7 @@ startLauncher = function()
                     end
                 end
             end))
-            task.delay(7, function()
+            task.delay(12, function()
                 if not failed and img.Parent and img.IsLoaded == false then
                     failed = true
                     img:Destroy()
@@ -1045,11 +1060,15 @@ startLauncher = function()
         STATE.games = {}
         local index = 1
         STATE.gameImages = result.gameImages or {}
+        local preloadList = {}
 
         for gameName, cheatsList in pairs(result.games) do
             local gameObj = { name = gameName, cheats = {} }
             for _, c in ipairs(cheatsList) do
                 table.insert(gameObj.cheats, { id = c.id, name = c.name, url = c.url, image_id = c.image_id })
+                if c.image_id and tostring(c.image_id) ~= "" then
+                    table.insert(preloadList, "rbxassetid://" .. tostring(c.image_id))
+                end
             end
             table.insert(STATE.games, gameObj)
 
@@ -1058,6 +1077,9 @@ startLauncher = function()
             
             local icon = GameIcons[gameName] or GameIcons.default
             local gameImageId = STATE.gameImages[gameName] or ""
+            if gameImageId ~= "" then
+                table.insert(preloadList, "rbxassetid://" .. tostring(gameImageId))
+            end
             
             local card = makeCard(gamesPage, gameName, subtitle, icon, gameImageId, function()
                 showCheatsForGame(gameObj)
@@ -1066,6 +1088,12 @@ startLauncher = function()
             card:SetAttribute("GameName", gameName)
             card.LayoutOrder = index
             index = index + 1
+        end
+
+        if #preloadList > 0 then
+            task.spawn(function()
+                pcall(function() ContentProvider:PreloadAsync(preloadList) end)
+            end)
         end
 
         if index == 1 then
@@ -1128,6 +1156,7 @@ startLauncher = function()
         showPage("cheats")
 
         task.spawn(function()
+            local t0 = os.clock()
             local allChecked = false
             while not allChecked do
                 task.wait(0.5)
@@ -1135,6 +1164,7 @@ startLauncher = function()
                 for _, cheat in ipairs(selectedGame.cheats) do
                     if LinkStatus[cheat.id] == "checking" or LinkStatus[cheat.id] == nil then allChecked = false; break end
                 end
+                if not allChecked and os.clock() - t0 > CONFIG.CHEATS_WAIT_S then break end
             end
             setLoaderStatus("Готов к работе", C.green)
             
@@ -1330,12 +1360,10 @@ startLauncher = function()
 
     showPage("games")
 
-    -- Параллельная загрузка списка игр (до входа)
     task.spawn(function()
         loadGamesList()
     end)
 
-    -- Предзагрузка фона и логотипа (без блокировки старта)
     task.spawn(function()
         pcall(function()
             local list = {}
@@ -1349,11 +1377,15 @@ end
 
 startLauncher()
 
-LocalPlayer.Chatted:Connect(function(msg)
-    local cmd = string.lower(msg):gsub("^%s+", "")
-    if cmd == "/rh" or cmd == ";rh" or cmd == "!rh" then
-        if not isRunning then
-            startLauncher()
+local function registerChatted()
+    if chattedConnection then pcall(function() chattedConnection:Disconnect() end); chattedConnection = nil end
+    chattedConnection = LocalPlayer.Chatted:Connect(function(msg)
+        local cmd = string.lower(msg):gsub("^%s+", "")
+        if cmd == "/rh" or cmd == ";rh" or cmd == "!rh" then
+            if not isRunning then
+                startLauncher()
+            end
         end
-    end
-end)
+    end)
+end
+registerChatted()
