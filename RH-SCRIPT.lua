@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.0 (Interface Preview)
+    Version: 0.1.1 (Responsive Interface)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.0",
+    Version = "0.1.1",
     Background = Color3.fromRGB(10, 11, 16),
     Panel = Color3.fromRGB(17, 20, 31),
     PanelLight = Color3.fromRGB(23, 27, 42),
@@ -122,17 +122,9 @@ stroke(Window, CONFIG.Border, 0.12)
 local WindowScale = make("UIScale", {Scale = 1}, Window)
 
 local function updateScale()
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local viewport = camera.ViewportSize
-    local scaleX = math.max(0.55, (viewport.X - 24) / 760)
-    local scaleY = math.max(0.55, (viewport.Y - 24) / 500)
-    WindowScale.Scale = math.min(1, scaleX, scaleY)
+    WindowScale.Scale = 1
 end
 updateScale()
-if workspace.CurrentCamera then
-    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-end
 
 local Header = make("Frame", {
     Name = "Header",
@@ -432,14 +424,168 @@ for index, item in ipairs(navItems) do
     end)
 end
 
-renderPage("MAIN")
+-- Responsive layout: desktop keeps the wide dashboard; phones use a compact panel.
+local function applyResponsiveLayout()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+
+    local viewport = camera.ViewportSize
+    local mobile = viewport.X <= 600
+    WindowScale.Scale = 1
+
+    if mobile then
+        local width = math.max(300, math.min(420, viewport.X - 20))
+        local height = math.max(300, math.min(370, viewport.Y - 70))
+        Window.Size = UDim2.fromOffset(width, height)
+
+        Header.Size = UDim2.new(1, 0, 0, 48)
+        HeaderLine.Position = UDim2.new(0, 0, 1, -1)
+        Logo.Position = UDim2.fromOffset(10, 9)
+        Logo.Size = UDim2.fromOffset(30, 30)
+        Brand.Position = UDim2.fromOffset(49, 7)
+        Brand.Size = UDim2.fromOffset(125, 18)
+        Brand.TextSize = 13
+        SubBrand.Position = UDim2.fromOffset(50, 25)
+        SubBrand.Size = UDim2.fromOffset(145, 13)
+        SubBrand.TextSize = 7
+        Version.Visible = false
+        MinButton.Position = UDim2.new(1, -62, 0, 11)
+        CloseButton.Position = UDim2.new(1, -31, 0, 11)
+        MinButton.Size = UDim2.fromOffset(24, 25)
+        CloseButton.Size = UDim2.fromOffset(24, 25)
+
+        Body.Position = UDim2.fromOffset(0, 48)
+        Body.Size = UDim2.new(1, 0, 1, -48)
+        Sidebar.Size = UDim2.new(0, 108, 1, 0)
+        NavCaption.Position = UDim2.fromOffset(10, 12)
+        NavCaption.Size = UDim2.new(1, -15, 0, 16)
+        NavCaption.TextSize = 8
+        NavHolder.Position = UDim2.fromOffset(6, 34)
+        NavHolder.Size = UDim2.new(1, -12, 0, 270)
+        SideFooter.Position = UDim2.new(0, 6, 1, -9)
+        SideFooter.Size = UDim2.new(1, -12, 0, 34)
+        FooterDot.Position = UDim2.fromOffset(7, 13)
+        FooterDot.Size = UDim2.fromOffset(6, 6)
+        FooterText.Position = UDim2.fromOffset(17, 0)
+        FooterText.Size = UDim2.new(1, -19, 1, 0)
+        FooterText.Text = "READY"
+        FooterText.TextSize = 8
+
+        Content.Position = UDim2.fromOffset(108, 0)
+        Content.Size = UDim2.new(1, -108, 1, 0)
+        PageTitle.Position = UDim2.fromOffset(13, 13)
+        PageTitle.Size = UDim2.new(1, -22, 0, 25)
+        PageTitle.TextSize = 17
+        PageDescription.Position = UDim2.fromOffset(14, 38)
+        PageDescription.Size = UDim2.new(1, -22, 0, 25)
+        PageDescription.TextSize = 9
+        PageDescription.TextWrapped = true
+        PageContainer.Position = UDim2.fromOffset(12, 70)
+        PageContainer.Size = UDim2.new(1, -24, 1, -82)
+
+        for _, button in pairs(navButtons) do
+            button.Size = UDim2.new(1, 0, 0, 35)
+            local icon = button:FindFirstChildOfClass("TextLabel")
+            if icon then
+                icon.Position = UDim2.fromOffset(5, 0)
+                icon.Size = UDim2.fromOffset(20, 35)
+                icon.TextSize = 13
+            end
+            local textObject = button:FindFirstChildOfClass("TextLabel")
+            if textObject and icon and textObject ~= icon then
+                textObject.Position = UDim2.fromOffset(29, 0)
+                textObject.Size = UDim2.new(1, -31, 1, 0)
+                textObject.TextSize = 9
+            end
+        end
+    else
+        Window.Size = UDim2.fromOffset(760, 500)
+        Header.Size = UDim2.new(1, 0, 0, 58)
+        Logo.Position = UDim2.fromOffset(17, 11)
+        Logo.Size = UDim2.fromOffset(36, 36)
+        Brand.Position = UDim2.fromOffset(64, 10)
+        Brand.Size = UDim2.fromOffset(180, 20)
+        Brand.TextSize = 15
+        SubBrand.Position = UDim2.fromOffset(65, 30)
+        SubBrand.Size = UDim2.fromOffset(220, 15)
+        SubBrand.TextSize = 9
+        Version.Visible = true
+        MinButton.Position = UDim2.new(1, -67, 0, 16)
+        CloseButton.Position = UDim2.new(1, -34, 0, 16)
+        MinButton.Size = UDim2.fromOffset(27, 26)
+        CloseButton.Size = UDim2.fromOffset(27, 26)
+        Body.Position = UDim2.fromOffset(0, 58)
+        Body.Size = UDim2.new(1, 0, 1, -58)
+        Sidebar.Size = UDim2.new(0, 174, 1, 0)
+        NavCaption.Position = UDim2.fromOffset(17, 17)
+        NavCaption.Size = UDim2.new(1, -30, 0, 18)
+        NavCaption.TextSize = 9
+        NavHolder.Position = UDim2.fromOffset(10, 43)
+        NavHolder.Size = UDim2.new(1, -20, 0, 300)
+        SideFooter.Position = UDim2.new(0, 10, 1, -12)
+        SideFooter.Size = UDim2.new(1, -20, 0, 48)
+        FooterDot.Position = UDim2.fromOffset(11, 18)
+        FooterDot.Size = UDim2.fromOffset(7, 7)
+        FooterText.Position = UDim2.fromOffset(25, 0)
+        FooterText.Size = UDim2.new(1, -30, 1, 0)
+        FooterText.Text = "Interface loaded"
+        FooterText.TextSize = 10
+        Content.Position = UDim2.fromOffset(174, 0)
+        Content.Size = UDim2.new(1, -174, 1, 0)
+        PageTitle.Position = UDim2.fromOffset(25, 19)
+        PageTitle.Size = UDim2.new(1, -50, 0, 29)
+        PageTitle.TextSize = 21
+        PageDescription.Position = UDim2.fromOffset(26, 49)
+        PageDescription.Size = UDim2.new(1, -50, 0, 20)
+        PageDescription.TextSize = 11
+        PageDescription.TextWrapped = false
+        PageContainer.Position = UDim2.fromOffset(25, 82)
+        PageContainer.Size = UDim2.new(1, -50, 1, -105)
+
+        for _, button in pairs(navButtons) do
+            button.Size = UDim2.new(1, 0, 0, 39)
+            local labels = {}
+            for _, child in ipairs(button:GetChildren()) do
+                if child:IsA("TextLabel") then
+                    table.insert(labels, child)
+                end
+            end
+            if labels[1] then
+                labels[1].Position = UDim2.fromOffset(12, 0)
+                labels[1].Size = UDim2.fromOffset(22, 39)
+                labels[1].TextSize = 16
+            end
+            if labels[2] then
+                labels[2].Position = UDim2.fromOffset(43, 0)
+                labels[2].Size = UDim2.new(1, -50, 1, 0)
+                labels[2].TextSize = 11
+            end
+        end
+    end
+
+    local targetSize = minimized and UDim2.fromOffset(Window.Size.X.Offset, 48) or Window.Size
+    if minimized then
+        Body.Visible = false
+        Window.Size = targetSize
+    end
+end
 
 local minimized = false
+applyResponsiveLayout()
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyResponsiveLayout)
+end
+renderPage("MAIN")
+
 local expandedSize = UDim2.fromOffset(760, 500)
 MinButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     Body.Visible = not minimized
-    local targetSize = minimized and UDim2.fromOffset(760, 58) or expandedSize
+    local camera = workspace.CurrentCamera
+    local mobile = camera and camera.ViewportSize.X <= 600
+    local targetSize = minimized
+        and UDim2.fromOffset(Window.Size.X.Offset, mobile and 48 or 58)
+        or (mobile and UDim2.fromOffset(math.max(300, math.min(420, camera.ViewportSize.X - 20)), math.max(300, math.min(370, camera.ViewportSize.Y - 70))) or expandedSize)
     TweenService:Create(Window, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Size = targetSize,
     }):Play()
