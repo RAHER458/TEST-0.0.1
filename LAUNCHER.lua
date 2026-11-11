@@ -1,6 +1,6 @@
 --[[
     RH-LAUNCHER — Standalone Roblox Launcher
-    Version: 1.0.3 (Auto Language Detection)
+    Version: 1.0.4 (Lifecycle & Reliability Fixes)
     Platform: Roblox / Delta Executor / iOS
 ]]
 
@@ -17,7 +17,7 @@ local LocalizationService = game:GetService("LocalizationService")
 local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
-    VERSION        = "1.0.3",
+    VERSION        = "1.0.4",
     NAME           = "RH-LAUNCHER",
     API_BASE       = "https://raherauth.rh-launcher.workers.dev",
     TOKEN_FILE     = "RH_LAUNCHER_TOKEN.dat",
