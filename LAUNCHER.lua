@@ -226,6 +226,7 @@ local GUI_NAMES = { "RH_LAUNCHER_GUI", "RH_LAUNCHER_AUTH_GUI", "RH_LAUNCHER_TOAS
 
 local activeConnections = {}
 local isRunning = false
+local launcherGeneration = 0
 local chattedConnection = nil
 local uiElements = {}
 
@@ -453,6 +454,8 @@ local updateLanguage
 
 startLauncher = function()
     if isRunning then return end
+    launcherGeneration += 1
+    local runGeneration = launcherGeneration
     isRunning = true
     clearAllGuis()
     STATE.busy = false
@@ -894,6 +897,7 @@ startLauncher = function()
 
                 if newGame then
                     for _, cheat in ipairs(newGame.cheats) do
+                        LinkCheckGeneration[cheat.id] = (LinkCheckGeneration[cheat.id] or 0) + 1
                         LinkStatus[cheat.id] = nil
                     end
                     STATE.lastSelectedGame = newGame
@@ -1017,13 +1021,24 @@ startLauncher = function()
     end
 
     local function killCheat(reason)
-        if not CheatTracker.active then return end
+        if not CheatTracker.active then
+            STATE.busy = false
+            return false
+        end
         CheatTracker.killFlag = true
-        for _, gui in ipairs(CheatTracker.guis) do pcall(function() if gui and gui.Parent then gui:Destroy() end end) end
+        for _, gui in ipairs(CheatTracker.guis) do
+            pcall(function() if gui and gui.Parent then gui:Destroy() end end)
+        end
         CheatTracker.guis = {}
         killNewConnections(CheatTracker.connSnap)
         CheatTracker.connSnap = nil
-        CheatTracker.active = false; CheatTracker.killFlag = false; CheatTracker.currentName = nil
+        CheatTracker.active = false
+        CheatTracker.killFlag = false
+        CheatTracker.currentName = nil
+        STATE.busy = false
+        if mainGui and mainGui.Parent then mainGui.Enabled = true end
+        if authScreen and authScreen.Parent and not STATE.authed then authScreen.Enabled = true end
+        return true
     end
 
     local function launchCheat(cheat)
@@ -1042,22 +1057,25 @@ startLauncher = function()
             local secureUrl = CONFIG.API_BASE .. "/secure_load?cheat_id=" .. cheat.id .. "&token=" .. tostring(STATE.token)
             local okFetch, source = pcall(function() return game:HttpGet(secureUrl) end)
             
-            if not okFetch or type(source) ~= "string" or #source < 10 then 
-                CheatTracker.active = false; CheatTracker.connSnap = nil; STATE.busy = false; 
-                showToast(L("toast_cheat_update"), "warn") 
-                return 
+            if not okFetch or type(source) ~= "string" or #source < 10 then
+                killCheat("load failed")
+                showToast(L("toast_cheat_update"), "warn")
+                return
             end
 
             local compiled
             if type(loadstring) == "function" then local okLs, fn = pcall(loadstring, source); if okLs then compiled = fn end end
-            if not compiled then CheatTracker.active = false; CheatTracker.connSnap = nil; STATE.busy = false; showToast(L("toast_compile_err"), "err"); return end
+            if not compiled then killCheat("compile failed"); showToast(L("toast_compile_err"), "err"); return end
 
             mainGui.Enabled = false
             authScreen.Enabled = false
 
             task.spawn(function()
                 local okRun, err = pcall(compiled)
-                if not okRun then showToast(L("toast_cheat_err") .. cheat.name .. ": " .. tostring(err):sub(1, 90), "err"); CheatTracker.active = false; mainGui.Enabled = true end
+                if not okRun then
+                    killCheat("runtime error")
+                    showToast(L("toast_cheat_err") .. cheat.name .. ": " .. tostring(err):sub(1, 90), "err")
+                end
             end)
 
             task.spawn(function()
@@ -1100,35 +1118,54 @@ startLauncher = function()
     end
 
     local Ratings = { data = {}, loading = false, lastFetch = 0, cacheDuration = 30 }
-    local LinkStatus = {} 
+    local LinkStatus = {}
+    local LinkCheckGeneration = {}
+    local LINK_CHECK_ATTEMPTS = 2
 
     local function checkLink(cheat)
+        if not cheat or not cheat.id or not cheat.url then return end
         if LinkStatus[cheat.id] then return end
         LinkStatus[cheat.id] = "checking"
-        
+        LinkCheckGeneration[cheat.id] = (LinkCheckGeneration[cheat.id] or 0) + 1
+        local checkGeneration = LinkCheckGeneration[cheat.id]
+
         task.spawn(function()
             local req = getRequestFn()
-            if not req then LinkStatus[cheat.id] = "unknown"; return end
+            if not req then
+                if LinkCheckGeneration[cheat.id] == checkGeneration then LinkStatus[cheat.id] = "unknown" end
+                return
+            end
 
-            local done = false
-            local result = nil
-            task.spawn(function()
-                local ok, res = pcall(function() return req({ Url = cheat.url, Method = "GET" }) end)
-                result = { ok = ok, res = res }
-                done = true
-            end)
+            local finalStatus = "dead"
+            for attempt = 1, LINK_CHECK_ATTEMPTS do
+                if LinkCheckGeneration[cheat.id] ~= checkGeneration then return end
+                local done, result = false, nil
+                task.spawn(function()
+                    local ok, res = pcall(function() return req({ Url = cheat.url, Method = "GET" }) end)
+                    result = { ok = ok, res = res }
+                    done = true
+                end)
 
-            local t0 = os.clock()
-            while not done and os.clock() - t0 < CONFIG.LINK_TIMEOUT_S do task.wait(0.1) end
+                local startedAt = os.clock()
+                while not done and os.clock() - startedAt < CONFIG.LINK_TIMEOUT_S do
+                    if LinkCheckGeneration[cheat.id] ~= checkGeneration then return end
+                    task.wait(0.1)
+                end
 
-            if not done then LinkStatus[cheat.id] = "dead"; return end
-            if not result or not result.ok or not result.res then LinkStatus[cheat.id] = "dead"; return end
+                if done and result and result.ok and result.res then
+                    local response = result.res
+                    local status = tonumber(response.StatusCode or response.Status or 0) or 0
+                    local body = response.Body or response.body
+                    if status >= 200 and status < 300 and type(body) == "string" and #body > 10 then
+                        finalStatus = "ok"
+                        break
+                    end
+                end
+                if attempt < LINK_CHECK_ATTEMPTS then task.wait(0.75) end
+            end
 
-            local status = tonumber(result.res.StatusCode or result.res.Status or 0) or 0
-            if status >= 200 and status < 300 and type(result.res.Body) == "string" and #result.res.Body > 10 then
-                LinkStatus[cheat.id] = "ok"
-            else
-                LinkStatus[cheat.id] = "dead"
+            if LinkCheckGeneration[cheat.id] == checkGeneration then
+                LinkStatus[cheat.id] = finalStatus
             end
         end)
     end
@@ -1593,6 +1630,7 @@ startLauncher = function()
     showPage = function(name)
         if name == "cheats" then
             if STATE.currentPage ~= "cheats" then STATE.lastNonCheatPage = STATE.currentPage end
+            STATE.currentPage = "cheats"
         else
             STATE.currentPage = name
         end
@@ -1652,7 +1690,7 @@ startLauncher = function()
         task.spawn(function() fetchRatings(true) end)
         
         task.spawn(function()
-            while isRunning and STATE.authed do
+            while isRunning and launcherGeneration == runGeneration and STATE.authed do
                 local res = api("/heartbeat", { device_id = STATE.deviceId })
                 if res and res.success then
                     local onlineRes = api("/get_online", nil, "GET")
@@ -1679,7 +1717,7 @@ startLauncher = function()
 
     task.spawn(function()
         task.spawn(function()
-            while isRunning do
+            while isRunning and launcherGeneration == runGeneration do
                 if STATE.authed and STATE.localRemaining and STATE.localRemaining > 0 then
                     STATE.localRemaining = STATE.localRemaining - 1; updateTimerLabel(STATE.localRemaining)
                     if STATE.localRemaining <= 0 then kickToAuth("Key expired") end
@@ -1687,7 +1725,7 @@ startLauncher = function()
                 task.wait(1)
             end
         end)
-        while isRunning do
+        while isRunning and launcherGeneration == runGeneration do
             if STATE.authed and STATE.token then
                 local result, err = api("/verify", { token = STATE.token })
                 if result and result.valid == true then STATE.localRemaining = tonumber(result.remaining_seconds); updateTimerLabel(STATE.localRemaining)
