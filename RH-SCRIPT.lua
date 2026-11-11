@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.0 (Interface Preview)
+    Version: 0.1.1 (Mobile Fit)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.0",
+    Version = "0.1.1",
     Background = Color3.fromRGB(10, 11, 16),
     Panel = Color3.fromRGB(17, 20, 31),
     PanelLight = Color3.fromRGB(23, 27, 42),
@@ -125,9 +125,12 @@ local function updateScale()
     local camera = workspace.CurrentCamera
     if not camera then return end
     local viewport = camera.ViewportSize
-    local scaleX = math.max(0.55, (viewport.X - 24) / 760)
-    local scaleY = math.max(0.55, (viewport.Y - 24) / 500)
-    WindowScale.Scale = math.min(1, scaleX, scaleY)
+
+    -- Keep the original desktop layout; on smaller screens, fit the whole
+    -- window inside the visible area instead of enforcing an oversized minimum.
+    local scaleX = (viewport.X - 32) / 760
+    local scaleY = (viewport.Y - 48) / 500
+    WindowScale.Scale = math.clamp(math.min(1, scaleX, scaleY), 0.1, 1)
 end
 updateScale()
 if workspace.CurrentCamera then
