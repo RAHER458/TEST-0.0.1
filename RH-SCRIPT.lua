@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.1 (Responsive Interface)
+    Version: 0.1.2 (Compact Mobile Window)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.1",
+    Version = "0.1.2",
     Background = Color3.fromRGB(10, 11, 16),
     Panel = Color3.fromRGB(17, 20, 31),
     PanelLight = Color3.fromRGB(23, 27, 42),
@@ -437,8 +437,8 @@ local function applyResponsiveLayout()
     WindowScale.Scale = 1
 
     if mobile then
-        local width = math.max(300, math.min(420, viewport.X - 20))
-        local height = math.max(300, math.min(370, viewport.Y - 70))
+        local width = math.max(250, math.min(300, viewport.X - 60))
+        local height = 270
         Window.Size = UDim2.fromOffset(width, height)
 
         Header.Size = UDim2.new(1, 0, 0, 48)
@@ -459,7 +459,7 @@ local function applyResponsiveLayout()
 
         Body.Position = UDim2.fromOffset(0, 48)
         Body.Size = UDim2.new(1, 0, 1, -48)
-        Sidebar.Size = UDim2.new(0, 108, 1, 0)
+        Sidebar.Size = UDim2.new(0, 86, 1, 0)
         NavCaption.Position = UDim2.fromOffset(10, 12)
         NavCaption.Size = UDim2.new(1, -15, 0, 16)
         NavCaption.TextSize = 8
@@ -474,8 +474,8 @@ local function applyResponsiveLayout()
         FooterText.Text = "READY"
         FooterText.TextSize = 8
 
-        Content.Position = UDim2.fromOffset(108, 0)
-        Content.Size = UDim2.new(1, -108, 1, 0)
+        Content.Position = UDim2.fromOffset(86, 0)
+        Content.Size = UDim2.new(1, -86, 1, 0)
         PageTitle.Position = UDim2.fromOffset(13, 13)
         PageTitle.Size = UDim2.new(1, -22, 0, 25)
         PageTitle.TextSize = 17
@@ -591,7 +591,7 @@ MinButton.MouseButton1Click:Connect(function()
     local mobile = camera and camera.ViewportSize.X <= 600
     local targetSize = minimized
         and UDim2.fromOffset(Window.Size.X.Offset, mobile and 48 or 58)
-        or (mobile and UDim2.fromOffset(math.max(300, math.min(420, camera.ViewportSize.X - 20)), math.max(300, math.min(370, camera.ViewportSize.Y - 70))) or expandedSize)
+        or (mobile and UDim2.fromOffset(math.max(250, math.min(300, camera.ViewportSize.X - 60)), 270) or expandedSize)
     TweenService:Create(Window, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Size = targetSize,
     }):Play()
