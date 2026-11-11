@@ -322,36 +322,38 @@ local function renderPage(pageName)
     PageDescription.Text = pageName == "MAIN" and "Your universal Roblox workspace" or "RH-SCRIPT  /  " .. pageName
     clearPage()
 
+    local camera = workspace.CurrentCamera
+    local mobile = camera and camera.ViewportSize.X <= 600
     if pageName == "MAIN" then
-        local welcome = createInfoCard(
+        createInfoCard(
             PageContainer,
             "Welcome back",
-            "RH-SCRIPT interface preview is running. Choose a section on the left to explore the layout.",
-            105
+            "RH-SCRIPT interface preview is running. Choose a section on the left to explore.",
+            mobile and 82 or 105
         )
         local status = createInfoCard(
             PageContainer,
             "SYSTEM STATUS",
             "UI: ONLINE     •     GAME MODULES: NOT ADDED",
-            82
+            mobile and 62 or 82
         )
-        status.Position = UDim2.fromOffset(0, 118)
+        status.Position = UDim2.fromOffset(0, mobile and 92 or 118)
         local note = createInfoCard(
             PageContainer,
             "DEVELOPMENT BUILD",
             "This is the visual foundation. Individual modules and their settings will be added separately.",
-            82
+            mobile and 62 or 82
         )
-        note.Position = UDim2.fromOffset(0, 212)
+        note.Position = UDim2.fromOffset(0, mobile and 164 or 212)
     else
-        createInfoCard(PageContainer, pageName .. " MODULE", pages[pageName], 105)
+        createInfoCard(PageContainer, pageName .. " MODULE", pages[pageName], mobile and 82 or 105)
         local note = createInfoCard(
             PageContainer,
             "COMING LATER",
             "This section is reserved for future features. The interface is ready for expansion.",
-            82
+            mobile and 62 or 82
         )
-        note.Position = UDim2.fromOffset(0, 118)
+        note.Position = UDim2.fromOffset(0, mobile and 92 or 118)
     end
 
     for name, button in pairs(navButtons) do
@@ -486,17 +488,21 @@ local function applyResponsiveLayout()
 
         for _, button in pairs(navButtons) do
             button.Size = UDim2.new(1, 0, 0, 35)
-            local icon = button:FindFirstChildOfClass("TextLabel")
-            if icon then
-                icon.Position = UDim2.fromOffset(5, 0)
-                icon.Size = UDim2.fromOffset(20, 35)
-                icon.TextSize = 13
+            local labels = {}
+            for _, child in ipairs(button:GetChildren()) do
+                if child:IsA("TextLabel") then
+                    table.insert(labels, child)
+                end
             end
-            local textObject = button:FindFirstChildOfClass("TextLabel")
-            if textObject and icon and textObject ~= icon then
-                textObject.Position = UDim2.fromOffset(29, 0)
-                textObject.Size = UDim2.new(1, -31, 1, 0)
-                textObject.TextSize = 9
+            if labels[1] then
+                labels[1].Position = UDim2.fromOffset(5, 0)
+                labels[1].Size = UDim2.fromOffset(20, 35)
+                labels[1].TextSize = 13
+            end
+            if labels[2] then
+                labels[2].Position = UDim2.fromOffset(29, 0)
+                labels[2].Size = UDim2.new(1, -31, 1, 0)
+                labels[2].TextSize = 9
             end
         end
     else
