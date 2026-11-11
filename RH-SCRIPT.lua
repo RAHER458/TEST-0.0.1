@@ -425,6 +425,7 @@ for index, item in ipairs(navItems) do
 end
 
 -- Responsive layout: desktop keeps the wide dashboard; phones use a compact panel.
+local minimized = false
 local function applyResponsiveLayout()
     local camera = workspace.CurrentCamera
     if not camera then return end
@@ -570,7 +571,6 @@ local function applyResponsiveLayout()
     end
 end
 
-local minimized = false
 applyResponsiveLayout()
 if workspace.CurrentCamera then
     workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(applyResponsiveLayout)
