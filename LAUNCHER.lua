@@ -114,6 +114,7 @@ local LOC = {
         prof_link = "Ссылка: ",
         set_dev = "Настройки в разработке",
         cheat_back = "←  НАЗАД К ИГРАМ",
+        cheat_stop = "⏹  ОСТАНОВИТЬ ЧИТ",
         cheat_refresh = "🔄  ОБНОВИТЬ СПИСОК",
         cheat_title = "ЧИТЫ ДЛЯ ",
         cheat_btn_launch = "ЗАПУСТИТЬ",
@@ -188,6 +189,7 @@ local LOC = {
         prof_link = "Link: ",
         set_dev = "Settings in development",
         cheat_back = "←  BACK TO GAMES",
+        cheat_stop = "⏹  STOP SCRIPT",
         cheat_refresh = "🔄  REFRESH LIST",
         cheat_title = "CHEATS FOR ",
         cheat_btn_launch = "LAUNCH",
@@ -463,6 +465,9 @@ startLauncher = function()
     local toastGui = create("ScreenGui", { Name = "RH_LAUNCHER_TOAST", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 99999, Enabled = true })
     safeParent(toastGui)
     local toastContainer = create("Frame", { Position = UDim2.new(0, 0, 1, -180), Size = UDim2.new(1, 0, 0, 170), BackgroundTransparency = 1, ZIndex = 200 }, toastGui)
+    local cheatStopBtn = create("TextButton", { Name = "RH_STOP_CHEAT", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -18), Size = UDim2.fromOffset(168, 42), BackgroundColor3 = C.red, BackgroundTransparency = 0.05, BorderSizePixel = 0, Text = L("cheat_stop"), TextColor3 = Color3.new(1, 1, 1), TextSize = 12, Font = Enum.Font.GothamBold, AutoButtonColor = true, Visible = false, ZIndex = 250 }, toastGui)
+    corner(cheatStopBtn, 10)
+    stroke(cheatStopBtn, C.red, 1.5, 0.1)
     create("UIListLayout", { Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Bottom, SortOrder = Enum.SortOrder.LayoutOrder }, toastContainer)
     create("UIPadding", { PaddingBottom = UDim.new(0, 12), PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16) }, toastContainer)
     local toastN = 0
@@ -974,6 +979,12 @@ startLauncher = function()
     end))
 
     local CheatTracker = { active = false, killFlag = false, guis = {}, connSnap = nil, currentName = nil }
+    cheatStopBtn.Activated:Connect(function()
+        if CheatTracker.active then
+            killCheat("user stop")
+            showToast(L("toast_closed"), "warn")
+        end
+    end)
     local PROTECTED_GUI_NAMES = { RH_LAUNCHER_AUTH_GUI = true, RH_LAUNCHER_GUI = true, RH_LAUNCHER_TOAST = true }
     local function isProtectedGui(obj) return PROTECTED_GUI_NAMES[obj.Name] == true end
 
@@ -1023,6 +1034,7 @@ startLauncher = function()
     local function killCheat(reason)
         if not CheatTracker.active then
             STATE.busy = false
+            if cheatStopBtn and cheatStopBtn.Parent then cheatStopBtn.Visible = false end
             return false
         end
         CheatTracker.killFlag = true
@@ -1036,6 +1048,7 @@ startLauncher = function()
         CheatTracker.killFlag = false
         CheatTracker.currentName = nil
         STATE.busy = false
+        if cheatStopBtn and cheatStopBtn.Parent then cheatStopBtn.Visible = false end
         if mainGui and mainGui.Parent then mainGui.Enabled = true end
         if authScreen and authScreen.Parent and not STATE.authed then authScreen.Enabled = true end
         return true
@@ -1051,6 +1064,8 @@ startLauncher = function()
         local connSnap = snapshotConnections()
 
         CheatTracker.active = true; CheatTracker.killFlag = false; CheatTracker.guis = {}; CheatTracker.connSnap = connSnap; CheatTracker.currentName = cheat.name
+        cheatStopBtn.Text = L("cheat_stop")
+        cheatStopBtn.Visible = true
         showToast(L("toast_load_cheat") .. cheat.name, "ok")
 
         task.spawn(function()
