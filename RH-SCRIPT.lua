@@ -513,6 +513,7 @@ UserInputService.InputEnded:Connect(function(input)
         if not bubbleMoved then
             minimized = false
             MiniBubble.Visible = false
+            Window.Position = MiniBubble.Position
             Window.Visible = true
             Window.Size = expandedSize
         end
