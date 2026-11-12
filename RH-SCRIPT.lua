@@ -499,10 +499,21 @@ UserInputService.InputChanged:Connect(function(input)
         local delta = input.Position - bubbleStart
         if delta.Magnitude > 7 then bubbleMoved = true end
         if bubbleMoved then
-            MiniBubble.Position = UDim2.new(
-                bubbleStartPosition.X.Scale, bubbleStartPosition.X.Offset + delta.X,
-                bubbleStartPosition.Y.Scale, bubbleStartPosition.Y.Offset + delta.Y
+            local camera = workspace.CurrentCamera
+            local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+            local half = MiniBubble.AbsoluteSize / 2
+            local margin = 8
+            local centerX = math.clamp(
+                bubbleStartPosition.X.Offset + delta.X,
+                half.X + margin,
+                math.max(half.X + margin, viewport.X - half.X - margin)
             )
+            local centerY = math.clamp(
+                bubbleStartPosition.Y.Offset + delta.Y,
+                half.Y + margin,
+                math.max(half.Y + margin, viewport.Y - half.Y - margin)
+            )
+            MiniBubble.Position = UDim2.fromOffset(centerX, centerY)
         end
     end
 end)
@@ -513,7 +524,22 @@ UserInputService.InputEnded:Connect(function(input)
         if not bubbleMoved then
             minimized = false
             MiniBubble.Visible = false
-            Window.Position = MiniBubble.Position
+            local camera = workspace.CurrentCamera
+            local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+            local half = expandedSize.X.Offset / 2
+            local halfY = expandedSize.Y.Offset / 2
+            local margin = 8
+            local centerX = math.clamp(
+                MiniBubble.Position.X.Offset,
+                half + margin,
+                math.max(half + margin, viewport.X - half - margin)
+            )
+            local centerY = math.clamp(
+                MiniBubble.Position.Y.Offset,
+                halfY + margin,
+                math.max(halfY + margin, viewport.Y - halfY - margin)
+            )
+            Window.Position = UDim2.fromOffset(centerX, centerY)
             Window.Visible = true
             Window.Size = expandedSize
         end
