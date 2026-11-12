@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.1 (Mobile Fit)
+    Version: 0.1.2 (Floating Minimize & Color Refresh)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,16 +18,16 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.1",
-    Background = Color3.fromRGB(10, 11, 16),
-    Panel = Color3.fromRGB(17, 20, 31),
-    PanelLight = Color3.fromRGB(23, 27, 42),
-    PanelHover = Color3.fromRGB(30, 35, 54),
-    Accent = Color3.fromRGB(105, 91, 255),
-    AccentBlue = Color3.fromRGB(67, 139, 255),
+    Version = "0.1.2",
+    Background = Color3.fromRGB(13, 17, 31),
+    Panel = Color3.fromRGB(24, 31, 54),
+    PanelLight = Color3.fromRGB(34, 44, 73),
+    PanelHover = Color3.fromRGB(47, 59, 96),
+    Accent = Color3.fromRGB(139, 92, 246),
+    AccentBlue = Color3.fromRGB(56, 189, 248),
     Text = Color3.fromRGB(239, 241, 255),
-    Muted = Color3.fromRGB(137, 145, 168),
-    Border = Color3.fromRGB(43, 49, 70),
+    Muted = Color3.fromRGB(164, 179, 210),
+    Border = Color3.fromRGB(57, 73, 112),
     Green = Color3.fromRGB(88, 214, 160),
 }
 
@@ -311,7 +311,11 @@ local function createInfoCard(parent, title, description, height)
         BorderSizePixel = 0,
     }, parent)
     round(card, 11)
-    stroke(card, CONFIG.Border, 0.25)
+    stroke(card, CONFIG.Border, 0.12)
+    make("UIGradient", {
+        Color = ColorSequence.new(CONFIG.Panel, CONFIG.PanelLight),
+        Rotation = 25,
+    }, card)
 
     local accent = make("Frame", {
         Position = UDim2.fromOffset(0, 13),
@@ -452,14 +456,75 @@ end
 
 renderPage("MAIN")
 
+-- Compact floating RH bubble shown while the main window is minimized.
+local MiniBubble = make("TextButton", {
+    Name = "RH_MiniBubble",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = Window.Position,
+    Size = UDim2.fromOffset(54, 54),
+    BackgroundColor3 = CONFIG.Accent,
+    Text = "RH",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 16,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    Visible = false,
+    BorderSizePixel = 0,
+    ZIndex = 100,
+}, ScreenGui)
+round(MiniBubble, 27)
+stroke(MiniBubble, CONFIG.AccentBlue, 0.05)
+make("UIGradient", {
+    Color = ColorSequence.new(CONFIG.Accent, CONFIG.AccentBlue),
+    Rotation = 35,
+}, MiniBubble)
+
+local bubbleDragging = false
+local bubbleMoved = false
+local bubbleStart
+local bubbleStartPosition
+local bubbleInput
+MiniBubble.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        bubbleDragging = true
+        bubbleMoved = false
+        bubbleStart = input.Position
+        bubbleStartPosition = MiniBubble.Position
+        bubbleInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if bubbleDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - bubbleStart
+        if delta.Magnitude > 7 then bubbleMoved = true end
+        if bubbleMoved then
+            MiniBubble.Position = UDim2.new(
+                bubbleStartPosition.X.Scale, bubbleStartPosition.X.Offset + delta.X,
+                bubbleStartPosition.Y.Scale, bubbleStartPosition.Y.Offset + delta.Y
+            )
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if bubbleDragging and (input == bubbleInput or input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        bubbleDragging = false
+        if not bubbleMoved then
+            minimized = false
+            MiniBubble.Visible = false
+            Window.Visible = true
+            Window.Size = expandedSize
+        end
+        bubbleInput = nil
+    end
+end)
+
 MinButton.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    Body.Visible = not minimized
-    local targetSize = minimized and UDim2.fromOffset(expandedSize.X.Offset, 58) or expandedSize
-    TweenService:Create(Window, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-        Size = targetSize,
-    }):Play()
-    MinButton.Text = minimized and "+" or "—"
+    minimized = true
+    Window.Visible = false
+    MiniBubble.Position = Window.Position
+    MiniBubble.Visible = true
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
