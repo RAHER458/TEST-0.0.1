@@ -235,10 +235,20 @@ local NavCaption = label(Sidebar, "NAVIGATION", 9, CONFIG.Muted, Enum.Font.Gotha
 NavCaption.Position = UDim2.fromOffset(17, 17)
 NavCaption.Size = UDim2.new(1, -30, 0, 18)
 
-local NavHolder = make("Frame", {
+local NavHolder = make("ScrollingFrame", {
+    Name = "NavigationScroll",
     Position = UDim2.fromOffset(10, 43),
-    Size = UDim2.new(1, -20, 0, 300),
+    Size = UDim2.new(1, -20, 1, -115),
     BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    Active = true,
+    ScrollingEnabled = true,
+    ScrollingDirection = Enum.ScrollingDirection.Y,
+    ScrollBarThickness = 2,
+    ScrollBarImageColor3 = CONFIG.Accent,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
 }, Sidebar)
 make("UIListLayout", {
     Padding = UDim.new(0, 6),
