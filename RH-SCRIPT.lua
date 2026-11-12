@@ -573,7 +573,7 @@ local function renderPage(pageName)
             toggle.Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ"
         end)
 
-        local flyCard = make("Frame", {Position = UDim2.fromOffset(0, 202), Size = UDim2.new(1, 0, 0, 126), BackgroundColor3 = CONFIG.Panel, BorderSizePixel = 0}, PageContainer)
+        local flyCard = make("Frame", {Position = UDim2.fromOffset(0, 322), Size = UDim2.new(1, 0, 0, 126), BackgroundColor3 = CONFIG.Panel, BorderSizePixel = 0}, PageContainer)
         round(flyCard, 11); stroke(flyCard, CONFIG.Border, 0.12)
         local flyTitle = label(flyCard, "HOLD FLIGHT", 13, CONFIG.Text, Enum.Font.GothamBold)
         flyTitle.Position = UDim2.fromOffset(14, 9); flyTitle.Size = UDim2.new(1, -28, 0, 20)
