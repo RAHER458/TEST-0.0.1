@@ -111,7 +111,7 @@ local Window = make("Frame", {
     Name = "Window",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromOffset(760, 500),
+    Size = UDim2.fromOffset(480, 460),
     BackgroundColor3 = CONFIG.Background,
     BorderSizePixel = 0,
     ClipsDescendants = true,
@@ -126,11 +126,12 @@ local function updateScale()
     if not camera then return end
     local viewport = camera.ViewportSize
 
-    -- Keep the original desktop layout; on smaller screens, fit the whole
-    -- window inside the visible area instead of enforcing an oversized minimum.
-    local scaleX = (viewport.X - 32) / 760
-    local scaleY = (viewport.Y - 48) / 500
-    WindowScale.Scale = math.clamp(math.min(1, scaleX, scaleY), 0.1, 1)
+    -- Match RH-LAUNCHER window dimensions and viewport fitting exactly.
+    WindowScale.Scale = 1
+    Window.Size = UDim2.fromOffset(
+        math.min(480, viewport.X - 20),
+        math.min(460, viewport.Y - 60)
+    )
 end
 updateScale()
 if workspace.CurrentCamera then
@@ -438,11 +439,11 @@ end
 renderPage("MAIN")
 
 local minimized = false
-local expandedSize = UDim2.fromOffset(760, 500)
+local expandedSize = UDim2.fromOffset(480, 460)
 MinButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     Body.Visible = not minimized
-    local targetSize = minimized and UDim2.fromOffset(760, 58) or expandedSize
+    local targetSize = minimized and UDim2.fromOffset(480, 58) or expandedSize
     TweenService:Create(Window, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Size = targetSize,
     }):Play()
