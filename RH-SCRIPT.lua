@@ -121,17 +121,21 @@ stroke(Window, CONFIG.Border, 0.12)
 
 local WindowScale = make("UIScale", {Scale = 1}, Window)
 
+local minimized = false
+local expandedSize = UDim2.fromOffset(480, 460)
+
 local function updateScale()
     local camera = workspace.CurrentCamera
     if not camera then return end
     local viewport = camera.ViewportSize
 
-    -- Match RH-LAUNCHER window dimensions and viewport fitting exactly.
+    -- Keep the expanded size fitted to the current viewport.
+    local fittedWidth = math.max(1, math.min(480, viewport.X - 20))
+    local fittedHeight = math.max(1, math.min(460, viewport.Y - 60))
+    expandedSize = UDim2.fromOffset(fittedWidth, fittedHeight)
+
     WindowScale.Scale = 1
-    Window.Size = UDim2.fromOffset(
-        math.min(480, viewport.X - 20),
-        math.min(460, viewport.Y - 60)
-    )
+    Window.Size = minimized and UDim2.fromOffset(fittedWidth, 58) or expandedSize
 end
 updateScale()
 if workspace.CurrentCamera then
@@ -275,10 +279,20 @@ local PageDescription = label(Content, "Your universal Roblox workspace", 11, CO
 PageDescription.Position = UDim2.fromOffset(26, 49)
 PageDescription.Size = UDim2.new(1, -50, 0, 20)
 
-local PageContainer = make("Frame", {
+local PageContainer = make("ScrollingFrame", {
+    Name = "PageContainer",
     Position = UDim2.fromOffset(25, 82),
     Size = UDim2.new(1, -50, 1, -105),
     BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    Active = true,
+    ScrollingEnabled = true,
+    ScrollingDirection = Enum.ScrollingDirection.Y,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = CONFIG.Accent,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
 }, Content)
 
 local pages = {
@@ -438,12 +452,10 @@ end
 
 renderPage("MAIN")
 
-local minimized = false
-local expandedSize = UDim2.fromOffset(480, 460)
 MinButton.MouseButton1Click:Connect(function()
     minimized = not minimized
     Body.Visible = not minimized
-    local targetSize = minimized and UDim2.fromOffset(480, 58) or expandedSize
+    local targetSize = minimized and UDim2.fromOffset(expandedSize.X.Offset, 58) or expandedSize
     TweenService:Create(Window, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
         Size = targetSize,
     }):Play()
