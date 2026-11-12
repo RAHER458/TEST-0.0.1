@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.2 (Floating Minimize & Color Refresh)
+    Version: 0.1.3 (Movement Controls)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.2",
+    Version = "0.1.3",
     Background = Color3.fromRGB(13, 17, 31),
     Panel = Color3.fromRGB(24, 31, 54),
     PanelLight = Color3.fromRGB(34, 44, 73),
@@ -343,6 +343,140 @@ local function clearPage()
     end
 end
 
+
+-- Movement utilities (client-side; games may enforce their own server movement rules).
+local RunService = game:GetService("RunService")
+local speedEnabled = false
+local speedMode = "WalkSpeed"
+local speedValue = 32
+local speedConnection
+local flightActive = false
+local flightVelocity
+local flightCharacter
+local flightEditMode = false
+local flightLocked = false
+local flightDragging = false
+local flightDragStart
+local flightButtonStart
+local flightPosition = UDim2.new(1, -92, 1, -210)
+
+local function getCharacterParts()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if humanoid and root then return character, humanoid, root end
+end
+
+local function stopSpeed()
+    speedEnabled = false
+    if speedConnection then speedConnection:Disconnect(); speedConnection = nil end
+    local _, humanoid = getCharacterParts()
+    if humanoid then humanoid.WalkSpeed = 16 end
+end
+
+local function startSpeed()
+    stopSpeed()
+    local character, humanoid, root = getCharacterParts()
+    if not character then return false end
+    speedEnabled = true
+    if speedMode == "WalkSpeed" then
+        humanoid.WalkSpeed = speedValue
+    else
+        speedConnection = RunService.Heartbeat:Connect(function(dt)
+            if not speedEnabled then return end
+            local currentCharacter, currentHumanoid, currentRoot = getCharacterParts()
+            if not currentCharacter or currentCharacter ~= character then stopSpeed(); return end
+            local direction = currentHumanoid.MoveDirection
+            if direction.Magnitude > 0 then
+                local distance = speedValue * dt
+                if speedMode == "Tween" then
+                    local target = currentRoot.CFrame + direction * distance
+                    local tween = TweenService:Create(currentRoot, TweenInfo.new(math.max(dt, 0.03), Enum.EasingStyle.Linear), {CFrame = target})
+                    tween:Play()
+                elseif speedMode == "CFrame" then
+                    currentRoot.CFrame = currentRoot.CFrame + direction * distance
+                end
+            end
+        end)
+    end
+    return true
+end
+
+local function stopFlight()
+    flightActive = false
+    if flightVelocity then flightVelocity:Destroy(); flightVelocity = nil end
+    local _, humanoid = getCharacterParts()
+    if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Freefall) end
+    flightButton.Text = "↑"
+    flightButton.BackgroundColor3 = CONFIG.Accent
+end
+
+local function beginFlight()
+    local character, humanoid, root = getCharacterParts()
+    if not character then return end
+    if flightVelocity then flightVelocity:Destroy() end
+    flightCharacter = character
+    flightVelocity = Instance.new("BodyVelocity")
+    flightVelocity.Name = "RH_HoldFlight"
+    flightVelocity.MaxForce = Vector3.new(0, math.huge, 0)
+    flightVelocity.P = 18000
+    flightVelocity.Velocity = Vector3.new(0, 42, 0)
+    flightVelocity.Parent = root
+    flightActive = true
+    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    flightButton.Text = "▲"
+    flightButton.BackgroundColor3 = CONFIG.AccentBlue
+end
+
+local flightButton = make("TextButton", {
+    Name = "RH_FlightButton",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = flightPosition,
+    Size = UDim2.fromOffset(58, 58),
+    BackgroundColor3 = CONFIG.Accent,
+    Text = "↑",
+    TextColor3 = Color3.new(1, 1, 1),
+    TextSize = 25,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    BorderSizePixel = 0,
+    Visible = true,
+    ZIndex = 120,
+}, ScreenGui)
+round(flightButton, 29)
+stroke(flightButton, CONFIG.AccentBlue, 0.08)
+make("UIGradient", {Color = ColorSequence.new(CONFIG.Accent, CONFIG.AccentBlue), Rotation = 35}, flightButton)
+
+flightButton.InputBegan:Connect(function(input)
+    if flightEditMode and not flightLocked and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
+        flightDragging = true
+        flightDragStart = input.Position
+        flightButtonStart = flightButton.Position
+        return
+    end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        beginFlight()
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if flightDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - flightDragStart
+        local camera = workspace.CurrentCamera
+        local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+        local x = math.clamp(flightButtonStart.X.Offset + delta.X, 37, viewport.X - 37)
+        local y = math.clamp(flightButtonStart.Y.Offset + delta.Y, 37, viewport.Y - 37)
+        flightButton.Position = UDim2.fromOffset(x, y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if flightDragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
+        flightDragging = false
+    elseif flightActive and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
+        stopFlight()
+    end
+end)
+
 local currentPage = "MAIN"
 local navButtons = {}
 
@@ -373,14 +507,64 @@ local function renderPage(pageName)
             82
         )
         note.Position = UDim2.fromOffset(0, 212)
+    elseif pageName == "MISC" then
+        local speedCard = make("Frame", {
+            Size = UDim2.new(1, 0, 0, 190),
+            BackgroundColor3 = CONFIG.Panel,
+            BorderSizePixel = 0,
+        }, PageContainer)
+        round(speedCard, 11); stroke(speedCard, CONFIG.Border, 0.12)
+        local speedTitle = label(speedCard, "SPEEDHACK", 13, CONFIG.Text, Enum.Font.GothamBold)
+        speedTitle.Position = UDim2.fromOffset(14, 10); speedTitle.Size = UDim2.new(1, -28, 0, 22)
+        local modeLabel = label(speedCard, "Режим: " .. speedMode, 10, CONFIG.Muted)
+        modeLabel.Position = UDim2.fromOffset(14, 38); modeLabel.Size = UDim2.new(1, -28, 0, 18)
+        local modeButton = make("TextButton", {Position = UDim2.fromOffset(12, 60), Size = UDim2.new(1, -24, 0, 29), BackgroundColor3 = CONFIG.PanelLight, Text = "Сменить режим", TextColor3 = CONFIG.Text, TextSize = 10, Font = Enum.Font.GothamBold, BorderSizePixel = 0, AutoButtonColor = false}, speedCard)
+        round(modeButton, 7)
+        modeButton.MouseButton1Click:Connect(function()
+            local modes = {"WalkSpeed", "Tween", "CFrame"}
+            local index = table.find(modes, speedMode) or 1
+            speedMode = modes[index % #modes + 1]
+            modeLabel.Text = "Режим: " .. speedMode
+            if speedEnabled then startSpeed() end
+        end)
+        local valueLabel = label(speedCard, "Скорость: " .. tostring(speedValue), 10, CONFIG.Muted)
+        valueLabel.Position = UDim2.fromOffset(14, 94); valueLabel.Size = UDim2.new(1, -28, 0, 18)
+        local minus = make("TextButton", {Position = UDim2.fromOffset(12, 118), Size = UDim2.fromOffset(34, 28), BackgroundColor3 = CONFIG.PanelLight, Text = "−", TextColor3 = CONFIG.Text, TextSize = 17, BorderSizePixel = 0}, speedCard)
+        round(minus, 7)
+        local plus = make("TextButton", {Position = UDim2.new(1, -46, 0, 118), Size = UDim2.fromOffset(34, 28), BackgroundColor3 = CONFIG.PanelLight, Text = "+", TextColor3 = CONFIG.Text, TextSize = 17, BorderSizePixel = 0}, speedCard)
+        round(plus, 7)
+        local toggle = make("TextButton", {Position = UDim2.fromOffset(53, 118), Size = UDim2.new(1, -106, 0, 28), BackgroundColor3 = CONFIG.Accent, Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ", TextColor3 = Color3.new(1,1,1), TextSize = 9, Font = Enum.Font.GothamBold, BorderSizePixel = 0}, speedCard)
+        round(toggle, 7)
+        local function updateSpeedValue()
+            valueLabel.Text = "Скорость: " .. tostring(speedValue)
+            if speedEnabled then startSpeed() end
+        end
+        minus.MouseButton1Click:Connect(function() speedValue = math.max(16, speedValue - 4); updateSpeedValue() end)
+        plus.MouseButton1Click:Connect(function() speedValue = math.min(200, speedValue + 4); updateSpeedValue() end)
+        toggle.MouseButton1Click:Connect(function()
+            if speedEnabled then stopSpeed() else startSpeed() end
+            toggle.Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ"
+        end)
+
+        local flyCard = make("Frame", {Position = UDim2.fromOffset(0, 202), Size = UDim2.new(1, 0, 0, 126), BackgroundColor3 = CONFIG.Panel, BorderSizePixel = 0}, PageContainer)
+        round(flyCard, 11); stroke(flyCard, CONFIG.Border, 0.12)
+        local flyTitle = label(flyCard, "HOLD FLIGHT", 13, CONFIG.Text, Enum.Font.GothamBold)
+        flyTitle.Position = UDim2.fromOffset(14, 9); flyTitle.Size = UDim2.new(1, -28, 0, 20)
+        local flyDesc = label(flyCard, "Удерживай плавающую кнопку — летишь вверх. Отпусти — падаешь.", 9, CONFIG.Muted)
+        flyDesc.Position = UDim2.fromOffset(14, 32); flyDesc.Size = UDim2.new(1, -28, 0, 32); flyDesc.TextWrapped = true
+        local editButton = make("TextButton", {Position = UDim2.fromOffset(12, 73), Size = UDim2.new(1, -24, 0, 30), BackgroundColor3 = CONFIG.PanelLight, Text = flightEditMode and "ПЕРЕМЕЩЕНИЕ: ВКЛ" or "ЗАФИКСИРОВАТЬ КНОПКУ", TextColor3 = CONFIG.Text, TextSize = 9, Font = Enum.Font.GothamBold, BorderSizePixel = 0}, flyCard)
+        round(editButton, 7)
+        editButton.MouseButton1Click:Connect(function()
+            flightEditMode = not flightEditMode
+            flightLocked = not flightEditMode
+            editButton.Text = flightEditMode and "ПЕРЕМЕЩАЙ КНОПКУ ПО ЭКРАНУ" or "ЗАФИКСИРОВАТЬ КНОПКУ"
+            flightButton.BackgroundColor3 = flightEditMode and CONFIG.PanelHover or CONFIG.Accent
+        end)
+        local hint = createInfoCard(PageContainer, "УПРАВЛЕНИЕ", "Кнопка полёта находится справа внизу рядом с мобильным управлением Roblox. Перемещение доступно после разблокировки в MISC.", 75)
+        hint.Position = UDim2.fromOffset(0, 338)
     else
         createInfoCard(PageContainer, pageName .. " MODULE", pages[pageName], 105)
-        local note = createInfoCard(
-            PageContainer,
-            "COMING LATER",
-            "This section is reserved for future features. The interface is ready for expansion.",
-            82
-        )
+        local note = createInfoCard(PageContainer, "COMING LATER", "This section is reserved for future features. The interface is ready for expansion.", 82)
         note.Position = UDim2.fromOffset(0, 118)
     end
 
