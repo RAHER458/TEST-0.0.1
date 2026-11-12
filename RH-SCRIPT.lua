@@ -1,7 +1,7 @@
 --[[
     RH-SCRIPT
     Universal Roblox UI framework
-    Version: 0.1.3 (Movement Controls)
+    Version: 0.1.4 (Speed Sliders)
 
     This file is independent from LAUNCHER.lua.
     Gameplay modules are intentionally not implemented yet.
@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local CONFIG = {
     Name = "RH-SCRIPT",
-    Version = "0.1.3",
+    Version = "0.1.4",
     Background = Color3.fromRGB(13, 17, 31),
     Panel = Color3.fromRGB(24, 31, 54),
     PanelLight = Color3.fromRGB(34, 44, 73),
@@ -348,7 +348,7 @@ end
 local RunService = game:GetService("RunService")
 local speedEnabled = false
 local speedMode = "WalkSpeed"
-local speedValue = 32
+local speedValues = {WalkSpeed = 32, Tween = 32, CFrame = 32}
 local speedConnection
 local flightActive = false
 local flightVelocity
@@ -382,7 +382,7 @@ local function startSpeed()
     if not character then return false end
     speedEnabled = true
     if speedMode == "WalkSpeed" then
-        humanoid.WalkSpeed = speedValue
+        humanoid.WalkSpeed = speedValues[speedMode]
     else
         speedConnection = RunService.Heartbeat:Connect(function(dt)
             if not speedEnabled then return end
@@ -390,7 +390,7 @@ local function startSpeed()
             if not currentCharacter or currentCharacter ~= character then stopSpeed(); return end
             local direction = currentHumanoid.MoveDirection
             if direction.Magnitude > 0 then
-                local distance = speedValue * dt
+                local distance = speedValues[speedMode] * dt
                 if speedMode == "Tween" then
                     local target = currentRoot.CFrame + direction * distance
                     local tween = TweenService:Create(currentRoot, TweenInfo.new(math.max(dt, 0.03), Enum.EasingStyle.Linear), {CFrame = target})
@@ -509,39 +509,65 @@ local function renderPage(pageName)
         )
         note.Position = UDim2.fromOffset(0, 212)
     elseif pageName == "MISC" then
-        local speedCard = make("Frame", {
-            Size = UDim2.new(1, 0, 0, 190),
-            BackgroundColor3 = CONFIG.Panel,
-            BorderSizePixel = 0,
-        }, PageContainer)
+        local speedCard = make("Frame", {Size = UDim2.new(1, 0, 0, 310), BackgroundColor3 = CONFIG.Panel, BorderSizePixel = 0}, PageContainer)
         round(speedCard, 11); stroke(speedCard, CONFIG.Border, 0.12)
         local speedTitle = label(speedCard, "SPEEDHACK", 13, CONFIG.Text, Enum.Font.GothamBold)
-        speedTitle.Position = UDim2.fromOffset(14, 10); speedTitle.Size = UDim2.new(1, -28, 0, 22)
-        local modeLabel = label(speedCard, "Режим: " .. speedMode, 10, CONFIG.Muted)
-        modeLabel.Position = UDim2.fromOffset(14, 38); modeLabel.Size = UDim2.new(1, -28, 0, 18)
-        local modeButton = make("TextButton", {Position = UDim2.fromOffset(12, 60), Size = UDim2.new(1, -24, 0, 29), BackgroundColor3 = CONFIG.PanelLight, Text = "Сменить режим", TextColor3 = CONFIG.Text, TextSize = 10, Font = Enum.Font.GothamBold, BorderSizePixel = 0, AutoButtonColor = false}, speedCard)
+        speedTitle.Position = UDim2.fromOffset(14, 9); speedTitle.Size = UDim2.new(1, -28, 0, 22)
+        local modeLabel = label(speedCard, "Активный режим: " .. speedMode, 10, CONFIG.Muted)
+        modeLabel.Position = UDim2.fromOffset(14, 34); modeLabel.Size = UDim2.new(1, -28, 0, 18)
+        local modeButton = make("TextButton", {Position = UDim2.fromOffset(12, 55), Size = UDim2.new(1, -24, 0, 27), BackgroundColor3 = CONFIG.PanelLight, Text = "Сменить активный режим", TextColor3 = CONFIG.Text, TextSize = 10, Font = Enum.Font.GothamBold, BorderSizePixel = 0, AutoButtonColor = false}, speedCard)
         round(modeButton, 7)
         modeButton.MouseButton1Click:Connect(function()
             local modes = {"WalkSpeed", "Tween", "CFrame"}
             local index = table.find(modes, speedMode) or 1
             speedMode = modes[index % #modes + 1]
-            modeLabel.Text = "Режим: " .. speedMode
+            modeLabel.Text = "Активный режим: " .. speedMode
             if speedEnabled then startSpeed() end
         end)
-        local valueLabel = label(speedCard, "Скорость: " .. tostring(speedValue), 10, CONFIG.Muted)
-        valueLabel.Position = UDim2.fromOffset(14, 94); valueLabel.Size = UDim2.new(1, -28, 0, 18)
-        local minus = make("TextButton", {Position = UDim2.fromOffset(12, 118), Size = UDim2.fromOffset(34, 28), BackgroundColor3 = CONFIG.PanelLight, Text = "−", TextColor3 = CONFIG.Text, TextSize = 17, BorderSizePixel = 0}, speedCard)
-        round(minus, 7)
-        local plus = make("TextButton", {Position = UDim2.new(1, -46, 0, 118), Size = UDim2.fromOffset(34, 28), BackgroundColor3 = CONFIG.PanelLight, Text = "+", TextColor3 = CONFIG.Text, TextSize = 17, BorderSizePixel = 0}, speedCard)
-        round(plus, 7)
-        local toggle = make("TextButton", {Position = UDim2.fromOffset(53, 118), Size = UDim2.new(1, -106, 0, 28), BackgroundColor3 = CONFIG.Accent, Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ", TextColor3 = Color3.new(1,1,1), TextSize = 9, Font = Enum.Font.GothamBold, BorderSizePixel = 0}, speedCard)
-        round(toggle, 7)
-        local function updateSpeedValue()
-            valueLabel.Text = "Скорость: " .. tostring(speedValue)
-            if speedEnabled then startSpeed() end
+        local sliderRows = {}
+        local function setSpeed(mode, value)
+            speedValues[mode] = math.clamp(math.floor(value + 0.5), 0, 500)
+            local row = sliderRows[mode]
+            if row then
+                row.value.Text = tostring(speedValues[mode])
+                row.fill.Size = UDim2.new(speedValues[mode] / 500, 0, 1, 0)
+                row.knob.Position = UDim2.new(speedValues[mode] / 500, -6, 0.5, -6)
+            end
+            if speedEnabled and speedMode == mode then startSpeed() end
         end
-        minus.MouseButton1Click:Connect(function() speedValue = math.max(16, speedValue - 4); updateSpeedValue() end)
-        plus.MouseButton1Click:Connect(function() speedValue = math.min(200, speedValue + 4); updateSpeedValue() end)
+        for i, mode in ipairs({"WalkSpeed", "Tween", "CFrame"}) do
+            local y = 91 + (i - 1) * 53
+            local name = label(speedCard, mode, 10, CONFIG.Text, Enum.Font.GothamBold)
+            name.Position = UDim2.fromOffset(14, y); name.Size = UDim2.fromOffset(105, 18)
+            local value = label(speedCard, tostring(speedValues[mode]), 10, CONFIG.AccentBlue, Enum.Font.GothamBold)
+            value.Position = UDim2.new(1, -48, 0, y); value.Size = UDim2.fromOffset(34, 18); value.TextXAlignment = Enum.TextXAlignment.Right
+            local track = make("TextButton", {Position = UDim2.fromOffset(14, y + 25), Size = UDim2.new(1, -28, 0, 8), BackgroundColor3 = CONFIG.PanelLight, Text = "", BorderSizePixel = 0, AutoButtonColor = false}, speedCard)
+            round(track, 5)
+            local fill = make("Frame", {Size = UDim2.new(speedValues[mode] / 500, 0, 1, 0), BackgroundColor3 = CONFIG.Accent, BorderSizePixel = 0}, track)
+            round(fill, 5)
+            local knob = make("Frame", {Size = UDim2.fromOffset(12, 12), Position = UDim2.new(speedValues[mode] / 500, -6, 0.5, -6), BackgroundColor3 = CONFIG.Text, BorderSizePixel = 0, ZIndex = 3}, track)
+            round(knob, 6)
+            sliderRows[mode] = {value = value, fill = fill, knob = knob}
+            local dragging = false
+            local function updateFromInput(input)
+                local ratio = math.clamp((input.Position.X - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
+                setSpeed(mode, ratio * 500)
+            end
+            track.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    updateFromInput(input)
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateFromInput(input) end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+            end)
+        end
+        local toggle = make("TextButton", {Position = UDim2.fromOffset(12, 258), Size = UDim2.new(1, -24, 0, 32), BackgroundColor3 = CONFIG.Accent, Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ", TextColor3 = Color3.new(1,1,1), TextSize = 9, Font = Enum.Font.GothamBold, BorderSizePixel = 0}, speedCard)
+        round(toggle, 7)
         toggle.MouseButton1Click:Connect(function()
             if speedEnabled then stopSpeed() else startSpeed() end
             toggle.Text = speedEnabled and "ВЫКЛЮЧИТЬ" or "ВКЛЮЧИТЬ"
