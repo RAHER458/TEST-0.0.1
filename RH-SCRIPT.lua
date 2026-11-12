@@ -359,6 +359,7 @@ local flightDragging = false
 local flightDragStart
 local flightButtonStart
 local flightPosition = UDim2.new(1, -92, 1, -210)
+local flightButton
 
 local function getCharacterParts()
     local character = LocalPlayer.Character
@@ -429,7 +430,7 @@ local function beginFlight()
     flightButton.BackgroundColor3 = CONFIG.AccentBlue
 end
 
-local flightButton = make("TextButton", {
+flightButton = make("TextButton", {
     Name = "RH_FlightButton",
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = flightPosition,
@@ -739,6 +740,8 @@ MinButton.MouseButton1Click:Connect(function()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
+    stopSpeed()
+    stopFlight()
     ScreenGui:Destroy()
 end)
 
