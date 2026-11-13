@@ -158,6 +158,26 @@ corner(Main, 22)
 stroke(Main, C.purple2, 0.08, 2)
 gradient(Main, Color3.fromRGB(13, 17, 43), Color3.fromRGB(12, 15, 36), 25)
 
+-- Subtle diagonal glass facets from the reference artwork.
+local facet = make("Frame", {
+    Position = UDim2.new(0.56, 0, -0.42, 0),
+    Size = UDim2.new(0, 180, 1.85, 0),
+    Rotation = 42,
+    BackgroundColor3 = Color3.fromRGB(35, 43, 104),
+    BackgroundTransparency = 0.72,
+    BorderSizePixel = 0,
+    ZIndex = 0
+}, Main)
+local facet2 = make("Frame", {
+    Position = UDim2.new(0.73, 0, -0.38, 0),
+    Size = UDim2.new(0, 110, 1.8, 0),
+    Rotation = 42,
+    BackgroundColor3 = Color3.fromRGB(30, 39, 91),
+    BackgroundTransparency = 0.82,
+    BorderSizePixel = 0,
+    ZIndex = 0
+}, Main)
+
 local SidebarW = mobile and 84 or math.floor(windowW * 0.205)
 local Sidebar = make("Frame", {
     Size = UDim2.new(0, SidebarW, 1, 0),
@@ -182,6 +202,25 @@ local Logo = make("Frame", {
 corner(Logo, 100)
 gradient(Logo, C.purple2, C.blue, 35)
 stroke(Logo, C.blue, 0.15, 2)
+
+local orbit = make("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = mobile and UDim2.fromOffset(72, 72) or UDim2.fromOffset(166, 166),
+    BackgroundTransparency = 1,
+    Rotation = -24
+}, Logo)
+corner(orbit, 100)
+stroke(orbit, C.purple2, 0.08, mobile and 2 or 4)
+local orbit2 = make("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = mobile and UDim2.fromOffset(80, 58) or UDim2.fromOffset(174, 128),
+    BackgroundTransparency = 1,
+    Rotation = 28
+}, Logo)
+corner(orbit2, 100)
+stroke(orbit2, C.blue, 0.32, mobile and 1 or 3)
 local crown = label(Logo, "♛", 21, UDim2.new(0.5, -11, 0, -15), Enum.Font.GothamBlack, Color3.fromRGB(255, 202, 92))
 crown.Size = UDim2.fromOffset(24, 24)
 crown.TextXAlignment = Enum.TextXAlignment.Center
@@ -364,7 +403,7 @@ local function buildMain()
     }, p)
     corner(banner, 15)
     gradient(banner, Color3.fromRGB(86, 36, 195), Color3.fromRGB(27, 34, 89), 0)
-    label(banner, "👑   RH-SCRIPT", 16, UDim2.new(0, 16, 0, 10), Enum.Font.GothamBold)
+    label(banner, "♛   RH-SCRIPT", 16, UDim2.new(0, 16, 0, 10), Enum.Font.GothamBold)
     label(banner, "Лучший чит для Roblox!", 11, UDim2.new(0, 18, 0, 37), Enum.Font.Gotham, C.muted)
     local made = button(banner, "♛  Made by RH", UDim2.new(0, 112, 0, 34), UDim2.new(1, -124, 0.5, -17), C.panel)
     made.TextSize = 11
