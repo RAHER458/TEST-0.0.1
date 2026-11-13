@@ -1,7 +1,7 @@
 --[[
     RH-CHEAT
     Standalone RH menu UI
-    Version: 1.0.0
+    Version: 1.0.1
     Visual layout based on the supplied RH reference.
     This file does not modify RH-SCRIPT.lua or LAUNCHER.lua.
 ]]
@@ -142,8 +142,8 @@ end
 
 local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(900, 700)
 local mobile = viewport.X < 650
-local windowW = mobile and math.min(viewport.X - 18, 520) or 760
-local windowH = mobile and math.min(viewport.Y - 70, 520) or 430
+local windowW = mobile and math.min(viewport.X - 12, 520) or 820
+local windowH = mobile and math.min(viewport.Y - 54, 600) or 470
 
 local Main = make("Frame", {
     Name = "MainWindow",
@@ -158,7 +158,7 @@ corner(Main, 22)
 stroke(Main, C.purple2, 0.08, 2)
 gradient(Main, Color3.fromRGB(13, 17, 43), Color3.fromRGB(12, 15, 36), 25)
 
-local SidebarW = mobile and 112 or 145
+local SidebarW = mobile and 104 or 145
 local Sidebar = make("Frame", {
     Size = UDim2.new(0, SidebarW, 1, 0),
     BackgroundColor3 = Color3.fromRGB(13, 18, 42),
@@ -182,6 +182,9 @@ local Logo = make("Frame", {
 corner(Logo, 40)
 gradient(Logo, C.purple2, C.blue, 35)
 stroke(Logo, C.blue, 0.15, 2)
+local crown = label(Logo, "♛", 21, UDim2.new(0.5, -11, 0, -15), Enum.Font.GothamBlack, Color3.fromRGB(255, 202, 92))
+crown.Size = UDim2.fromOffset(24, 24)
+crown.TextXAlignment = Enum.TextXAlignment.Center
 local logoText = label(Logo, "RH", 31, UDim2.new(0, 0, 0, 0), Enum.Font.GothamBlack, C.white)
 logoText.TextXAlignment = Enum.TextXAlignment.Center
 logoText.Size = UDim2.fromScale(1, 1)
@@ -272,6 +275,10 @@ local function addToggle(parent, title, desc, default, callback)
     }, row)
     corner(ico, 12)
     gradient(ico, Color3.fromRGB(91, 37, 208), Color3.fromRGB(51, 45, 145), 45)
+    local glyphs = {ESP="⌖", ["ESP Boxes"]="◉", ["Player ESP"]="●", Tracers="◆", Aimbot="◎", ["Silent Aim"]="⊙", Hitbox="▣", ["Auto Shoot"]="ϟ", WalkSpeed="➤", ["Jump Power"]="↑", Fly="✈", Noclip="◇", Boxes="▣", Names="♙", Distance="↔", ["Anti AFK"]="◷", ["Full Bright"]="☼", ["Hide UI"]="◧", ["Show Notifications"]="♢", ["Compact Mode"]="▤", ["Remember Position"]="⌖"}
+    local glyph = label(ico, glyphs[title] or "✦", 25, UDim2.new(0, 0, 0, 0), Enum.Font.GothamBold, C.white)
+    glyph.Size = UDim2.fromScale(1, 1)
+    glyph.TextXAlignment = Enum.TextXAlignment.Center
     local titleLabel = label(row, title, 14, UDim2.new(0, 70, 0, 13), Enum.Font.GothamSemibold)
     titleLabel.Size = UDim2.new(1, -145, 0, 22)
     local descLabel = label(row, desc, 11, UDim2.new(0, 70, 0, 36), Enum.Font.Gotham, C.muted)
@@ -321,23 +328,23 @@ end
 
 local function buildMain()
     local p = makePage("Main")
-    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 306 or 154), BackgroundTransparency = 1}, p)
-    local columns = mobile and 1 or 2
+    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 318 or 154), BackgroundTransparency = 1}, p)
+    local columns = 2
     local gridLayout = make("UIGridLayout", {
-        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 72),
+        CellSize = UDim2.new(0.5, -7, 0, mobile and 82 or 72),
         CellPadding = UDim2.fromOffset(10, 10),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, grid)
-    if columns == 1 then grid.Size = UDim2.new(1, -4, 0, 318) end
+    if mobile then grid.Size = UDim2.new(1, -4, 0, 174) end
     addToggle(grid, "ESP", "Показывает игроков и объекты", true)
     addToggle(grid, "ESP Boxes", "Рамки вокруг игроков", true)
     addToggle(grid, "Player ESP", "Информация о игроках", false)
     addToggle(grid, "Tracers", "Линии к игрокам", false)
     section(p, "🚀  Quick Actions")
-    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 192 or 66), BackgroundTransparency = 1}, p)
+    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 126 or 66), BackgroundTransparency = 1}, p)
     make("UIGridLayout", {
-        CellSize = UDim2.new(mobile and 1 or 1/3, mobile and -4 or -8, 0, mobile and 54 or 62),
-        CellPadding = UDim2.fromOffset(8, 7)
+        CellSize = UDim2.new(mobile and 1/3 or 1/3, mobile and -7 or -8, 0, mobile and 58 or 62),
+        CellPadding = UDim2.fromOffset(6, 7)
     }, actions)
     addAction(actions, "Reset Character", "Сброс персонажа", "ϟ", function()
         local hum = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
@@ -356,8 +363,10 @@ local function buildMain()
     }, p)
     corner(banner, 15)
     gradient(banner, Color3.fromRGB(86, 36, 195), Color3.fromRGB(27, 34, 89), 0)
-    label(banner, "👑   RH-CHEAT", 16, UDim2.new(0, 16, 0, 10), Enum.Font.GothamBold)
-    label(banner, "Меню в стиле RH  •  Made by RH", 11, UDim2.new(0, 18, 0, 37), Enum.Font.Gotham, C.muted)
+    label(banner, "👑   RH-SCRIPT", 16, UDim2.new(0, 16, 0, 10), Enum.Font.GothamBold)
+    label(banner, "Лучший чит для Roblox!", 11, UDim2.new(0, 18, 0, 37), Enum.Font.Gotham, C.muted)
+    local made = button(banner, "♛  Made by RH", UDim2.new(0, 112, 0, 34), UDim2.new(1, -124, 0.5, -17), C.panel)
+    made.TextSize = 11
 end
 
 local function buildSimple(name, subtitle, entries)
