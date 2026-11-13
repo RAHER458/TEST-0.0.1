@@ -1,7 +1,7 @@
 --[[
     RH-CHEAT
     Standalone RH menu UI
-    Version: 1.0.2
+    Version: 1.0.3
     Visual layout based on the supplied RH reference.
     This file does not modify RH-SCRIPT.lua or LAUNCHER.lua.
 ]]
@@ -158,7 +158,7 @@ corner(Main, 22)
 stroke(Main, C.purple2, 0.08, 2)
 gradient(Main, Color3.fromRGB(13, 17, 43), Color3.fromRGB(12, 15, 36), 25)
 
-local SidebarW = mobile and 92 or math.floor(windowW * 0.205)
+local SidebarW = mobile and 84 or math.floor(windowW * 0.205)
 local Sidebar = make("Frame", {
     Size = UDim2.new(0, SidebarW, 1, 0),
     BackgroundColor3 = Color3.fromRGB(13, 18, 42),
@@ -190,8 +190,8 @@ logoText.TextXAlignment = Enum.TextXAlignment.Center
 logoText.Size = UDim2.fromScale(1, 1)
 
 local navHolder = make("ScrollingFrame", {
-    Position = UDim2.new(0, 9, 0, 108),
-    Size = UDim2.new(1, -18, 1, -158),
+    Position = UDim2.new(0, 10, 0, 112),
+    Size = UDim2.new(1, -20, 1, -164),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 2,
@@ -215,8 +215,8 @@ local Content = make("Frame", {
 }, Main)
 
 local Header = make("Frame", {
-    Position = UDim2.new(0, 22, 0, 12),
-    Size = UDim2.new(1, -44, 0, 58),
+    Position = UDim2.new(0, 24, 0, 16),
+    Size = UDim2.new(1, -48, 0, 66),
     BackgroundTransparency = 1
 }, Content)
 local headerIcon = label(Header, "⌂", 34, UDim2.new(0, 0, 0, 0), Enum.Font.GothamBold, C.purple2)
@@ -232,8 +232,8 @@ local close = button(Content, "×", UDim2.fromOffset(38, 34), UDim2.new(1, -43, 
 close.TextSize = 24
 
 local pageHolder = make("Frame", {
-    Position = UDim2.new(0, 18, 0, 78),
-    Size = UDim2.new(1, -36, 1, -92),
+    Position = UDim2.new(0, 20, 0, 88),
+    Size = UDim2.new(1, -40, 1, -102),
     BackgroundTransparency = 1,
     ClipsDescendants = true
 }, Content)
@@ -261,15 +261,15 @@ end
 
 local function addToggle(parent, title, desc, default, callback)
     local row = make("Frame", {
-        Size = UDim2.new(1, -4, 0, 72),
+        Size = UDim2.new(1, -4, 0, 82),
         BackgroundColor3 = C.card,
         BorderSizePixel = 0
     }, parent)
     corner(row, 14)
     stroke(row, C.border, 0.6, 1)
     local ico = make("Frame", {
-        Position = UDim2.new(0, 10, 0.5, -24),
-        Size = UDim2.fromOffset(48, 48),
+        Position = UDim2.new(0, 10, 0.5, -26),
+        Size = UDim2.fromOffset(52, 52),
         BackgroundColor3 = Color3.fromRGB(65, 34, 150),
         BorderSizePixel = 0
     }, row)
@@ -287,15 +287,15 @@ local function addToggle(parent, title, desc, default, callback)
     local track = make("TextButton", {
         Text = "",
         AutoButtonColor = false,
-        Position = UDim2.new(1, -66, 0.5, -12),
-        Size = UDim2.fromOffset(54, 25),
+        Position = UDim2.new(1, -70, 0.5, -13),
+        Size = UDim2.fromOffset(58, 27),
         BackgroundColor3 = default and C.purple or C.off,
         BorderSizePixel = 0
     }, row)
     corner(track, 20)
     local knob = make("Frame", {
-        Position = default and UDim2.new(1, -22, 0, 3) or UDim2.new(0, 3, 0, 3),
-        Size = UDim2.fromOffset(19, 19),
+        Position = default and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 3, 0, 3),
+        Size = UDim2.fromOffset(21, 21),
         BackgroundColor3 = C.white,
         BorderSizePixel = 0
     }, track)
@@ -304,7 +304,7 @@ local function addToggle(parent, title, desc, default, callback)
     track.Activated:Connect(function()
         state = not state
         TweenService:Create(track, TweenInfo.new(0.16), {BackgroundColor3 = state and C.purple or C.off}):Play()
-        TweenService:Create(knob, TweenInfo.new(0.16), {Position = state and UDim2.new(1, -22, 0, 3) or UDim2.new(0, 3, 0, 3)}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.16), {Position = state and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 3, 0, 3)}):Play()
         if callback then pcall(callback, state) end
     end)
     return row
@@ -328,14 +328,14 @@ end
 
 local function buildMain()
     local p = makePage("Main")
-    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 318 or 154), BackgroundTransparency = 1}, p)
+    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 358 or 174), BackgroundTransparency = 1}, p)
     local columns = mobile and 1 or 2
     local gridLayout = make("UIGridLayout", {
-        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 72),
+        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 82),
         CellPadding = UDim2.fromOffset(10, 10),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, grid)
-    if mobile then grid.Size = UDim2.new(1, -4, 0, 318) end
+    if mobile then grid.Size = UDim2.new(1, -4, 0, 358) end
     addToggle(grid, "ESP", "Показывает игроков и объекты", true)
     addToggle(grid, "ESP Boxes", "Рамки вокруг игроков", true)
     addToggle(grid, "Player ESP", "Информация о игроках", false)
@@ -357,7 +357,7 @@ local function buildMain()
         notify("Server Hop: функция требует списка серверов")
     end)
     local banner = make("Frame", {
-        Size = UDim2.new(1, -4, 0, 68),
+        Size = UDim2.new(1, -4, 0, 76),
         BackgroundColor3 = Color3.fromRGB(63, 27, 154),
         BorderSizePixel = 0
     }, p)
@@ -373,7 +373,7 @@ local function buildSimple(name, subtitle, entries)
     local p = makePage(name)
     section(p, subtitle)
     local grid = make("Frame", {
-        Size = UDim2.new(1, -4, 0, math.ceil(#entries / (mobile and 1 or 2)) * 82),
+        Size = UDim2.new(1, -4, 0, math.ceil(#entries / (mobile and 1 or 2)) * 92),
         BackgroundTransparency = 1
     }, p)
     local columns = mobile and 1 or 2
@@ -464,11 +464,11 @@ for i, item in ipairs(navItems) do
     local b = make("TextButton", {
         Name = item[1],
         LayoutOrder = i,
-        Size = UDim2.new(1, 0, 0, 43),
+        Size = UDim2.new(1, 0, 0, mobile and 42 or 52),
         BackgroundColor3 = item[1] == "Main" and C.purple or Color3.fromRGB(13, 18, 42),
         Text = item[2] .. "   " .. item[3],
         TextColor3 = item[1] == "Main" and C.white or C.muted,
-        TextSize = mobile and 11 or 13,
+        TextSize = mobile and 10 or 14,
         Font = Enum.Font.GothamSemibold,
         TextXAlignment = Enum.TextXAlignment.Left,
         AutoButtonColor = false,
