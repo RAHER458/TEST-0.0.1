@@ -1,7 +1,7 @@
 --[[
     RH-CHEAT
     Standalone RH menu UI
-    Version: 1.0.3
+    Version: 1.0.4
     Visual layout based on the supplied RH reference.
     This file does not modify RH-SCRIPT.lua or LAUNCHER.lua.
 ]]
@@ -174,12 +174,12 @@ make("Frame", {
 }, Sidebar)
 
 local Logo = make("Frame", {
-    Position = UDim2.new(0.5, -39, 0, 15),
-    Size = UDim2.fromOffset(78, 78),
+    Position = mobile and UDim2.new(0.5, -31, 0, 12) or UDim2.new(0.5, -73, 0, -2),
+    Size = mobile and UDim2.fromOffset(62, 62) or UDim2.fromOffset(146, 146),
     BackgroundColor3 = C.purple,
     BorderSizePixel = 0
 }, Sidebar)
-corner(Logo, 40)
+corner(Logo, 100)
 gradient(Logo, C.purple2, C.blue, 35)
 stroke(Logo, C.blue, 0.15, 2)
 local crown = label(Logo, "♛", 21, UDim2.new(0.5, -11, 0, -15), Enum.Font.GothamBlack, Color3.fromRGB(255, 202, 92))
@@ -190,8 +190,8 @@ logoText.TextXAlignment = Enum.TextXAlignment.Center
 logoText.Size = UDim2.fromScale(1, 1)
 
 local navHolder = make("ScrollingFrame", {
-    Position = UDim2.new(0, 10, 0, 112),
-    Size = UDim2.new(1, -20, 1, -164),
+    Position = UDim2.new(0, 10, 0, mobile and 88 or 170),
+    Size = UDim2.new(1, -20, 1, mobile and -140 or -224),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     ScrollBarThickness = 2,
@@ -261,15 +261,15 @@ end
 
 local function addToggle(parent, title, desc, default, callback)
     local row = make("Frame", {
-        Size = UDim2.new(1, -4, 0, 82),
+        Size = UDim2.new(1, -4, 0, mobile and 82 or 124),
         BackgroundColor3 = C.card,
         BorderSizePixel = 0
     }, parent)
     corner(row, 14)
     stroke(row, C.border, 0.6, 1)
     local ico = make("Frame", {
-        Position = UDim2.new(0, 10, 0.5, -26),
-        Size = UDim2.fromOffset(52, 52),
+        Position = UDim2.new(0, mobile and 10 or 20, 0.5, mobile and -26 or -40),
+        Size = mobile and UDim2.fromOffset(52, 52) or UDim2.fromOffset(80, 80),
         BackgroundColor3 = Color3.fromRGB(65, 34, 150),
         BorderSizePixel = 0
     }, row)
@@ -279,23 +279,24 @@ local function addToggle(parent, title, desc, default, callback)
     local glyph = label(ico, glyphs[title] or "✦", 25, UDim2.new(0, 0, 0, 0), Enum.Font.GothamBold, C.white)
     glyph.Size = UDim2.fromScale(1, 1)
     glyph.TextXAlignment = Enum.TextXAlignment.Center
-    local titleLabel = label(row, title, 14, UDim2.new(0, 70, 0, 13), Enum.Font.GothamSemibold)
-    titleLabel.Size = UDim2.new(1, -145, 0, 22)
-    local descLabel = label(row, desc, 11, UDim2.new(0, 70, 0, 36), Enum.Font.Gotham, C.muted)
-    descLabel.Size = UDim2.new(1, -145, 0, 25)
+    local textX = mobile and 70 or 125
+    local titleLabel = label(row, title, mobile and 14 or 23, UDim2.new(0, textX, 0, mobile and 13 or 22), Enum.Font.GothamSemibold)
+    titleLabel.Size = UDim2.new(1, mobile and -145 or -220, 0, mobile and 22 or 34)
+    local descLabel = label(row, desc, mobile and 11 or 18, UDim2.new(0, textX, 0, mobile and 36 or 61), Enum.Font.Gotham, C.muted)
+    descLabel.Size = UDim2.new(1, mobile and -145 or -220, 0, mobile and 25 or 42)
     descLabel.TextWrapped = true
     local track = make("TextButton", {
         Text = "",
         AutoButtonColor = false,
-        Position = UDim2.new(1, -70, 0.5, -13),
-        Size = UDim2.fromOffset(58, 27),
+        Position = UDim2.new(1, mobile and -70 or -100, 0.5, mobile and -13 or -21),
+        Size = mobile and UDim2.fromOffset(58, 27) or UDim2.fromOffset(78, 42),
         BackgroundColor3 = default and C.purple or C.off,
         BorderSizePixel = 0
     }, row)
     corner(track, 20)
     local knob = make("Frame", {
-        Position = default and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 3, 0, 3),
-        Size = UDim2.fromOffset(21, 21),
+        Position = default and UDim2.new(1, mobile and -24 or -38, 0, mobile and 3 or 4) or UDim2.new(0, 3, 0, mobile and 3 or 4),
+        Size = mobile and UDim2.fromOffset(21, 21) or UDim2.fromOffset(34, 34),
         BackgroundColor3 = C.white,
         BorderSizePixel = 0
     }, track)
@@ -304,7 +305,7 @@ local function addToggle(parent, title, desc, default, callback)
     track.Activated:Connect(function()
         state = not state
         TweenService:Create(track, TweenInfo.new(0.16), {BackgroundColor3 = state and C.purple or C.off}):Play()
-        TweenService:Create(knob, TweenInfo.new(0.16), {Position = state and UDim2.new(1, -24, 0, 3) or UDim2.new(0, 3, 0, 3)}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.16), {Position = state and UDim2.new(1, mobile and -24 or -38, 0, mobile and 3 or 4) or UDim2.new(0, 3, 0, mobile and 3 or 4)}):Play()
         if callback then pcall(callback, state) end
     end)
     return row
@@ -328,10 +329,10 @@ end
 
 local function buildMain()
     local p = makePage("Main")
-    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 358 or 174), BackgroundTransparency = 1}, p)
+    local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 358 or 258), BackgroundTransparency = 1}, p)
     local columns = mobile and 1 or 2
     local gridLayout = make("UIGridLayout", {
-        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 82),
+        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, mobile and 82 or 124),
         CellPadding = UDim2.fromOffset(10, 10),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, grid)
@@ -341,9 +342,9 @@ local function buildMain()
     addToggle(grid, "Player ESP", "Информация о игроках", false)
     addToggle(grid, "Tracers", "Линии к игрокам", false)
     section(p, "🚀  Quick Actions")
-    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 192 or 66), BackgroundTransparency = 1}, p)
+    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 192 or 96), BackgroundTransparency = 1}, p)
     make("UIGridLayout", {
-        CellSize = UDim2.new(mobile and 1 or 1/3, mobile and -4 or -8, 0, mobile and 54 or 62),
+        CellSize = UDim2.new(mobile and 1 or 1/3, mobile and -4 or -8, 0, mobile and 54 or 96),
         CellPadding = UDim2.fromOffset(6, 7)
     }, actions)
     addAction(actions, "Reset Character", "Сброс персонажа", "ϟ", function()
@@ -357,7 +358,7 @@ local function buildMain()
         notify("Server Hop: функция требует списка серверов")
     end)
     local banner = make("Frame", {
-        Size = UDim2.new(1, -4, 0, 76),
+        Size = UDim2.new(1, -4, 0, mobile and 76 or 90),
         BackgroundColor3 = Color3.fromRGB(63, 27, 154),
         BorderSizePixel = 0
     }, p)
@@ -378,7 +379,7 @@ local function buildSimple(name, subtitle, entries)
     }, p)
     local columns = mobile and 1 or 2
     make("UIGridLayout", {
-        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 72),
+        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, mobile and 82 or 124),
         CellPadding = UDim2.fromOffset(10, 10),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, grid)
@@ -464,7 +465,7 @@ for i, item in ipairs(navItems) do
     local b = make("TextButton", {
         Name = item[1],
         LayoutOrder = i,
-        Size = UDim2.new(1, 0, 0, mobile and 42 or 52),
+        Size = UDim2.new(1, 0, 0, mobile and 42 or 58),
         BackgroundColor3 = item[1] == "Main" and C.purple or Color3.fromRGB(13, 18, 42),
         Text = item[2] .. "   " .. item[3],
         TextColor3 = item[1] == "Main" and C.white or C.muted,
