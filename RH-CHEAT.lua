@@ -1,7 +1,7 @@
 --[[
     RH-CHEAT
     Standalone RH menu UI
-    Version: 1.0.1
+    Version: 1.0.2
     Visual layout based on the supplied RH reference.
     This file does not modify RH-SCRIPT.lua or LAUNCHER.lua.
 ]]
@@ -142,8 +142,8 @@ end
 
 local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(900, 700)
 local mobile = viewport.X < 650
-local windowW = mobile and math.min(viewport.X - 12, 520) or 820
-local windowH = mobile and math.min(viewport.Y - 54, 600) or 470
+local windowW = mobile and math.max(300, viewport.X - 12) or math.min(1280, math.floor(viewport.X * 0.84))
+local windowH = mobile and math.max(380, viewport.Y - 42) or math.min(720, math.floor(viewport.Y * 0.82))
 
 local Main = make("Frame", {
     Name = "MainWindow",
@@ -158,7 +158,7 @@ corner(Main, 22)
 stroke(Main, C.purple2, 0.08, 2)
 gradient(Main, Color3.fromRGB(13, 17, 43), Color3.fromRGB(12, 15, 36), 25)
 
-local SidebarW = mobile and 104 or 145
+local SidebarW = mobile and 92 or math.floor(windowW * 0.205)
 local Sidebar = make("Frame", {
     Size = UDim2.new(0, SidebarW, 1, 0),
     BackgroundColor3 = Color3.fromRGB(13, 18, 42),
@@ -372,11 +372,21 @@ end
 local function buildSimple(name, subtitle, entries)
     local p = makePage(name)
     section(p, subtitle)
+    local grid = make("Frame", {
+        Size = UDim2.new(1, -4, 0, math.ceil(#entries / (mobile and 1 or 2)) * 82),
+        BackgroundTransparency = 1
+    }, p)
+    local columns = mobile and 1 or 2
+    make("UIGridLayout", {
+        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 72),
+        CellPadding = UDim2.fromOffset(10, 10),
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, grid)
     for _, item in ipairs(entries) do
         if item[1] == "toggle" then
-            addToggle(p, item[2], item[3], item[4] or false)
+            addToggle(grid, item[2], item[3], item[4] or false)
         else
-            addAction(p, item[2], item[3], item[4] or "✦", function()
+            addAction(grid, item[2], item[3], item[4] or "✦", function()
                 notify(item[5] or "Раздел интерфейса готов")
             end)
         end
