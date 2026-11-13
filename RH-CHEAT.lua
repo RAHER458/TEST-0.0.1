@@ -329,21 +329,21 @@ end
 local function buildMain()
     local p = makePage("Main")
     local grid = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 318 or 154), BackgroundTransparency = 1}, p)
-    local columns = 2
+    local columns = mobile and 1 or 2
     local gridLayout = make("UIGridLayout", {
-        CellSize = UDim2.new(0.5, -7, 0, mobile and 82 or 72),
+        CellSize = UDim2.new(columns == 1 and 1 or 0.5, columns == 1 and -4 or -7, 0, 72),
         CellPadding = UDim2.fromOffset(10, 10),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, grid)
-    if mobile then grid.Size = UDim2.new(1, -4, 0, 174) end
+    if mobile then grid.Size = UDim2.new(1, -4, 0, 318) end
     addToggle(grid, "ESP", "Показывает игроков и объекты", true)
     addToggle(grid, "ESP Boxes", "Рамки вокруг игроков", true)
     addToggle(grid, "Player ESP", "Информация о игроках", false)
     addToggle(grid, "Tracers", "Линии к игрокам", false)
     section(p, "🚀  Quick Actions")
-    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 126 or 66), BackgroundTransparency = 1}, p)
+    local actions = make("Frame", {Size = UDim2.new(1, -4, 0, mobile and 192 or 66), BackgroundTransparency = 1}, p)
     make("UIGridLayout", {
-        CellSize = UDim2.new(mobile and 1/3 or 1/3, mobile and -7 or -8, 0, mobile and 58 or 62),
+        CellSize = UDim2.new(mobile and 1 or 1/3, mobile and -4 or -8, 0, mobile and 54 or 62),
         CellPadding = UDim2.fromOffset(6, 7)
     }, actions)
     addAction(actions, "Reset Character", "Сброс персонажа", "ϟ", function()
